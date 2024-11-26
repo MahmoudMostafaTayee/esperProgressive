@@ -24,16 +24,16 @@ import org.slf4j.LoggerFactory;
 
 import java.util.LinkedList;
 
-public class StockTickerMain implements Runnable {
-    private static final Logger log = LoggerFactory.getLogger(StockTickerMain.class);
+public class IotMain implements Runnable {
+    private static final Logger log = LoggerFactory.getLogger(IotMain.class);
 
     private final String runtimeURI;
 
     public static void main(String[] args) {
-        new StockTickerMain("IotEventRuntime").run();
+        new IotMain("IotEventRuntime").run();
     }
 
-    public StockTickerMain(String runtimeURI) {
+    public IotMain(String runtimeURI) {
         this.runtimeURI = runtimeURI;
     }
 
