@@ -40,38 +40,33 @@ public class IotMain implements Runnable {
     public void run() {
         Configuration configuration = IotEventEPLUtil.getConfiguration();
         EPCompiled compiled = IotEventEPLUtil.compileEPL(configuration);
-
+    
         log.info("Setting up runtime");
         EPRuntime runtime = EPRuntimeProvider.getRuntime(runtimeURI, configuration);
         runtime.initialize();
-
+    
         log.info("Deploying compiled EPL");
         DeploymentOptions options = new DeploymentOptions();
         options.setDeploymentId("MatchQuery");
-        
+
         try {
             runtime.getDeploymentService().deploy(compiled, options);
         } catch (EPDeployException e) {
             log.error("Deployment failed", e);
+            return; // Stop further processing since deployment failed
         }
-        
+    
         EPStatement statement = runtime.getDeploymentService().getStatement("MatchQuery", "out");
         if (statement != null) {
             statement.addListener(new IotEventListener());
         } else {
             log.error("Statement not found: 'out'");
         }
-
-        log.info("Generating test events");
+    
+        log.info("Generating and sending events with time advancement");
         IotEventGenerator generator = new IotEventGenerator();
-        LinkedList<Object> stream = generator.createEventStream();
-        log.info("Generated " + stream.size() + " events");
-
-        log.info("Sending events");
-        for (Object event : stream) {
-            runtime.getEventService().sendEventBean(event, "iotEvent");
-        }
-
+        generator.generateEvents(runtime);
+    
         log.info("Done.");
-    }
+    }    
 }

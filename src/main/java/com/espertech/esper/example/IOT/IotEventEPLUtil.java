@@ -15,7 +15,10 @@ public class IotEventEPLUtil {
     private static final Logger log = LoggerFactory.getLogger(IotEventEPLUtil.class);
 
     public static EPCompiled compileEPL(Configuration configuration) {
-        String eplQuery = "@name('out') select * from iotEvent;";
+        String eplQuery = "@name('out') select * from iotEvent output all every 3 seconds order by dateCreated;";
+        // String eplQuery = "@name('out') select count(*) as count_num, sum(amount) as total from iotEvent output last every 2 seconds;";
+        // String eplQuery = "@name('out') select count(*) as count_num, sum(amount) as total from iotEvent#time(4);";
+        // String eplQuery = "@name('out') select count(*) as count_num, sum(amount) as total from iotEvent#time(5);";
         
         log.info("Compiling EPL");
         try {

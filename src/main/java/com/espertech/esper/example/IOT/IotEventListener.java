@@ -21,6 +21,8 @@ public class IotEventListener implements UpdateListener {
     }
 
     private void logEvent(EventBean event) {
+        // log.info("------ Matched Event: " + event.get("count_num")+ 
+        //  ", total: " + event.get("total"));
         log.info("Matched Event: id=" + event.get("id") +
                 ", amount=" + event.get("amount") +
                 ", dateCreated=" + event.get("dateCreated"));
