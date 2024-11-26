@@ -1,4 +1,4 @@
-package com.espertech.esper.example.stockticker;
+package com.espertech.esper.example.IOT;
 
 import com.espertech.esper.common.client.EPCompiled;
 import com.espertech.esper.common.client.configuration.Configuration;

@@ -8,10 +8,10 @@
     <properties>
         <rootPath>${project.parent.parent.basedir}</rootPath>
     </properties>
-    <name>Esper Examples - StockTicker</name>
-    <artifactId>esper-example-stockticker</artifactId>
+    <name>Esper Examples - IOT</name>
+    <artifactId>esper-example-IOT</artifactId>
     <packaging>jar</packaging>
-    <description>Esper Example StockTicker</description>
+    <description>Esper Example IOT</description>
     <build>
         <plugins>
             <plugin>
