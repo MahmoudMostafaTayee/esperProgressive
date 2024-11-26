@@ -12,8 +12,13 @@ package com.espertech.esper.example.stockticker;
 
 import com.espertech.esper.common.client.EPCompiled;
 import com.espertech.esper.common.client.configuration.Configuration;
+import com.espertech.esper.runtime.client.DeploymentOptions;
+import com.espertech.esper.runtime.client.EPDeployException;
+import com.espertech.esper.runtime.client.EPDeployment;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPRuntimeProvider;
+import com.espertech.esper.runtime.client.EPStatement;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +46,21 @@ public class StockTickerMain implements Runnable {
         runtime.initialize();
 
         log.info("Deploying compiled EPL");
-        IotEventEPLUtil.deploy(runtime, compiled);
+        DeploymentOptions options = new DeploymentOptions();
+        options.setDeploymentId("MatchQuery");
+        
+        try {
+            runtime.getDeploymentService().deploy(compiled, options);
+        } catch (EPDeployException e) {
+            log.error("Deployment failed", e);
+        }
+        
+        EPStatement statement = runtime.getDeploymentService().getStatement("MatchQuery", "out");
+        if (statement != null) {
+            statement.addListener(new IotEventListener());
+        } else {
+            log.error("Statement not found: 'out'");
+        }
 
         log.info("Generating test events");
         IotEventGenerator generator = new IotEventGenerator();
