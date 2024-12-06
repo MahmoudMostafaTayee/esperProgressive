@@ -1,6 +1,7 @@
 package com.espertech.esper.example.IOT;
 
 import com.espertech.esper.example.IOT.SensorData.SensorData;
+import com.espertech.esper.example.IOT.DeviceCommand.DeviceCommand;
 import com.espertech.esper.common.client.EPCompiled;
 import com.espertech.esper.common.client.configuration.Configuration;
 import com.espertech.esper.compiler.client.CompilerArguments;
@@ -29,6 +30,7 @@ public class EventEPLUtil {
     public static Configuration getConfiguration() {
         Configuration configuration = new Configuration();
         configuration.getCommon().addEventType("sensorData", SensorData.class);
+        configuration.getCommon().addEventType("deviceCommand", DeviceCommand.class);
         return configuration;
     }
 

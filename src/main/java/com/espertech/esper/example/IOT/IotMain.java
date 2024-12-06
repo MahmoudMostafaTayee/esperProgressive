@@ -12,6 +12,9 @@ package com.espertech.esper.example.IOT;
 
 import com.espertech.esper.common.client.EPCompiled;
 import com.espertech.esper.common.client.configuration.Configuration;
+import com.espertech.esper.common.client.util.NameAccessModifier;
+import com.espertech.esper.compiler.client.CompilerArguments;
+import com.espertech.esper.compiler.client.EPCompilerProvider;
 import com.espertech.esper.runtime.client.DeploymentOptions;
 import com.espertech.esper.runtime.client.EPDeployException;
 import com.espertech.esper.runtime.client.EPDeployment;
@@ -29,7 +32,7 @@ public class IotMain implements Runnable {
     private static final Logger log = LoggerFactory.getLogger(IotMain.class);
 
     private final String runtimeURI;
-    private EPRuntime runtime;
+    static private EPRuntime runtime;
     private Configuration configuration;
 
     public static void main(String[] args) {
@@ -48,22 +51,22 @@ public class IotMain implements Runnable {
         runtime.initialize();
     }
 
-    private void deploy(String eplQuery, String deploymentId){
-        EPCompiled compiled = EventEPLUtil.compileEPL(configuration, eplQuery);
-        log.info("Deploying compiled EPL");
-        DeploymentOptions options = new DeploymentOptions();
-        options.setDeploymentId(deploymentId);
-
+    private static EPStatement compileDeploy(String epl) {
         try {
-            runtime.getDeploymentService().deploy(compiled, options);
-        } catch (EPDeployException e) {
-            log.error("Deployment failed", e);
-            return; // Stop further processing since deployment failed
+            CompilerArguments args = new CompilerArguments();
+            args.getPath().add(runtime.getRuntimePath());
+            args.getOptions().setAccessModifierEventType(env -> NameAccessModifier.PUBLIC);
+
+            EPCompiled compiled = EPCompilerProvider.getCompiler().compile(epl, args);
+            EPDeployment deployment = runtime.getDeploymentService().deploy(compiled);
+            return deployment.getStatements()[0];
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
         }
     }
 
-    private void add_listener(String deploymentId, String eplQuery_name, UpdateListener listener){
-        EPStatement statement = runtime.getDeploymentService().getStatement(deploymentId, eplQuery_name);
+    private void add_listener(EPStatement statement, UpdateListener listener){
+        // EPStatement statement = runtime.getDeploymentService().getStatement(deploymentId, eplQuery_name);
         if (statement != null) {
             statement.addListener(listener);
         } else {
@@ -82,16 +85,24 @@ public class IotMain implements Runnable {
         String deploymentId = "MatchQuery";
 
         String eplQuery_name = "out"; 
-        String eplQuery = "@name('" + eplQuery_name + "') select * from sensorData output all every 4 seconds order by timestamp;";
+        String eplQuery = "select * from sensorData output all every 4 seconds order by timestamp;";
         // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData output last every 2 seconds;";
         // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(4);";
         // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(5);";
         
-        deploy(eplQuery, deploymentId);
-        add_listener(deploymentId, eplQuery_name, new IotEventListener());
+        // deploy(eplQuery, deploymentId);
+        EPStatement statement = compileDeploy(eplQuery);
+        add_listener(statement, new IotEventListener());
+        
+        eplQuery_name = "combinedEvent"; 
+        eplQuery = "select * from deviceCommand;";
+        
+        // deploy(eplQuery, deploymentId);
+        statement = compileDeploy(eplQuery);
+        add_listener(statement, new CombinedEventListener());
+
         add_generator(new IotStreamGenerator());
         
-    
         log.info("Done.");
     }    
 }

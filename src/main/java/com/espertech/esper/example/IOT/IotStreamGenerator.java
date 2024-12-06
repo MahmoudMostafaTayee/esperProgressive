@@ -1,6 +1,7 @@
 package com.espertech.esper.example.IOT;
 
 import com.espertech.esper.example.IOT.SensorData.SensorData;
+import com.espertech.esper.example.IOT.DeviceCommand.DeviceCommand;
 import com.espertech.esper.runtime.client.EPRuntime;
 
 public class IotStreamGenerator {
@@ -24,6 +25,7 @@ public class IotStreamGenerator {
         long timeTracker = System.currentTimeMillis();
 
         runtime.getEventService().sendEventBean(new SensorData(10, "101", "temp_sensor", 18002000L), "sensorData");
+        runtime.getEventService().sendEventBean(new DeviceCommand("101", "Set Temperature", "24°C", 18002000L), "deviceCommand");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
         
         runtime.getEventService().sendEventBean(new SensorData(5, "102", "camera", 18001000L), "sensorData");
