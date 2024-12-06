@@ -51,29 +51,6 @@ public class IotMain implements Runnable {
         runtime.initialize();
     }
 
-    private static EPStatement compileDeploy(String epl) {
-        try {
-            CompilerArguments args = new CompilerArguments();
-            args.getPath().add(runtime.getRuntimePath());
-            args.getOptions().setAccessModifierEventType(env -> NameAccessModifier.PUBLIC);
-
-            EPCompiled compiled = EPCompilerProvider.getCompiler().compile(epl, args);
-            EPDeployment deployment = runtime.getDeploymentService().deploy(compiled);
-            return deployment.getStatements()[0];
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    private void add_listener(EPStatement statement, UpdateListener listener){
-        // EPStatement statement = runtime.getDeploymentService().getStatement(deploymentId, eplQuery_name);
-        if (statement != null) {
-            statement.addListener(listener);
-        } else {
-            log.error("Statement not found: 'out'");
-        }
-    }
-
     private void add_generator(IotStreamGenerator generator){
         log.info("Generating and sending events with time advancement");
         generator.generateEvents(runtime);
@@ -88,8 +65,8 @@ public class IotMain implements Runnable {
         // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData output last every 2 seconds;";
         // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(4);";
         // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(5);";
-        statement = compileDeploy(eplQuery);
-        add_listener(statement, new GenericIotEventListener("Out sensorData every 4 seconds Event"));
+        statement = EventEPLUtil.compileDeploy(runtime, eplQuery);
+        EventEPLUtil.add_listener(statement, new GenericIotEventListener("Out sensorData every 4 seconds Event"));
         
         eplQuery = "insert into CombinedEvent(deviceId, type, command, value, timestamp)" +
         "select D.deviceId," +
@@ -102,8 +79,8 @@ public class IotMain implements Runnable {
         "where D.deviceId = C.deviceId";
         
         // eplQuery = "select * from deviceCommand;";
-        statement = compileDeploy(eplQuery);
-        add_listener(statement, new GenericIotEventListener("Combined event"));
+        statement = EventEPLUtil.compileDeploy(runtime, eplQuery);
+        EventEPLUtil.add_listener(statement, new GenericIotEventListener("Combined event"));
 
         add_generator(new IotStreamGenerator());
         
