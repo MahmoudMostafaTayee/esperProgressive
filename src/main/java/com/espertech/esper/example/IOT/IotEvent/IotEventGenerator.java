@@ -54,16 +54,16 @@ public class IotEventGenerator {
             /**************************************************************************** */
 
             /**************************************************************************** */
-            // /*This is to advance with a column; here dateCreated. */
+            // /*This is to advance with a column; here timestamp. */
             // // Advance time based on the difference between the event time and the last event time
-            // long timeToAdvance = iotEvent.getDateCreated() - lastEventTime;
+            // long timeToAdvance = iotEvent.getTimestamp() - lastEventTime;
             
             // // If there's a time difference, advance time
             // if (timeToAdvance > 0) {
             //     runtime.getEventService().advanceTime(lastEventTime);
             // }
         
-            // lastEventTime = iotEvent.getDateCreated();
+            // lastEventTime = iotEvent.getTimestamp();
             /**************************************************************************** */
         }
     }

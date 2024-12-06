@@ -1,31 +1,31 @@
 package com.espertech.esper.example.IOT.IotEvent;
 
 public class IotEvent {
-    private int amount;
-    private String id;
+    private int value;
+    private String deviceId;
     private String type;
-    private long dateCreated;
+    private long timestamp;
 
-    public IotEvent(int amount, String id, String type, long dateCreated) {
-        this.amount = amount;
-        this.id = id;
+    public IotEvent(int value, String deviceId, String type, long timestamp) {
+        this.value = value;
+        this.deviceId = deviceId;
         this.type = type;
-        this.dateCreated = dateCreated;
+        this.timestamp = timestamp;
     }
 
-    public int getAmount() {
-        return amount;
+    public int getValue() {
+        return value;
     }
 
-    public String getId() {
-        return id;
+    public String getDeviceId() {
+        return deviceId;
     }
 
     public String getType() {
         return type;
     }
 
-    public long getDateCreated() {
-        return dateCreated;
+    public long getTimestamp() {
+        return timestamp;
     }
 }
