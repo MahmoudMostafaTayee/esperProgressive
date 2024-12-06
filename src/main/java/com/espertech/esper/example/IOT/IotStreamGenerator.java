@@ -1,9 +1,10 @@
-package com.espertech.esper.example.IOT.SensorData;
+package com.espertech.esper.example.IOT;
 
+import com.espertech.esper.example.IOT.SensorData.SensorData;
 import com.espertech.esper.runtime.client.EPRuntime;
 import java.util.LinkedList;
 
-public class SensorDataGenerator {
+public class IotStreamGenerator {
 
     public LinkedList<Object> createEventStream() {
         LinkedList<Object> events = new LinkedList<>();
