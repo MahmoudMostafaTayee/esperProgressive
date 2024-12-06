@@ -25,13 +25,13 @@ public class IotStreamGenerator {
         long timeTracker = System.currentTimeMillis();
 
         runtime.getEventService().sendEventBean(new SensorData(10, "101", "temp_sensor", 18002000L), "sensorData");
-        runtime.getEventService().sendEventBean(new DeviceCommand("101", "Set Temperature", "24°C", 18002000L), "deviceCommand");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
         
         runtime.getEventService().sendEventBean(new SensorData(5, "102", "camera", 18001000L), "sensorData");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
         
         runtime.getEventService().sendEventBean(new SensorData(3, "104", "mic", 18002000L), "sensorData");
+        runtime.getEventService().sendEventBean(new DeviceCommand("101", "Set Temperature", "24°C", 18002000L), "deviceCommand");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
         
         runtime.getEventService().sendEventBean(new SensorData(7, "107", "camera", 18001000L), "sensorData");
@@ -43,6 +43,7 @@ public class IotStreamGenerator {
         runtime.getEventService().sendEventBean(new SensorData(10, "103", "mobile", 18004000L), "sensorData");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
         
+        runtime.getEventService().sendEventBean(new SensorData(44, "101", "temp_sensor", 18006000L), "sensorData");
         runtime.getEventService().sendEventBean(new SensorData(10, "109", "wash-machine", 18006000L), "sensorData");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
         

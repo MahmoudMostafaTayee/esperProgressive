@@ -81,23 +81,27 @@ public class IotMain implements Runnable {
 
     public void run() {
         initiateRunTime();
+        String eplQuery;
+        EPStatement statement;
 
-        String deploymentId = "MatchQuery";
-
-        String eplQuery_name = "out"; 
-        String eplQuery = "select * from sensorData output all every 4 seconds order by timestamp;";
-        // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData output last every 2 seconds;";
-        // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(4);";
-        // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(5);";
+        // eplQuery = "select * from sensorData output all every 4 seconds order by timestamp;";
+        // // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData output last every 2 seconds;";
+        // // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(4);";
+        // // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(5);";
+        // statement = compileDeploy(eplQuery);
+        // add_listener(statement, new IotEventListener());
         
-        // deploy(eplQuery, deploymentId);
-        EPStatement statement = compileDeploy(eplQuery);
-        add_listener(statement, new IotEventListener());
+        eplQuery = "insert into CombinedEvent(deviceId, type, command, value, timestamp)" +
+        "select D.deviceId," +
+        "type," +
+        "command," +
+        "value," +
+        "D.timestamp " +
+        "from sensorData#time(5 sec) D," +
+        "deviceCommand#time(5 sec) C " +
+        "where D.deviceId = C.deviceId";
         
-        eplQuery_name = "combinedEvent"; 
-        eplQuery = "select * from deviceCommand;";
-        
-        // deploy(eplQuery, deploymentId);
+        // eplQuery = "select * from deviceCommand;";
         statement = compileDeploy(eplQuery);
         add_listener(statement, new CombinedEventListener());
 
