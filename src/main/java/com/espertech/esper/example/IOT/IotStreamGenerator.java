@@ -2,29 +2,8 @@ package com.espertech.esper.example.IOT;
 
 import com.espertech.esper.example.IOT.SensorData.SensorData;
 import com.espertech.esper.runtime.client.EPRuntime;
-import java.util.LinkedList;
 
 public class IotStreamGenerator {
-
-    public LinkedList<Object> createEventStream() {
-        LinkedList<Object> events = new LinkedList<>();
-
-        // Adding sample SensorData objects to the event stream
-        events.add(new SensorData(10, "101", "temp_sensor", 18002000L));
-        events.add(new SensorData(5, "102", "camera", 18001000L));
-
-        events.add(new SensorData(3, "104", "mic", 18002000L));
-        events.add(new SensorData(7, "107", "camera", 18001000L));
-
-        events.add(new SensorData(10, "106", "screen", 18005000L));
-        events.add(new SensorData(10, "103", "mobile", 18004000L));
-
-        events.add(new SensorData(10, "109", "wash-machine", 18006000L));
-        events.add(new SensorData(10, "105", "mic", 18007000L));
-
-        return events;
-    }
-
     private long advanceTime(EPRuntime runtime, long timeTracker, long timeStep){
         long currentTime = timeTracker + timeStep;
         
