@@ -10,7 +10,6 @@
  */
 package com.espertech.esper.example.IOT;
 
-import com.espertech.esper.example.IOT.IotEvent.IotEventListener;
 import com.espertech.esper.example.IOT.IotEvent.IotEventGenerator;
 import com.espertech.esper.common.client.EPCompiled;
 import com.espertech.esper.common.client.configuration.Configuration;
