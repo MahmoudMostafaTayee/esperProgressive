@@ -84,12 +84,12 @@ public class IotMain implements Runnable {
         String eplQuery;
         EPStatement statement;
 
-        // eplQuery = "select * from sensorData output all every 4 seconds order by timestamp;";
-        // // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData output last every 2 seconds;";
-        // // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(4);";
-        // // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(5);";
-        // statement = compileDeploy(eplQuery);
-        // add_listener(statement, new IotEventListener());
+        eplQuery = "select * from sensorData output all every 4 seconds order by timestamp;";
+        // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData output last every 2 seconds;";
+        // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(4);";
+        // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(5);";
+        statement = compileDeploy(eplQuery);
+        add_listener(statement, new GenericIotEventListener("Out sensorData every 4 seconds Event"));
         
         eplQuery = "insert into CombinedEvent(deviceId, type, command, value, timestamp)" +
         "select D.deviceId," +
@@ -103,7 +103,7 @@ public class IotMain implements Runnable {
         
         // eplQuery = "select * from deviceCommand;";
         statement = compileDeploy(eplQuery);
-        add_listener(statement, new CombinedEventListener());
+        add_listener(statement, new GenericIotEventListener("Combined event"));
 
         add_generator(new IotStreamGenerator());
         
