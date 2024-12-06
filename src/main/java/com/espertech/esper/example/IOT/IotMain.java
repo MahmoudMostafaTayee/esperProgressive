@@ -10,6 +10,8 @@
  */
 package com.espertech.esper.example.IOT;
 
+import com.espertech.esper.example.IOT.IotEvent.IotEventListener;
+import com.espertech.esper.example.IOT.IotEvent.IotEventGenerator;
 import com.espertech.esper.common.client.EPCompiled;
 import com.espertech.esper.common.client.configuration.Configuration;
 import com.espertech.esper.runtime.client.DeploymentOptions;
@@ -38,8 +40,8 @@ public class IotMain implements Runnable {
     }
 
     public void run() {
-        Configuration configuration = IotEventEPLUtil.getConfiguration();
-        EPCompiled compiled = IotEventEPLUtil.compileEPL(configuration);
+        Configuration configuration = EventEPLUtil.getConfiguration();
+        EPCompiled compiled = EventEPLUtil.compileEPL(configuration);
     
         log.info("Setting up runtime");
         EPRuntime runtime = EPRuntimeProvider.getRuntime(runtimeURI, configuration);
