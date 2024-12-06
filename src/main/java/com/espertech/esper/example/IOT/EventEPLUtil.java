@@ -15,12 +15,7 @@ import org.slf4j.LoggerFactory;
 public class EventEPLUtil {
     private static final Logger log = LoggerFactory.getLogger(EventEPLUtil.class);
 
-    public static EPCompiled compileEPL(Configuration configuration) {
-        String eplQuery = "@name('out') select * from sensorData output all every 4 seconds order by timestamp;";
-        // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData output last every 2 seconds;";
-        // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(4);";
-        // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(5);";
-        
+    public static EPCompiled compileEPL(Configuration configuration, String eplQuery) {
         log.info("Compiling EPL");
         try {
             EPCompiled compiled = EPCompilerProvider.getCompiler().compile(eplQuery, new CompilerArguments(configuration));
