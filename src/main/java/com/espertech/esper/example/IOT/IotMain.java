@@ -10,7 +10,7 @@
  */
 package com.espertech.esper.example.IOT;
 
-import com.espertech.esper.example.IOT.IotEvent.IotEventGenerator;
+import com.espertech.esper.example.IOT.SensorData.SensorDataGenerator;
 import com.espertech.esper.common.client.EPCompiled;
 import com.espertech.esper.common.client.configuration.Configuration;
 import com.espertech.esper.runtime.client.DeploymentOptions;
@@ -65,7 +65,7 @@ public class IotMain implements Runnable {
         }
     
         log.info("Generating and sending events with time advancement");
-        IotEventGenerator generator = new IotEventGenerator();
+        SensorDataGenerator generator = new SensorDataGenerator();
         generator.generateEvents(runtime);
     
         log.info("Done.");

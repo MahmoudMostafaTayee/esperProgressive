@@ -1,12 +1,12 @@
-package com.espertech.esper.example.IOT.IotEvent;
+package com.espertech.esper.example.IOT.SensorData;
 
-public class IotEvent {
+public class SensorData {
     private int value;
     private String deviceId;
     private String type;
     private long timestamp;
 
-    public IotEvent(int value, String deviceId, String type, long timestamp) {
+    public SensorData(int value, String deviceId, String type, long timestamp) {
         this.value = value;
         this.deviceId = deviceId;
         this.type = type;
