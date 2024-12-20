@@ -61,11 +61,23 @@ public class IotMain implements Runnable {
         "command," +
         "value," +
         "D.timestamp " +
-        "from sensorData#time(5 sec) D," +
+        "from sensorData#time(5 sec) D JOIN " +
         "deviceCommand#time(5 sec) C " +
-        "where D.deviceId = C.deviceId;";
+        "ON D.deviceId = C.deviceId;";
+
+        /*
+         * // Same Query but with using mulitple selects and where clause not join and on.
+         eplQuery = "insert into CombinedEvent(deviceId, type, command, value, timestamp)" +
+         "select D.deviceId," +
+         "type," +
+         "command," +
+         "value," +
+         "D.timestamp " +
+         "from sensorData#time(5 sec) D," +
+         "deviceCommand#time(5 sec) C " +
+         "where D.deviceId = C.deviceId;";
+         */
         
-        // eplQuery = "select * from deviceCommand;";
         compileDeployAddListener(   
                                     eplQuery, 
                                     new GenericIotEventListener("Combined event")
