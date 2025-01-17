@@ -12,6 +12,18 @@
     <artifactId>esper-example-IOT</artifactId>
     <packaging>jar</packaging>
     <description>Esper Example IOT</description>
+    <dependencies>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-nop</artifactId>
+            <version>2.0.9</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.15.2</version>
+        </dependency>
+    </dependencies>
     <build>
         <plugins>
             <plugin>

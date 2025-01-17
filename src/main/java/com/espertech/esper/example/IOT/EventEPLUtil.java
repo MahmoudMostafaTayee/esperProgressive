@@ -2,6 +2,7 @@ package com.espertech.esper.example.IOT;
 
 import com.espertech.esper.example.IOT.SensorData.SensorData;
 import com.espertech.esper.example.IOT.DeviceCommand.DeviceCommand;
+import com.espertech.esper.example.IOT.PersonView.PersonView;
 import com.espertech.esper.common.client.EPCompiled;
 import com.espertech.esper.common.client.configuration.Configuration;
 import com.espertech.esper.common.client.util.NameAccessModifier;
@@ -22,6 +23,8 @@ public class EventEPLUtil {
         Configuration configuration = new Configuration();
         configuration.getCommon().addEventType("sensorData", SensorData.class);
         configuration.getCommon().addEventType("deviceCommand", DeviceCommand.class);
+        configuration.getCommon().addEventType("personView", PersonView.class);
+        configuration.getCommon().addEventType("ViewData", PersonView.View.class);
         return configuration;
     }
 

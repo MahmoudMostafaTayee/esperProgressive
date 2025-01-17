@@ -83,6 +83,12 @@ public class IotMain implements Runnable {
                                     new GenericIotEventListener("Combined event")
                                 );
 
+        eplQuery = "select * from personView;";
+        compileDeployAddListener(   
+                                    eplQuery, 
+                                    new GenericIotEventListener("personView First Draft")
+                                );
+
         add_generator(new IotStreamGenerator());
         
         log.info("Done.");
