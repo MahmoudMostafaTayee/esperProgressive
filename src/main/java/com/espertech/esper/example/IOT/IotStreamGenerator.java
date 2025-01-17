@@ -3,11 +3,11 @@ package com.espertech.esper.example.IOT;
 import com.espertech.esper.example.IOT.SensorData.SensorData;
 
 import java.util.List;
-
+import com.espertech.esper.example.IOT.helpers.JsonReader;
 import com.espertech.esper.example.IOT.DeviceCommand.DeviceCommand;
 import com.espertech.esper.example.IOT.PersonView.PersonView;
 import com.espertech.esper.runtime.client.EPRuntime;
-
+import java.io.IOException;
 public class IotStreamGenerator {
     private long advanceTime(EPRuntime runtime, long timeTracker, long timeStep){
         long currentTime = timeTracker + timeStep;
@@ -27,6 +27,20 @@ public class IotStreamGenerator {
 
         // Track current starting time for advancing time.
         long timeTracker = System.currentTimeMillis();
+
+        try {
+            // Read PersonView data from JSON file
+            List<PersonView> personViews = JsonReader.readPersonViewsFromJson("D:\\Moi\\Masters\\DeepCEP\\esperee-9.0.0\\examples\\examples-esper\\esperProgressive\\Dataset\\Wildtrack_dataset\\annotations_positions\\00000000.json");
+
+            // Stream events to Esper
+            for (PersonView personView : personViews) {
+                runtime.getEventService().sendEventBean(personView, "personView");
+                timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading JSON file: " + e.getMessage());
+            e.printStackTrace();
+        }
 
         runtime.getEventService().sendEventBean(new SensorData(10, "101", "temp_sensor", 18002000L), "sensorData");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);

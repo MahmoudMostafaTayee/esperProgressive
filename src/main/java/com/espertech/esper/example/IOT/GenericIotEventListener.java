@@ -39,6 +39,6 @@ public class GenericIotEventListener implements UpdateListener {
             eventDetails.setLength(eventDetails.length() - 2);
         }
 
-        log.info(eventDetails.toString());
+        System.out.println(eventDetails.toString());
     }
 }
