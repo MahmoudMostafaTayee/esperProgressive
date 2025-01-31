@@ -30,12 +30,15 @@ public class IotStreamGenerator {
         long timeTracker = System.currentTimeMillis();
 
         String directoryPath = "D:\\Moi\\Masters\\DeepCEP\\esperee-9.0.0\\examples\\examples-esper\\esperProgressive\\Dataset\\Wildtrack_dataset\\annotations_positions";
-
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(Paths.get(directoryPath), "*.json")) {
             for (Path entry : stream) {
                 try {
+                    String fileName = entry.getFileName().toString();
+                    int frameNumber = Integer.parseInt(fileName.replace(".json", ""));
                     List<PersonView> personViews = JsonReader.readPersonViewsFromJson(entry.toString());
                     for (PersonView personView : personViews) {
+                        personView.setFrameNumber(frameNumber);
+                        personView.setTimeStamp(timeTracker);
                         runtime.getEventService().sendEventBean(personView, "personView");
                         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
                     }
@@ -53,7 +56,7 @@ public class IotStreamGenerator {
         runtime.getEventService().sendEventBean(new SensorData(10, "101", "temp_sensor", 18002000L), "sensorData");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
 
-        runtime.getEventService().sendEventBean(new PersonView(122, 456826, List.of(new PersonView.View(0, 1561, 1510, 299, 139))), "personView");
+        runtime.getEventService().sendEventBean(new PersonView(timeTracker, 122, 0, 456826, List.of(new PersonView.View(0, 1561, 1510, 299, 139))), "personView");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
         
         runtime.getEventService().sendEventBean(new SensorData(5, "102", "camera", 18001000L), "sensorData");

@@ -6,7 +6,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 public class PersonView {
+    private long timeStamp;
     private int personID;
+    private int frameNumber;
     private int positionID;
     private List<View> views;
 
@@ -17,17 +19,38 @@ public class PersonView {
     // Constructor with annotations
     @JsonCreator
     public PersonView(
+            @JsonProperty("timeStamp") long timeStamp,
             @JsonProperty("personID") int personID,
+            @JsonProperty("frameNumber") int frameNumber,
             @JsonProperty("positionID") int positionID,
             @JsonProperty("views") List<View> views) {
         this.personID = personID;
+        this.timeStamp = timeStamp;
+        this.frameNumber = frameNumber;
         this.positionID = positionID;
         this.views = views;
+    }
+
+    /*Setters*/
+    public void setFrameNumber(int frameNumber) {
+        this.frameNumber = frameNumber;
+    }
+
+    public void setTimeStamp(long timeStamp) {
+        this.timeStamp = timeStamp;
     }
 
     // Getters
     public int getPersonID() {
         return personID;
+    }
+
+    public long getTimeStamp() {
+        return timeStamp;
+    }
+
+    public int getFrameNumber() {
+        return frameNumber;
     }
 
     public int getPositionID() {
