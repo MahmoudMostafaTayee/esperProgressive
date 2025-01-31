@@ -92,17 +92,40 @@ public class IotMain implements Runnable {
         // Loop through all view numbers (0 to 6)
         for (int viewNumberCounter = 0; viewNumberCounter <= 6; viewNumberCounter++) {
             // Generate the EPL query for the current view number
-            eplQuery = "insert into OverlappingDetections(personID_1, personID_2, frameNumber, eventTime, viewNum_1, viewNum_2) " +
+            eplQuery = "insert into OverlappingDetections(personID_1, personID_2, frameNumber, eventTime, viewNum_1, viewNum_2, iou) " +
                         "select A.personID, " +
                         "B.personID, " +
                         "A.frameNumber, " +
                         "A.timeStamp, " +
-                        "A.views[" + viewNumberCounter + "].viewNum as viewNum_1, " +  // Dynamically use viewNumberCounter
-                        "B.views[" + viewNumberCounter + "].viewNum as viewNum_2 " +  // Dynamically use viewNumberCounter
+                        "A.views[" + viewNumberCounter + "].viewNum as viewNum_1, " +
+                        "B.views[" + viewNumberCounter + "].viewNum as viewNum_2, " +
+                        "(" +
+                        "   1.0 * ( " +  // Ensure floating-point division
+                        "      (min(A.views[" + viewNumberCounter + "].xmax, B.views[" + viewNumberCounter + "].xmax) - " +
+                        "       max(A.views[" + viewNumberCounter + "].xmin, B.views[" + viewNumberCounter + "].xmin)) * " +
+                        "      (min(A.views[" + viewNumberCounter + "].ymax, B.views[" + viewNumberCounter + "].ymax) - " +
+                        "       max(A.views[" + viewNumberCounter + "].ymin, B.views[" + viewNumberCounter + "].ymin)) " +
+                        "   ) / ( " +  // Start denominator
+                        "      ( (A.views[" + viewNumberCounter + "].xmax - A.views[" + viewNumberCounter + "].xmin) * " +
+                        "        (A.views[" + viewNumberCounter + "].ymax - A.views[" + viewNumberCounter + "].ymin) ) + " +
+                        "      ( (B.views[" + viewNumberCounter + "].xmax - B.views[" + viewNumberCounter + "].xmin) * " +
+                        "        (B.views[" + viewNumberCounter + "].ymax - B.views[" + viewNumberCounter + "].ymin) ) - " +
+                        "      ( (min(A.views[" + viewNumberCounter + "].xmax, B.views[" + viewNumberCounter + "].xmax) - " +
+                        "          max(A.views[" + viewNumberCounter + "].xmin, B.views[" + viewNumberCounter + "].xmin)) * " +
+                        "        (min(A.views[" + viewNumberCounter + "].ymax, B.views[" + viewNumberCounter + "].ymax) - " +
+                        "         max(A.views[" + viewNumberCounter + "].ymin, B.views[" + viewNumberCounter + "].ymin)) ) " +
+                        "   ) " +
+                        ") as iou " +  // Close IoU calculation
                         "from personView#ext_timed_batch(timeStamp, 5 sec) A JOIN " +
                         "personView#ext_timed_batch(timeStamp, 5 sec) B " +
                         "ON A.frameNumber = B.frameNumber " +
-                        "WHERE A.personID != B.personID;";
+                        "WHERE A.personID != B.personID " +
+                        "AND (min(A.views[" + viewNumberCounter + "].xmax, B.views[" + viewNumberCounter + "].xmax) - " +
+                        "     max(A.views[" + viewNumberCounter + "].xmin, B.views[" + viewNumberCounter + "].xmin)) > 0 " +
+                        "AND (min(A.views[" + viewNumberCounter + "].ymax, B.views[" + viewNumberCounter + "].ymax) - " +
+                        "     max(A.views[" + viewNumberCounter + "].ymin, B.views[" + viewNumberCounter + "].ymin)) > 0;";
+
+
 
             // Deploy the query and add the listener with the dynamically generated name
             compileDeployAddListener(
