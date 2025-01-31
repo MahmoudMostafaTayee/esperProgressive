@@ -100,7 +100,7 @@ public class IotMain implements Runnable {
                         "A.views[" + viewNumberCounter + "].viewNum as viewNum_1, " +
                         "B.views[" + viewNumberCounter + "].viewNum as viewNum_2, " +
                         "(" +
-                        "   1.0 * ( " +  // Ensure floating-point division
+                        "   1.0 * ( " +  // Ensures floating-point division
                         "      (min(A.views[" + viewNumberCounter + "].xmax, B.views[" + viewNumberCounter + "].xmax) - " +
                         "       max(A.views[" + viewNumberCounter + "].xmin, B.views[" + viewNumberCounter + "].xmin)) * " +
                         "      (min(A.views[" + viewNumberCounter + "].ymax, B.views[" + viewNumberCounter + "].ymax) - " +
@@ -123,9 +123,24 @@ public class IotMain implements Runnable {
                         "AND (min(A.views[" + viewNumberCounter + "].xmax, B.views[" + viewNumberCounter + "].xmax) - " +
                         "     max(A.views[" + viewNumberCounter + "].xmin, B.views[" + viewNumberCounter + "].xmin)) > 0 " +
                         "AND (min(A.views[" + viewNumberCounter + "].ymax, B.views[" + viewNumberCounter + "].ymax) - " +
-                        "     max(A.views[" + viewNumberCounter + "].ymin, B.views[" + viewNumberCounter + "].ymin)) > 0;";
-
-
+                        "     max(A.views[" + viewNumberCounter + "].ymin, B.views[" + viewNumberCounter + "].ymin)) > 0 " +
+                        "AND ( " +  // IoU Threshold Filter
+                        "   1.0 * ( " +  // Ensures floating-point division
+                        "      (min(A.views[" + viewNumberCounter + "].xmax, B.views[" + viewNumberCounter + "].xmax) - " +
+                        "       max(A.views[" + viewNumberCounter + "].xmin, B.views[" + viewNumberCounter + "].xmin)) * " +
+                        "      (min(A.views[" + viewNumberCounter + "].ymax, B.views[" + viewNumberCounter + "].ymax) - " +
+                        "       max(A.views[" + viewNumberCounter + "].ymin, B.views[" + viewNumberCounter + "].ymin)) " +
+                        "   ) / ( " +  // Start denominator
+                        "      ( (A.views[" + viewNumberCounter + "].xmax - A.views[" + viewNumberCounter + "].xmin) * " +
+                        "        (A.views[" + viewNumberCounter + "].ymax - A.views[" + viewNumberCounter + "].ymin) ) + " +
+                        "      ( (B.views[" + viewNumberCounter + "].xmax - B.views[" + viewNumberCounter + "].xmin) * " +
+                        "        (B.views[" + viewNumberCounter + "].ymax - B.views[" + viewNumberCounter + "].ymin) ) - " +
+                        "      ( (min(A.views[" + viewNumberCounter + "].xmax, B.views[" + viewNumberCounter + "].xmax) - " +
+                        "          max(A.views[" + viewNumberCounter + "].xmin, B.views[" + viewNumberCounter + "].xmin)) * " +
+                        "        (min(A.views[" + viewNumberCounter + "].ymax, B.views[" + viewNumberCounter + "].ymax) - " +
+                        "         max(A.views[" + viewNumberCounter + "].ymin, B.views[" + viewNumberCounter + "].ymin)) ) " +
+                        "   ) " +
+                        ") > 0.5;";  // Only keep overlapping bounding boxes with IoU > 0.5
 
             // Deploy the query and add the listener with the dynamically generated name
             compileDeployAddListener(
