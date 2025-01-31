@@ -66,7 +66,7 @@ public class IotMain implements Runnable {
         "ON D.deviceId = C.deviceId;";
 
         /*
-         * // Same Query but with using mulitple selects and where clause not join and on.
+         * // Same Query but with using multiple selects and where clause not join and on.
          eplQuery = "insert into CombinedEvent(deviceId, type, command, value, timestamp)" +
          "select D.deviceId," +
          "type," +
@@ -86,8 +86,31 @@ public class IotMain implements Runnable {
         eplQuery = "select * from personView;";
         compileDeployAddListener(   
                                     eplQuery, 
-                                    new GenericIotEventListener("personView First Draft")
+                                    new GenericIotEventListener("personView raw event")
                                 );
+
+        // Loop through all view numbers (0 to 6)
+        for (int viewNumberCounter = 0; viewNumberCounter <= 6; viewNumberCounter++) {
+            // Generate the EPL query for the current view number
+            eplQuery = "insert into OverlappingDetections(personID_1, personID_2, frameNumber, eventTime, viewNum_1, viewNum_2) " +
+                        "select A.personID, " +
+                        "B.personID, " +
+                        "A.frameNumber, " +
+                        "A.timeStamp, " +
+                        "A.views[" + viewNumberCounter + "].viewNum as viewNum_1, " +  // Dynamically use viewNumberCounter
+                        "B.views[" + viewNumberCounter + "].viewNum as viewNum_2 " +  // Dynamically use viewNumberCounter
+                        "from personView#ext_timed_batch(timeStamp, 5 sec) A JOIN " +
+                        "personView#ext_timed_batch(timeStamp, 5 sec) B " +
+                        "ON A.frameNumber = B.frameNumber " +
+                        "WHERE A.personID != B.personID;";
+
+            // Deploy the query and add the listener with the dynamically generated name
+            compileDeployAddListener(
+                    eplQuery,
+                    new GenericIotEventListener("DetectOverlaps for view Number " + viewNumberCounter)
+            );
+        }
+
 
         add_generator(new IotStreamGenerator());
         

@@ -40,8 +40,8 @@ public class IotStreamGenerator {
                         personView.setFrameNumber(frameNumber);
                         personView.setTimeStamp(timeTracker);
                         runtime.getEventService().sendEventBean(personView, "personView");
-                        timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
                     }
+                    timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
                 } catch (IOException e) {
                     System.err.println("Error reading JSON file: " + entry + " - " + e.getMessage());
                     e.printStackTrace();
