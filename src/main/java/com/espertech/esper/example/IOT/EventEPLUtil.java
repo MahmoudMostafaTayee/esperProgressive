@@ -34,7 +34,7 @@ public class EventEPLUtil {
         EventEPLUtil.add_listener(statement, listener);
     }
 
-    private static EPStatement compileDeploy(EPRuntime runtime, String epl) {
+    public static EPStatement compileDeploy(EPRuntime runtime, String epl) {
         try {
             CompilerArguments args = new CompilerArguments();
             args.getPath().add(runtime.getRuntimePath());

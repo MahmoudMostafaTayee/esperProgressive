@@ -42,6 +42,10 @@ public class IotMain implements Runnable {
                                                 listener);
     }
 
+    private static void compileDeploy(String eplQuery){
+        EventEPLUtil.compileDeploy(  runtime, eplQuery);
+    }
+
     public void run() {
         initiateRunTime();
         String eplQuery;
@@ -91,61 +95,60 @@ public class IotMain implements Runnable {
 
         // Loop through all view numbers (0 to 6)
         for (int viewNumberCounter = 0; viewNumberCounter <= 6; viewNumberCounter++) {
-            // Generate the EPL query for the current view number
-            eplQuery = "insert into OverlappingDetections(personID_1, personID_2, frameNumber, eventTime, viewNum_1, viewNum_2, iou) " +
-                        "select A.personID, " +
-                        "B.personID, " +
-                        "A.frameNumber, " +
-                        "A.timeStamp, " +
-                        "A.views[" + viewNumberCounter + "].viewNum as viewNum_1, " +
-                        "B.views[" + viewNumberCounter + "].viewNum as viewNum_2, " +
-                        "(" +
-                        "   1.0 * ( " +  // Ensures floating-point division
-                        "      (min(A.views[" + viewNumberCounter + "].xmax, B.views[" + viewNumberCounter + "].xmax) - " +
-                        "       max(A.views[" + viewNumberCounter + "].xmin, B.views[" + viewNumberCounter + "].xmin)) * " +
-                        "      (min(A.views[" + viewNumberCounter + "].ymax, B.views[" + viewNumberCounter + "].ymax) - " +
-                        "       max(A.views[" + viewNumberCounter + "].ymin, B.views[" + viewNumberCounter + "].ymin)) " +
-                        "   ) / ( " +  // Start denominator
-                        "      ( (A.views[" + viewNumberCounter + "].xmax - A.views[" + viewNumberCounter + "].xmin) * " +
-                        "        (A.views[" + viewNumberCounter + "].ymax - A.views[" + viewNumberCounter + "].ymin) ) + " +
-                        "      ( (B.views[" + viewNumberCounter + "].xmax - B.views[" + viewNumberCounter + "].xmin) * " +
-                        "        (B.views[" + viewNumberCounter + "].ymax - B.views[" + viewNumberCounter + "].ymin) ) - " +
-                        "      ( (min(A.views[" + viewNumberCounter + "].xmax, B.views[" + viewNumberCounter + "].xmax) - " +
-                        "          max(A.views[" + viewNumberCounter + "].xmin, B.views[" + viewNumberCounter + "].xmin)) * " +
-                        "        (min(A.views[" + viewNumberCounter + "].ymax, B.views[" + viewNumberCounter + "].ymax) - " +
-                        "         max(A.views[" + viewNumberCounter + "].ymin, B.views[" + viewNumberCounter + "].ymin)) ) " +
-                        "   ) " +
-                        ") as iou " +  // Close IoU calculation
-                        "from personView#ext_timed_batch(timeStamp, 5 sec) A JOIN " +
-                        "personView#ext_timed_batch(timeStamp, 5 sec) B " +
-                        "ON A.frameNumber = B.frameNumber " +
-                        "WHERE A.personID != B.personID " +
-                        "AND (min(A.views[" + viewNumberCounter + "].xmax, B.views[" + viewNumberCounter + "].xmax) - " +
-                        "     max(A.views[" + viewNumberCounter + "].xmin, B.views[" + viewNumberCounter + "].xmin)) > 0 " +
-                        "AND (min(A.views[" + viewNumberCounter + "].ymax, B.views[" + viewNumberCounter + "].ymax) - " +
-                        "     max(A.views[" + viewNumberCounter + "].ymin, B.views[" + viewNumberCounter + "].ymin)) > 0 " +
-                        "AND ( " +  // IoU Threshold Filter
-                        "   1.0 * ( " +  // Ensures floating-point division
-                        "      (min(A.views[" + viewNumberCounter + "].xmax, B.views[" + viewNumberCounter + "].xmax) - " +
-                        "       max(A.views[" + viewNumberCounter + "].xmin, B.views[" + viewNumberCounter + "].xmin)) * " +
-                        "      (min(A.views[" + viewNumberCounter + "].ymax, B.views[" + viewNumberCounter + "].ymax) - " +
-                        "       max(A.views[" + viewNumberCounter + "].ymin, B.views[" + viewNumberCounter + "].ymin)) " +
-                        "   ) / ( " +  // Start denominator
-                        "      ( (A.views[" + viewNumberCounter + "].xmax - A.views[" + viewNumberCounter + "].xmin) * " +
-                        "        (A.views[" + viewNumberCounter + "].ymax - A.views[" + viewNumberCounter + "].ymin) ) + " +
-                        "      ( (B.views[" + viewNumberCounter + "].xmax - B.views[" + viewNumberCounter + "].xmin) * " +
-                        "        (B.views[" + viewNumberCounter + "].ymax - B.views[" + viewNumberCounter + "].ymin) ) - " +
-                        "      ( (min(A.views[" + viewNumberCounter + "].xmax, B.views[" + viewNumberCounter + "].xmax) - " +
-                        "          max(A.views[" + viewNumberCounter + "].xmin, B.views[" + viewNumberCounter + "].xmin)) * " +
-                        "        (min(A.views[" + viewNumberCounter + "].ymax, B.views[" + viewNumberCounter + "].ymax) - " +
-                        "         max(A.views[" + viewNumberCounter + "].ymin, B.views[" + viewNumberCounter + "].ymin)) ) " +
-                        "   ) " +
-                        ") > 0.5;";  // Only keep overlapping bounding boxes with IoU > 0.5
+            String PersonViewExtracted =    "insert into PersonViewExtracted " +
+                                            "select " +
+                                            "  personID, " +
+                                            "  frameNumber, " +
+                                            "  timeStamp, " +
+                                            "  views[" + viewNumberCounter + "].viewNum as viewNum, " +
+                                            "  views[" + viewNumberCounter + "].xmin as xmin, " +
+                                            "  views[" + viewNumberCounter + "].xmax as xmax, " +
+                                            "  views[" + viewNumberCounter + "].ymin as ymin, " +
+                                            "  views[" + viewNumberCounter + "].ymax as ymax " +
+                                            "from personView;";
+            compileDeploy(PersonViewExtracted);
+
+            String OverlapCandidates =  "insert into OverlapCandidates " +
+                                        "select " +
+                                        "  A.personID as personID_1, " +
+                                        "  B.personID as personID_2, " +
+                                        "  A.frameNumber as frameNumber, " +
+                                        "  A.timeStamp as eventTime, " +
+                                        "  A.viewNum as viewNum_1, " +
+                                        "  B.viewNum as viewNum_2, " +
+                                        "  (min(A.xmax, B.xmax) - max(A.xmin, B.xmin)) as overlapX, " +
+                                        "  (min(A.ymax, B.ymax) - max(A.ymin, B.ymin)) as overlapY, " +
+                                        "  (A.xmax - A.xmin) * (A.ymax - A.ymin) as areaA, " +
+                                        "  (B.xmax - B.xmin) * (B.ymax - B.ymin) as areaB " +
+                                        "from " +
+                                        "  PersonViewExtracted#ext_timed_batch(timeStamp, 5 sec) A " +
+                                        "  join " +
+                                        "  PersonViewExtracted#ext_timed_batch(timeStamp, 5 sec) B " +
+                                        "  on A.frameNumber = B.frameNumber " +
+                                        "where " +
+                                        "  A.personID != B.personID " +
+                                        "  and (min(A.xmax, B.xmax) > max(A.xmin, B.xmin)) " +
+                                        "  and (min(A.ymax, B.ymax) > max(A.ymin, B.ymin));";
+            compileDeploy(OverlapCandidates);
+
+            String OverlappingDetections =  "insert into OverlappingDetections " +
+                                            "select " +
+                                            "  personID_1, " +
+                                            "  personID_2, " +
+                                            "  frameNumber, " +
+                                            "  eventTime, " +
+                                            "  viewNum_1, " +
+                                            "  viewNum_2, " +
+                                            "  (overlapX * overlapY) / (areaA + areaB - (overlapX * overlapY)) as iou " +
+                                            "from OverlapCandidates " +
+                                            "where " +
+                                            "  (overlapX * overlapY) > 0 " +  // Redundant but explicit safety check
+                                            "  and (overlapX * overlapY) / (areaA + areaB - (overlapX * overlapY)) > 0.5;";
 
             // Deploy the query and add the listener with the dynamically generated name
             compileDeployAddListener(
-                    eplQuery,
-                    new GenericIotEventListener("DetectOverlaps for view Number " + viewNumberCounter)
+                    OverlappingDetections,
+                    new GenericIotEventListener("OverlappingDetections for view Number " + viewNumberCounter)
             );
         }
 
