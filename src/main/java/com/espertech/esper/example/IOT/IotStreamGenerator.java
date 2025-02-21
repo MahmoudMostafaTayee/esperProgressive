@@ -29,7 +29,7 @@ public class IotStreamGenerator {
         // Track current starting time for advancing time.
         long timeTracker = System.currentTimeMillis();
 
-        String directoryPath = "D:\\Moi\\Masters\\DeepCEP\\esperee-9.0.0\\examples\\examples-esper\\esperProgressive\\Dataset\\Wildtrack_dataset\\annotations_positions";
+        String directoryPath = "./Dataset/Wildtrack_dataset/annotations_positions";
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(Paths.get(directoryPath), "*.json")) {
             for (Path entry : stream) {
                 try {
