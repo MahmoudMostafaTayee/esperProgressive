@@ -9,7 +9,24 @@ import com.espertech.esper.example.IOT.DeviceCommand.DeviceCommand;
 import com.espertech.esper.example.IOT.PersonView.PersonView;
 import com.espertech.esper.runtime.client.EPRuntime;
 import java.io.IOException;
+
 public class IotStreamGenerator {
+    // Fixed time step (1 second) to advance time after each event
+    private long oneSecTimeStep = 1000L;  // 1 second (in milliseconds)
+    // Track current starting time for advancing time.
+    private long timeTracker = System.currentTimeMillis();
+
+    /**
+     * Advances the given runtime's time by the specified time step.
+     *
+     * <p>This method calculates the new current time by adding the time step to the provided
+     * time tracker value, and then advances the EPRuntime to this new time.</p>
+     *
+     * @param runtime The EPRuntime instance whose time is to be advanced.
+     * @param timeTracker The current time tracker value in milliseconds.
+     * @param timeStep The time step in milliseconds by which to advance the time.
+     * @return The new current time after the advancement.
+     */
     private long advanceTime(EPRuntime runtime, long timeTracker, long timeStep){
         long currentTime = timeTracker + timeStep;
         
@@ -21,14 +38,17 @@ public class IotStreamGenerator {
 
         return currentTime;
     }
-    
-    public void generateEvents(EPRuntime runtime) {        
-        // Fixed time step (1 second) to advance time after each event
-        long oneSecTimeStep = 1000L;  // 1 second (in milliseconds)
-
-        // Track current starting time for advancing time.
-        long timeTracker = System.currentTimeMillis();
-
+    /**
+     * Streams the Wildtrack dataset to the runtime, one event per frame.
+     * <p>
+     * This method reads all the JSON files in the specified directory, parses them as PersonView objects,
+     * and sends them to the runtime as events. The timestamp of each event is set to the current time,
+     * and the frame number is set to the number in the filename.
+     * <p>
+     * The time is advanced by one second after each event.
+     * @param runtime the runtime to which the events are sent.
+     */
+    private void streamWildTrackDataset(EPRuntime runtime){
         String directoryPath = "./Dataset/Wildtrack_dataset/annotations_positions";
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(Paths.get(directoryPath), "*.json")) {
             for (Path entry : stream) {
@@ -51,36 +71,49 @@ public class IotStreamGenerator {
             System.err.println("Error accessing directory: " + e.getMessage());
             e.printStackTrace();
         }
+    }
 
-
+    /**
+     * Streams a series of predefined sensor data and device command events to the EPRuntime.
+     * Each event is followed by a time advancement step to simulate real-time event processing.
+     *
+     * @param runtime The EPRuntime instance used to send event beans.
+     */
+    private void streamDeviceCommands(EPRuntime runtime){
         runtime.getEventService().sendEventBean(new SensorData(10, "101", "temp_sensor", 18002000L), "sensorData");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
 
         runtime.getEventService().sendEventBean(new PersonView(timeTracker, 122, 0, 456826, List.of(new PersonView.View(0, 1561, 1510, 299, 139))), "personView");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
-        
+
         runtime.getEventService().sendEventBean(new SensorData(5, "102", "camera", 18001000L), "sensorData");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
-        
+
         runtime.getEventService().sendEventBean(new SensorData(3, "104", "mic", 18002000L), "sensorData");
         runtime.getEventService().sendEventBean(new DeviceCommand("101", "Set Temperature", "24°C", 18002000L), "deviceCommand");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
-        
+
         runtime.getEventService().sendEventBean(new SensorData(7, "107", "camera", 18001000L), "sensorData");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
-        
+
         runtime.getEventService().sendEventBean(new SensorData(10, "106", "screen", 18005000L), "sensorData");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
-        
+
         runtime.getEventService().sendEventBean(new SensorData(10, "103", "mobile", 18004000L), "sensorData");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
-        
+
         runtime.getEventService().sendEventBean(new SensorData(44, "101", "temp_sensor", 18006000L), "sensorData");
         runtime.getEventService().sendEventBean(new SensorData(10, "109", "wash-machine", 18006000L), "sensorData");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
-        
+
         runtime.getEventService().sendEventBean(new SensorData(10, "105", "mic", 18007000L), "sensorData");
         timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
+    }
+
+    public void generateEvents(EPRuntime runtime) {
+
+        streamWildTrackDataset(runtime);
+
         /**************************************************************************** */
 
         /**************************************************************************** */

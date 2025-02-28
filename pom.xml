@@ -1,31 +1,102 @@
 <project>
-    <modelVersion>4.0.0</modelVersion>
-    <parent>
-        <groupId>com.espertech</groupId>
-        <artifactId>esper-examples-parent</artifactId>
-        <version>9.0.0</version>
-    </parent>
     <properties>
-        <rootPath>${project.parent.parent.basedir}</rootPath>
+        <maven.compiler.plugin.version>3.8.1</maven.compiler.plugin.version>
+        <maven.surefire.plugin.version>3.0.0-M7</maven.surefire.plugin.version>
+        <maven.jar.plugin.version>3.2.0</maven.jar.plugin.version>
+        <antlr4-runtime.version>4.13.1</antlr4-runtime.version>  
+        <slf4j-api.version>1.7.36</slf4j-api.version>  
+        <reload4j.version>1.2.25</reload4j.version>  
+        <junit.version>4.13.2</junit.version>  
     </properties>
-    <name>Esper Examples - IOT</name>
+    <groupId>com.espertech</groupId>
     <artifactId>esper-example-IOT</artifactId>
+    <version>1.0.0</version>
+
+    <modelVersion>4.0.0</modelVersion>
+    <name>Esper Examples - IOT</name>
     <packaging>jar</packaging>
     <description>Esper Example IOT</description>
     <dependencies>
         <dependency>
+            <groupId>com.espertech</groupId>
+            <artifactId>esper-common</artifactId>
+            <version>9.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.espertech</groupId>
+            <artifactId>esper-compiler</artifactId>
+            <version>9.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.espertech</groupId>
+            <artifactId>esper-runtime</artifactId>
+            <version>9.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr4-runtime</artifactId>
+            <version>${antlr4-runtime.version}</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.slf4j/slf4j-api -->
+        <dependency>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-nop</artifactId>
-            <version>2.0.9</version>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.16</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.reload4j</groupId>
+            <artifactId>reload4j</artifactId>
+            <version>${reload4j.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>javax.jms</groupId>
+                    <artifactId>jms</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.sun.jdmk</groupId>
+                    <artifactId>jmxtools</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.sun.jmx</groupId>
+                    <artifactId>jmxri</artifactId>
+                </exclusion>
+            </exclusions>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>2.15.2</version>
         </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.9</version>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.1.1</version>
+                <executions>
+                    <execution>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>

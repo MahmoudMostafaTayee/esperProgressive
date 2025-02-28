@@ -1,3 +1,6 @@
+/*
+    mvn clean install -Dcheckstyle.skip=true
+ */
 package com.espertech.esper.example.IOT;
 
 import com.espertech.esper.common.client.configuration.Configuration;
