@@ -111,22 +111,6 @@ public class IotStreamGenerator {
     }
 
     public void generateEvents(EPRuntime runtime) {
-
         streamWildTrackDataset(runtime);
-
-        /**************************************************************************** */
-
-        /**************************************************************************** */
-        // /*This is to advance with a column; here timestamp. */
-        // // Advance time based on the difference between the event time and the last event time
-        // long timeToAdvance = sensorData.getTimestamp() - lastEventTime;
-        
-        // // If there's a time difference, advance time
-        // if (timeToAdvance > 0) {
-        //     runtime.getEventService().advanceTime(lastEventTime);
-        // }
-    
-        // lastEventTime = sensorData.getTimestamp();
-        /**************************************************************************** */
     }
 }
