@@ -10,16 +10,10 @@ import com.espertech.esper.example.IOT.PersonView.PersonView;
 import com.espertech.esper.example.IOT.EmbeddingFeature.EmbeddingFeature;
 import com.espertech.esper.runtime.client.EPRuntime;
 import java.io.IOException;
-
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 import java.io.File;
-
-import java.util.Arrays;
-import java.util.stream.Collectors;
-
 import java.util.ArrayList;
-import java.util.List;
 
 public class IotStreamGenerator {
     // Fixed time step (1 second) to advance time after each event
@@ -122,32 +116,39 @@ public class IotStreamGenerator {
     }
 
     private void streamEmbeddingFeatures(EPRuntime runtime){
+        String directoryPath = "/home/mahmoud-tayee/Masters/AIC24_Track1_YACHIYO_RIIPS/EmbedFeature/scene_001/camera_0001";
 
-        try {
-            INDArray data = Nd4j.createFromNpyFile(new File("/home/mahmoud-tayee/Masters/AIC24_Track1_YACHIYO_RIIPS/EmbedFeature/scene_001/camera_0001/feature_1_1_716_748_239_309_09949760437011719.npy"));
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(Paths.get(directoryPath), "*.npy")) {
+            for (Path entry : stream) {
+                try {
+                    File npyFile = entry.toFile(); // Convert Path to File dynamically
+                    INDArray data = Nd4j.createFromNpyFile(npyFile);
 
-            // Convert float[] to List<Float> manually
-            float[] featureArray = data.toFloatVector();
-            List<Float> featureList = new ArrayList<>();
-            for (float value : featureArray) {
-                featureList.add(value);
+                    // Convert float[] to List<Float> manually
+                    float[] featureArray = data.toFloatVector();
+                    List<Float> featureList = new ArrayList<>();
+                    for (float value : featureArray) {
+                        featureList.add(value);
+                    }
+
+                    // Send event with List<Float>
+                    runtime.getEventService().sendEventBean(new EmbeddingFeature(timeTracker, featureList), "embeddingFeature");
+
+                    timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
+
+                } catch (Exception e) {
+                    System.err.println("Error processing file: " + entry.getFileName() + " - " + e.getMessage());
+                    e.printStackTrace();
+                }
             }
-
-            // Send event with List<Float>
-            runtime.getEventService().sendEventBean(new EmbeddingFeature(timeTracker, featureList), "embeddingFeature");
-
-            timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
-
-            System.out.println("Loaded .npy file: " + data);
-        } catch (Exception e) {
-            System.err.println("Error loading .npy file: " + e.getMessage());
+        } catch (IOException e) {
+            System.err.println("Error accessing directory: " + e.getMessage());
             e.printStackTrace();
         }
-
     }
 
     public void generateEvents(EPRuntime runtime) {
-        streamWildTrackDataset(runtime);
+//        streamWildTrackDataset(runtime);
         streamEmbeddingFeatures(runtime);
     }
 }
