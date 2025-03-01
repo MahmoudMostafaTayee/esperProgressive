@@ -14,6 +14,8 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class IotStreamGenerator {
     // Fixed time step (1 second) to advance time after each event
@@ -118,26 +120,51 @@ public class IotStreamGenerator {
     private void streamEmbeddingFeatures(EPRuntime runtime){
         String directoryPath = "/home/mahmoud-tayee/Masters/AIC24_Track1_YACHIYO_RIIPS/EmbedFeature/scene_001/camera_0001";
 
+        // Define regex pattern for extracting filename parts
+        Pattern pattern = Pattern.compile("feature_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+\\.?\\d*)\\.npy");
+
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(Paths.get(directoryPath), "*.npy")) {
             for (Path entry : stream) {
+                String fileName = entry.getFileName().toString();
+                Matcher matcher = pattern.matcher(fileName);
+
+                if (!matcher.matches()) {
+                    System.err.println("Skipping file (invalid format): " + fileName);
+                    continue;
+                }
+
                 try {
-                    File npyFile = entry.toFile(); // Convert Path to File dynamically
+                    File npyFile = entry.toFile();
                     INDArray data = Nd4j.createFromNpyFile(npyFile);
 
-                    // Convert float[] to List<Float> manually
+                    // Convert to List<Float>
                     float[] featureArray = data.toFloatVector();
                     List<Float> featureList = new ArrayList<>();
                     for (float value : featureArray) {
                         featureList.add(value);
                     }
 
-                    // Send event with List<Float>
-                    runtime.getEventService().sendEventBean(new EmbeddingFeature(timeTracker, featureList), "embeddingFeature");
+                    // Extract values from filename
+                    int curFrame = Integer.parseInt(matcher.group(1));
+                    int uNum = Integer.parseInt(matcher.group(2));
+                    int x1 = Integer.parseInt(matcher.group(3));
+                    int x2 = Integer.parseInt(matcher.group(4));
+                    int y1 = Integer.parseInt(matcher.group(5));
+                    int y2 = Integer.parseInt(matcher.group(6));
+                    float conf = Float.parseFloat(matcher.group(7));
+
+                    // Send event
+                    runtime.getEventService().sendEventBean(
+                            new EmbeddingFeature(timeTracker, featureList, curFrame, uNum, x1, x2, y1, y2, conf),
+                            "embeddingFeature"
+                    );
 
                     timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
 
+                    System.out.println("Processed: " + fileName);
+
                 } catch (Exception e) {
-                    System.err.println("Error processing file: " + entry.getFileName() + " - " + e.getMessage());
+                    System.err.println("Error processing file: " + fileName + " - " + e.getMessage());
                     e.printStackTrace();
                 }
             }
