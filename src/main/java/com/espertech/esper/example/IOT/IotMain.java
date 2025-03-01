@@ -57,8 +57,8 @@ public class IotMain implements Runnable {
         // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData output last every 2 seconds;";
         // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(4);";
         // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(5);";
-        compileDeployAddListener(   
-                                    eplQuery, 
+        compileDeployAddListener(
+                                    eplQuery,
                                     new GenericIotEventListener("Out sensorData every 4 seconds Event")
                                 );
 
@@ -84,15 +84,15 @@ public class IotMain implements Runnable {
          "deviceCommand#time(5 sec) C " +
          "where D.deviceId = C.deviceId;";
          */
-        
-        compileDeployAddListener(   
-                                    eplQuery, 
+
+        compileDeployAddListener(
+                                    eplQuery,
                                     new GenericIotEventListener("Combined event")
                                 );
 
         eplQuery = "select * from personView;";
-        compileDeployAddListener(   
-                                    eplQuery, 
+        compileDeployAddListener(
+                                    eplQuery,
                                     new GenericIotEventListener("personView raw event")
                                 );
 
@@ -155,6 +155,11 @@ public class IotMain implements Runnable {
             );
         }
 
+        eplQuery = "select * from embeddingFeature;";
+        compileDeployAddListener(
+                eplQuery,
+                new GenericIotEventListener("embeddingFeature raw event")
+        );
 
         add_generator(new IotStreamGenerator());
         

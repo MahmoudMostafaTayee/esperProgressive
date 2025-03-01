@@ -12,11 +12,9 @@ public class PersonView {
     private int positionID;
     private List<View> views;
 
-    // Default constructor
     public PersonView() {
     }
 
-    // Constructor with annotations
     @JsonCreator
     public PersonView(
             @JsonProperty("timeStamp") long timeStamp,
