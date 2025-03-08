@@ -16,7 +16,6 @@ public class IotMain implements Runnable {
 
     private final String runtimeURI;
     static private EPRuntime runtime;
-    private Configuration configuration;
 
     public static void main(String[] args) {
         new IotMain("IotEventRuntime").run();
@@ -26,19 +25,35 @@ public class IotMain implements Runnable {
         this.runtimeURI = runtimeURI;
     }
 
+    /**
+     * Initiates the Esper runtime with the provided runtime URI and configuration.
+     * This method gets the configuration from {@link EventEPLUtil#getConfiguration()},
+     * Gets the runtime from the
+     * configuration and initializes it.
+     */
     private void initiateRunTime(){
-        configuration = EventEPLUtil.getConfiguration();
+        Configuration configuration = EventEPLUtil.getConfiguration();
         log.info("Setting up runtime");
 
         runtime = EPRuntimeProvider.getRuntime(runtimeURI, configuration);
         runtime.initialize();
     }
 
+    /**
+     * Adds a generator to send events to the runtime.
+     * @param generator the generator to add
+     */
     private void add_generator(IotStreamGenerator generator){
         log.info("Generating and sending events with time advancement");
         generator.generateEvents(runtime);
     }
 
+
+    /**
+     * Compile-deploy the given EPL query and add the listener to the resulting EPStatement.
+     * @param eplQuery the EPL query to compile and deploy
+     * @param listener the listener to add to the resulting EPStatement
+     */
     private static void compileDeployAddListener(String eplQuery, UpdateListener listener){
         EventEPLUtil.compileDeployAddListener(  runtime, 
                                                 eplQuery, 
@@ -51,7 +66,7 @@ public class IotMain implements Runnable {
 
     public void run() {
         initiateRunTime();
-        
+
 //        someExampleQueries();
 //        wildTrackDatasetQueries();
 
