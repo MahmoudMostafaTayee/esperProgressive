@@ -81,17 +81,29 @@ public class IotMain implements Runnable {
     private void embeddingFeatureQueries(){
         String batchEpl = "insert into EmbeddingWindow select * from embeddingFeature#time_batch(2 sec)";
 //        compileDeploy(batchEpl);
-        compileDeployAddListener(batchEpl, new GenericIotEventListener("Time Batch"));
+        compileDeployAddListener(batchEpl, new GenericIotEventListener("Embedding features Time Batch"));
 
         String similarityEpl = "insert into SimilarityPairs " +
                 "select a.curFrame as frame1, a.UNum as id1, " +
                 "       b.curFrame as frame2, b.UNum as id2, " +
-                "       com.espertech.esper.example.IOT.helpers.SimilarityUtils.cosineSimilarity(a.features, b.features) as similarity " +
+                "       com.espertech.esper.example.IOT.helpers.SimilarityUtils.cosineSimilarity(a.features, b.features) as similarity, " +
+                "       com.espertech.esper.example.IOT.helpers.SpatialFunctions.iou(a, b) as iou " +
                 "from embeddingFeature#time_batch(2 sec) as a, embeddingFeature#time_batch(2 sec) as b " +
                 "where a.UNum < b.UNum " + /* Avoid duplicate comparisons */
                 "and a.curFrame != b.curFrame "; /* Avoid comparing same individuals from the same frame */
 
         compileDeployAddListener(similarityEpl, new GenericIotEventListener("cosine similarity calculation"));
+
+        String clusterEpl = "insert into PotentialClusters " +
+                "select * from SimilarityPairs " +
+                "match_recognize ( " +
+                "  measures A.id1 as id1, A.id2 as id2 " +
+                "  pattern (A) " +
+                "  define A as A.similarity > 0.8" + /* Similarity threshold */
+                "  and iou > 0.3" + /* Spatial overlap threshold */
+                ")";
+
+        compileDeployAddListener(clusterEpl, new GenericIotEventListener("Potential Cluster"));
     }
     private void wildTrackDatasetQueries(){
         String eplQuery;
