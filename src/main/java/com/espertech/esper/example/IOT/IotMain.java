@@ -79,7 +79,7 @@ public class IotMain implements Runnable {
     }
 
     private void embeddingFeatureQueries(){
-        String batchEpl = "insert into EmbeddingWindow select * from embeddingFeature#time_batch(5 sec)";
+        String batchEpl = "insert into EmbeddingWindow select * from embeddingFeature#time_batch(2 sec)";
 //        compileDeploy(batchEpl);
         compileDeployAddListener(batchEpl, new GenericIotEventListener("Time Batch"));
 
@@ -87,8 +87,9 @@ public class IotMain implements Runnable {
                 "select a.curFrame as frame1, a.UNum as id1, " +
                 "       b.curFrame as frame2, b.UNum as id2, " +
                 "       com.espertech.esper.example.IOT.helpers.SimilarityUtils.cosineSimilarity(a.features, b.features) as similarity " +
-                "from EmbeddingWindow#time(5 sec) as a, EmbeddingWindow#time(5 sec) as b " +
-                "where a.UNum < b.UNum";  // Avoid duplicate comparisons
+                "from embeddingFeature#time_batch(2 sec) as a, embeddingFeature#time_batch(2 sec) as b " +
+                "where a.UNum < b.UNum " + /* Avoid duplicate comparisons */
+                "and a.curFrame != b.curFrame "; /* Avoid comparing same individuals from the same frame */
 
         compileDeployAddListener(similarityEpl, new GenericIotEventListener("cosine similarity calculation"));
     }
@@ -201,24 +202,5 @@ public class IotMain implements Runnable {
         );
     }
 
-        public static double cosineSimilarity(List<Float> features1, List<Float> features2) {
-            if (features1 == null || features2 == null || features1.size() != features2.size()) {
-                throw new IllegalArgumentException("Feature lists must be non-null and of the same size");
-            }
-
-            double dotProduct = 0.0;
-            double normA = 0.0;
-            double normB = 0.0;
-
-            for (int i = 0; i < features1.size(); i++) {
-                float f1 = features1.get(i);
-                float f2 = features2.get(i);
-                dotProduct += f1 * f2;
-                normA += f1 * f1;
-                normB += f2 * f2;
-            }
-
-            return (normA == 0 || normB == 0) ? 0 : (dotProduct / (Math.sqrt(normA) * Math.sqrt(normB)));
-        }
 }
 

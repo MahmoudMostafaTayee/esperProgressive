@@ -146,6 +146,7 @@ public class IotStreamGenerator {
                         // Sort files based on filename
                         files.sort(Comparator.comparing(p -> p.getFileName().toString()));
 
+                        int prevFrame = 1;  // Track previous frame number
                         for (Path entry : files) {
                             String fileName = entry.getFileName().toString();
                             Matcher matcher = pattern.matcher(fileName);
@@ -175,13 +176,17 @@ public class IotStreamGenerator {
                                 int y2 = Integer.parseInt(matcher.group(6));
                                 float conf = Float.parseFloat(matcher.group(7));
 
+                                // Advance time only if the frame number changes
+                                if (curFrame != prevFrame) {
+                                    timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
+                                    prevFrame = curFrame;  // Update previous frame number
+                                }
+
                                 // Send event
                                 runtime.getEventService().sendEventBean(
                                         new EmbeddingFeature(timeTracker, featureList, curFrame, uNum, x1, x2, y1, y2, conf),
                                         "embeddingFeature"
                                 );
-
-                                timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
 
                                 System.out.println("Processed: " + sceneCameraPath + "/" + fileName);
 
