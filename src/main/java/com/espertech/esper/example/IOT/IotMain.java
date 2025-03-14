@@ -10,6 +10,7 @@ import com.espertech.esper.runtime.client.UpdateListener;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.util.List;
 
 public class IotMain implements Runnable {
     private static final Logger log = LoggerFactory.getLogger(IotMain.class);
@@ -78,12 +79,18 @@ public class IotMain implements Runnable {
     }
 
     private void embeddingFeatureQueries(){
-        String eplQuery;
-        eplQuery = "select * from embeddingFeature;";
-        compileDeployAddListener(
-                eplQuery,
-                new GenericIotEventListener("embeddingFeature raw event")
-        );
+        String batchEpl = "insert into EmbeddingWindow select * from embeddingFeature#time_batch(5 sec)";
+//        compileDeploy(batchEpl);
+        compileDeployAddListener(batchEpl, new GenericIotEventListener("Time Batch"));
+
+        String similarityEpl = "insert into SimilarityPairs " +
+                "select a.curFrame as frame1, a.UNum as id1, " +
+                "       b.curFrame as frame2, b.UNum as id2, " +
+                "       com.espertech.esper.example.IOT.helpers.SimilarityUtils.cosineSimilarity(a.features, b.features) as similarity " +
+                "from EmbeddingWindow#time(5 sec) as a, EmbeddingWindow#time(5 sec) as b " +
+                "where a.UNum < b.UNum";  // Avoid duplicate comparisons
+
+        compileDeployAddListener(similarityEpl, new GenericIotEventListener("cosine similarity calculation"));
     }
     private void wildTrackDatasetQueries(){
         String eplQuery;
@@ -193,4 +200,25 @@ public class IotMain implements Runnable {
                 new GenericIotEventListener("Combined event")
         );
     }
+
+        public static double cosineSimilarity(List<Float> features1, List<Float> features2) {
+            if (features1 == null || features2 == null || features1.size() != features2.size()) {
+                throw new IllegalArgumentException("Feature lists must be non-null and of the same size");
+            }
+
+            double dotProduct = 0.0;
+            double normA = 0.0;
+            double normB = 0.0;
+
+            for (int i = 0; i < features1.size(); i++) {
+                float f1 = features1.get(i);
+                float f2 = features2.get(i);
+                dotProduct += f1 * f2;
+                normA += f1 * f1;
+                normB += f2 * f2;
+            }
+
+            return (normA == 0 || normB == 0) ? 0 : (dotProduct / (Math.sqrt(normA) * Math.sqrt(normB)));
+        }
 }
+

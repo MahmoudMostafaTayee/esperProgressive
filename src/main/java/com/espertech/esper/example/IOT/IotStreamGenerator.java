@@ -16,6 +16,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Comparator;
 
 public class IotStreamGenerator {
     // Fixed time step (1 second) to advance time after each event
@@ -134,53 +135,60 @@ public class IotStreamGenerator {
                         String sceneCameraPath = scene.getFileName() + "/" + camera.getFileName();
                         System.out.println("Processing: " + sceneCameraPath);
 
+                        // Collect files into a list and sort them
+                        List<Path> files = new ArrayList<>();
                         try (DirectoryStream<Path> stream = Files.newDirectoryStream(camera, "*.npy")) {
                             for (Path entry : stream) {
-                                String fileName = entry.getFileName().toString();
-                                Matcher matcher = pattern.matcher(fileName);
-
-                                if (!matcher.matches()) {
-                                    System.err.println("Skipping file (invalid format): " + fileName);
-                                    continue;
-                                }
-
-                                try {
-                                    File npyFile = entry.toFile();
-                                    INDArray data = Nd4j.createFromNpyFile(npyFile);
-
-                                    // Convert to List<Float>
-                                    float[] featureArray = data.toFloatVector();
-                                    List<Float> featureList = new ArrayList<>();
-                                    for (float value : featureArray) {
-                                        featureList.add(value);
-                                    }
-
-                                    // Extract values from filename
-                                    int curFrame = Integer.parseInt(matcher.group(1));
-                                    int uNum = Integer.parseInt(matcher.group(2));
-                                    int x1 = Integer.parseInt(matcher.group(3));
-                                    int x2 = Integer.parseInt(matcher.group(4));
-                                    int y1 = Integer.parseInt(matcher.group(5));
-                                    int y2 = Integer.parseInt(matcher.group(6));
-                                    float conf = Float.parseFloat(matcher.group(7));
-
-                                    // Send event
-                                    runtime.getEventService().sendEventBean(
-                                            new EmbeddingFeature(timeTracker, featureList, curFrame, uNum, x1, x2, y1, y2, conf),
-                                            "embeddingFeature"
-                                    );
-
-                                    timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
-
-                                    System.out.println("Processed: " + sceneCameraPath + "/" + fileName);
-
-                                } catch (Exception e) {
-                                    System.err.println("Error processing file: " + fileName + " - " + e.getMessage());
-                                    e.printStackTrace();
-                                }
+                                files.add(entry);
                             }
-                        } catch (IOException e) {
-                            System.err.println("Error accessing camera directory: " + camera + " - " + e.getMessage());
+                        }
+
+                        // Sort files based on filename
+                        files.sort(Comparator.comparing(p -> p.getFileName().toString()));
+
+                        for (Path entry : files) {
+                            String fileName = entry.getFileName().toString();
+                            Matcher matcher = pattern.matcher(fileName);
+
+                            if (!matcher.matches()) {
+                                System.err.println("Skipping file (invalid format): " + fileName);
+                                continue;
+                            }
+
+                            try {
+                                File npyFile = entry.toFile();
+                                INDArray data = Nd4j.createFromNpyFile(npyFile);
+
+                                // Convert to List<Float>
+                                float[] featureArray = data.toFloatVector();
+                                List<Float> featureList = new ArrayList<>();
+                                for (float value : featureArray) {
+                                    featureList.add(value);
+                                }
+
+                                // Extract values from filename
+                                int curFrame = Integer.parseInt(matcher.group(1));
+                                int uNum = Integer.parseInt(matcher.group(2));
+                                int x1 = Integer.parseInt(matcher.group(3));
+                                int x2 = Integer.parseInt(matcher.group(4));
+                                int y1 = Integer.parseInt(matcher.group(5));
+                                int y2 = Integer.parseInt(matcher.group(6));
+                                float conf = Float.parseFloat(matcher.group(7));
+
+                                // Send event
+                                runtime.getEventService().sendEventBean(
+                                        new EmbeddingFeature(timeTracker, featureList, curFrame, uNum, x1, x2, y1, y2, conf),
+                                        "embeddingFeature"
+                                );
+
+                                timeTracker = advanceTime(runtime, timeTracker, oneSecTimeStep);
+
+                                System.out.println("Processed: " + sceneCameraPath + "/" + fileName);
+
+                            } catch (Exception e) {
+                                System.err.println("Error processing file: " + fileName + " - " + e.getMessage());
+                                e.printStackTrace();
+                            }
                         }
                     }
                 } catch (IOException e) {
