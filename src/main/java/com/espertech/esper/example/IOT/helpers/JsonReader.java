@@ -2,7 +2,7 @@ package com.espertech.esper.example.IOT.helpers;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.espertech.esper.example.IOT.PersonView.PersonView;
+import com.espertech.esper.example.IOT.streams.PersonView;
 
 import java.io.File;
 import java.io.IOException;

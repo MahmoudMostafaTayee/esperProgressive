@@ -1,4 +1,4 @@
-package com.espertech.esper.example.IOT.PersonView;
+package com.espertech.esper.example.IOT.streams;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;

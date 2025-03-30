@@ -5,8 +5,8 @@ import com.espertech.esper.example.IOT.SensorData.SensorData;
 import java.util.List;
 import java.nio.file.*;
 
-import com.espertech.esper.example.IOT.DeviceCommand.DeviceCommand;
-import com.espertech.esper.example.IOT.PersonView.PersonView;
+import com.espertech.esper.example.IOT.streams.DeviceCommand;
+import com.espertech.esper.example.IOT.streams.PersonView;
 import com.espertech.esper.example.IOT.streams.EmbeddingFeature;
 import com.espertech.esper.runtime.client.EPRuntime;
 import java.io.IOException;

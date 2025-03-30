@@ -1,4 +1,4 @@
-package com.espertech.esper.example.IOT.DeviceCommand;
+package com.espertech.esper.example.IOT.streams;
 
 public class DeviceCommand {
     private String deviceId;
