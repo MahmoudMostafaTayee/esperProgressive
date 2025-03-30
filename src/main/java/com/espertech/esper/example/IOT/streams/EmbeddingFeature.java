@@ -1,4 +1,4 @@
-package com.espertech.esper.example.IOT.EmbeddingFeature;
+package com.espertech.esper.example.IOT.streams;
 
 import java.util.List;
 

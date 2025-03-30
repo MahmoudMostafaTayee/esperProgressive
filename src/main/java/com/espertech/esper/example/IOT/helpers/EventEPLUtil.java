@@ -3,7 +3,7 @@ package com.espertech.esper.example.IOT.helpers;
 import com.espertech.esper.example.IOT.SensorData.SensorData;
 import com.espertech.esper.example.IOT.DeviceCommand.DeviceCommand;
 import com.espertech.esper.example.IOT.PersonView.PersonView;
-import com.espertech.esper.example.IOT.EmbeddingFeature.EmbeddingFeature;
+import com.espertech.esper.example.IOT.streams.EmbeddingFeature;
 import com.espertech.esper.common.client.EPCompiled;
 import com.espertech.esper.common.client.configuration.Configuration;
 import com.espertech.esper.common.client.util.NameAccessModifier;

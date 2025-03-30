@@ -1,6 +1,6 @@
 package com.espertech.esper.example.IOT.helpers;
 
-import com.espertech.esper.example.IOT.EmbeddingFeature.EmbeddingFeature;
+import com.espertech.esper.example.IOT.streams.EmbeddingFeature;
 
 public class SpatialFunctions {
 

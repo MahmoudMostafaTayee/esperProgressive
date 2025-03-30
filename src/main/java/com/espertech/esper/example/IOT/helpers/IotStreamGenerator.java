@@ -7,7 +7,7 @@ import java.nio.file.*;
 
 import com.espertech.esper.example.IOT.DeviceCommand.DeviceCommand;
 import com.espertech.esper.example.IOT.PersonView.PersonView;
-import com.espertech.esper.example.IOT.EmbeddingFeature.EmbeddingFeature;
+import com.espertech.esper.example.IOT.streams.EmbeddingFeature;
 import com.espertech.esper.runtime.client.EPRuntime;
 import java.io.IOException;
 import org.nd4j.linalg.api.ndarray.INDArray;
