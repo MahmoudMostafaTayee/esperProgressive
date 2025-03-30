@@ -25,9 +25,9 @@ public class ClustersListeners {
         private long clustream_clustering_time_tracker = 0;
         private int cluster_number = 0;
 
-        public CluStreamListener() {
+        public CluStreamListener(int numClusters) {
             cluStream.prepareForUse();
-            cluStream.maxNumKernelsOption.setValue(7);
+            cluStream.maxNumKernelsOption.setValue(numClusters);
             cluStream.resetLearningImpl();
         }
 
