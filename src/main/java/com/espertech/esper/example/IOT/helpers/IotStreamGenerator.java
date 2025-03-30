@@ -1,10 +1,10 @@
-package com.espertech.esper.example.IOT;
+package com.espertech.esper.example.IOT.helpers;
 
 import com.espertech.esper.example.IOT.SensorData.SensorData;
 
 import java.util.List;
 import java.nio.file.*;
-import com.espertech.esper.example.IOT.helpers.JsonReader;
+
 import com.espertech.esper.example.IOT.DeviceCommand.DeviceCommand;
 import com.espertech.esper.example.IOT.PersonView.PersonView;
 import com.espertech.esper.example.IOT.EmbeddingFeature.EmbeddingFeature;

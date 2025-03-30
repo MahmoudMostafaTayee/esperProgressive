@@ -1,4 +1,4 @@
-package com.espertech.esper.example.IOT;
+package com.espertech.esper.example.IOT.helpers;
 
 import com.espertech.esper.example.IOT.SensorData.SensorData;
 import com.espertech.esper.example.IOT.DeviceCommand.DeviceCommand;
