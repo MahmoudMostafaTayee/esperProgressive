@@ -60,10 +60,7 @@ public class IotMain implements Runnable {
      * @param eplQuery    the EPL query to compile and deploy
      * @param streamName  the name of the stream to which the listener will listen
      */
-    private static void compileDeployAddListener(String eplQuery, String streamName) {
-        // Create a listener that listens to the events of the stream
-        UpdateListener listener = new GenericIotEventListener(streamName);
-
+    private static void compileDeployAddListener(String eplQuery, UpdateListener listener) {
         // Compile and deploy the given EPL query
         EventEPLUtil.compileDeployAddListener(
                 runtime,
@@ -111,7 +108,7 @@ public class IotMain implements Runnable {
     private void embeddingFeatureQueries(){
         String batchEpl = "insert into EmbeddingWindow select * from embeddingFeature#time_batch(2 sec)";
 //        compileDeploy(batchEpl);
-        compileDeployAddListener(batchEpl, "Embedding features Time Batch");
+        compileDeployAddListener(batchEpl, new GenericIotEventListener("Embedding features Time Batch"));
 
         String featureBatchEPL =
                 "select features, UNum " +
@@ -134,7 +131,7 @@ public class IotMain implements Runnable {
                 "where a.UNum < b.UNum " + /* Avoid duplicate comparisons */
                 "and a.curFrame != b.curFrame "; /* Avoid comparing same individuals from the same frame */
 
-        compileDeployAddListener(similarityEpl, "cosine similarity calculation");
+        compileDeployAddListener(similarityEpl, new GenericIotEventListener("cosine similarity calculation"));
         String clusterEpl = "insert into PotentialClusters " +
                 "select * from SimilarityPairs " +
                 "match_recognize ( " +
@@ -144,14 +141,14 @@ public class IotMain implements Runnable {
                 "  and iou > 0.3" + /* Spatial overlap threshold */
                 ")";
 
-        compileDeployAddListener(clusterEpl,"Potential Cluster");
+        compileDeployAddListener(clusterEpl,new GenericIotEventListener("Potential Cluster"));
     }
     private void wildTrackDatasetQueries(){
         String eplQuery;
         eplQuery = "select * from personView;";
         compileDeployAddListener(
                 eplQuery,
-                "personView raw event"
+                new GenericIotEventListener("personView raw event")
         );
 
         // Loop through all view numbers (0 to 6)
@@ -209,7 +206,7 @@ public class IotMain implements Runnable {
             // Deploy the query and add the listener with the dynamically generated name
             compileDeployAddListener(
                     OverlappingDetections,
-                    "OverlappingDetections for view Number " + viewNumberCounter
+                    new GenericIotEventListener("OverlappingDetections for view Number " + viewNumberCounter)
             );
         }
     }
@@ -223,7 +220,7 @@ public class IotMain implements Runnable {
         // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(5);";
         compileDeployAddListener(
                 eplQuery,
-                "Out sensorData every 4 seconds Event"
+                new GenericIotEventListener("Out sensorData every 4 seconds Event")
         );
 
         eplQuery = "insert into CombinedEvent(deviceId, type, command, value, timestamp)" +
@@ -251,7 +248,7 @@ public class IotMain implements Runnable {
 
         compileDeployAddListener(
                 eplQuery,
-                "Combined event"
+                new GenericIotEventListener("Combined event")
         );
     }
 
