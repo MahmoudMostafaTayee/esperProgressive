@@ -128,7 +128,16 @@ public class IotStreamGenerator {
             for (Path scene : scenes) {
                 if (!Files.isDirectory(scene)) continue;
 
-                try (DirectoryStream<Path> cameras = Files.newDirectoryStream(scene)) {
+                try (DirectoryStream<Path> camerasStream = Files.newDirectoryStream(scene)) {
+                    List<Path> cameras = new ArrayList<>();
+                    for (Path camera : camerasStream) {
+                        if (Files.isDirectory(camera)) {
+                            cameras.add(camera);
+                        }
+                    }
+
+                    // Sort the list (alphabetically by default)
+                    cameras.sort(Comparator.naturalOrder());
                     for (Path camera : cameras) {
                         if (!Files.isDirectory(camera)) continue;
 
