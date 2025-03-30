@@ -5,7 +5,6 @@ import com.yahoo.labs.samoa.instances.*;
 import moa.cluster.Cluster;
 import moa.cluster.Clustering;
 import moa.clusterers.clustream.Clustream;
-import moa.clusterers.clustree.ClusTree;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import smile.clustering.HierarchicalClustering;
@@ -17,14 +16,14 @@ import java.util.*;
 public class ClustersUtils {
     private static final Logger log = LoggerFactory.getLogger(EventEPLUtil.class);
 
-    public static class CluStreamListener {
+    public static class CluStream {
         private final Clustream cluStream = new Clustream();
         private final Map<Integer, List<Integer>> clusterToDataIds = new HashMap<>();
         private InstancesHeader cluStreamHeader;
         private long clustream_clustering_time_tracker = 0;
         private int cluster_number = 0;
 
-        public CluStreamListener(int numClusters) {
+        public CluStream(int numClusters) {
             cluStream.prepareForUse();
             cluStream.maxNumKernelsOption.setValue(numClusters);
             cluStream.resetLearningImpl();
@@ -67,7 +66,7 @@ public class ClustersUtils {
         }
     }
 
-    public static class AgglomerativeClusteringListener {
+    public static class AgglomerativeClustering {
         private long agglomerative_clustering_time_tracker = 0;
 
         public UpdateListener agglomerativeListener() {
@@ -100,10 +99,10 @@ public class ClustersUtils {
         }
     }
 
-    public static class ClusTreeListener {
-        private final ClusTree clusTree = new ClusTree();
+    public static class ClusTree {
+        private final moa.clusterers.clustree.ClusTree clusTree = new moa.clusterers.clustree.ClusTree();
 
-        public ClusTreeListener() {
+        public ClusTree() {
             clusTree.prepareForUse();
         }
 

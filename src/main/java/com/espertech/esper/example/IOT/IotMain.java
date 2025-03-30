@@ -96,17 +96,17 @@ public class IotMain implements Runnable {
                 "select features, UNum " +
                 "from embeddingFeature#time_batch(2 sec)";
 
-        ClustersUtils.AgglomerativeClusteringListener agglomerativeListener = new ClustersUtils.AgglomerativeClusteringListener();
+        ClustersUtils.AgglomerativeClustering agglomerativeListener = new ClustersUtils.AgglomerativeClustering();
         compileDeployAddListener(featureBatchEPL, agglomerativeListener.agglomerativeListener());
 
-        ClustersUtils.CluStreamListener cluStreamListener = new ClustersUtils.CluStreamListener(7);
-        compileDeployAddListener(featureBatchEPL, cluStreamListener.cluStreamListener());
+        ClustersUtils.CluStream cluStream = new ClustersUtils.CluStream(7);
+        compileDeployAddListener(featureBatchEPL, cluStream.cluStreamListener());
 
         String featureStreamEPL =
                 "select features, UNum " +
                         "from embeddingFeature";
-        ClustersUtils.ClusTreeListener clusTreeListener = new ClustersUtils.ClusTreeListener();
-        compileDeployAddListener(featureStreamEPL,clusTreeListener.clusTreeListener());
+        ClustersUtils.ClusTree clusTree = new ClustersUtils.ClusTree();
+        compileDeployAddListener(featureStreamEPL, clusTree.clusTreeListener());
 
         String similarityEpl = "insert into SimilarityPairs " +
                 "select a.curFrame as frame1, a.UNum as id1, " +
