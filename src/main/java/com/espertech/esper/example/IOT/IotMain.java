@@ -105,7 +105,7 @@ public class IotMain implements Runnable {
 
         String featureBatchEPL =
                 "select features, UNum " +
-                "from embeddingFeature#time_batch(30 sec)";
+                "from embeddingFeature#time_batch(2 sec)";
 
         compileDeployAddListener_with_Agglomerative_clustering(featureBatchEPL, new GenericIotEventListener("FeatureBatch agglomerative clustering"));
         compileDeployAddListener_with_clu_clustering(featureBatchEPL, new GenericIotEventListener("FeatureStream clu"));
@@ -125,7 +125,6 @@ public class IotMain implements Runnable {
                 "and a.curFrame != b.curFrame "; /* Avoid comparing same individuals from the same frame */
 
         compileDeployAddListener(similarityEpl, new GenericIotEventListener("cosine similarity calculation"));
-
         String clusterEpl = "insert into PotentialClusters " +
                 "select * from SimilarityPairs " +
                 "match_recognize ( " +

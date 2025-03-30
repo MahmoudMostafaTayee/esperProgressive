@@ -10,6 +10,9 @@ import com.espertech.esper.common.client.util.NameAccessModifier;
 import com.espertech.esper.compiler.client.CompilerArguments;
 import com.espertech.esper.compiler.client.EPCompilerProvider;
 import com.espertech.esper.example.IOT.helpers.ClustersListeners;
+import com.espertech.esper.example.IOT.helpers.ClustersListeners.CluStreamListener;
+import com.espertech.esper.example.IOT.helpers.ClustersListeners.AgglomerativeClusteringListener;
+import com.espertech.esper.example.IOT.helpers.ClustersListeners.ClusTreeListener;
 import com.espertech.esper.runtime.client.EPDeployment;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPStatement;
@@ -39,22 +42,22 @@ public class EventEPLUtil {
     public static void compileDeployAddListener_with_Agglomerative_clustering(EPRuntime runtime, String eplQuery, UpdateListener listener){
         EPStatement statement;
         statement = EventEPLUtil.compileDeploy(runtime, eplQuery);
-        ClustersListeners clusterListener = new ClustersListeners();
-        clusterListener.add_listener_with_Agglomerative_clustering(statement, listener);
+        AgglomerativeClusteringListener clusterListener = new AgglomerativeClusteringListener();
+        clusterListener.addListener(statement);
     }
 
     public static void compileDeployAddListener_with_clu_clustering(EPRuntime runtime, String eplQuery, UpdateListener listener){
         EPStatement statement;
         statement = EventEPLUtil.compileDeploy(runtime, eplQuery);
-        ClustersListeners clusterListener = new ClustersListeners();
-        clusterListener.add_listener_with_clu_clustering(statement, listener);
+        CluStreamListener clusterListener = new CluStreamListener();
+        clusterListener.addListener(statement);
     }
 
     public static void compileDeployAddListener_with_ClusTree(EPRuntime runtime, String eplQuery, UpdateListener listener){
         EPStatement statement;
         statement = EventEPLUtil.compileDeploy(runtime, eplQuery);
-        ClustersListeners clusterListener = new ClustersListeners();
-        clusterListener.add_listener_with_ClusTree(statement, listener);
+        ClusTreeListener clusterListener = new ClusTreeListener();
+        clusterListener.addListener(statement);
     }
 
     public static EPStatement compileDeploy(EPRuntime runtime, String epl) {

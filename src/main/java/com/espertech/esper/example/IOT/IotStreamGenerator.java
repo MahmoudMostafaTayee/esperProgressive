@@ -197,7 +197,7 @@ public class IotStreamGenerator {
                                         "embeddingFeature"
                                 );
 
-                                System.out.println("Processed: " + sceneCameraPath + "/" + fileName);
+//                                System.out.println("Processed: " + sceneCameraPath + "/" + fileName);
 
                             } catch (Exception e) {
                                 System.err.println("Error processing file: " + fileName + " - " + e.getMessage());
