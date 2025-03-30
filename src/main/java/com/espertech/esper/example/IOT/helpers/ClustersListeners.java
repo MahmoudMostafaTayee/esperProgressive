@@ -18,7 +18,7 @@ import java.util.AbstractMap.SimpleEntry;
 
 import java.util.*;
 
-public class ClustreamListener {
+public class ClustersListeners {
     private static final Logger log = LoggerFactory.getLogger(EventEPLUtil.class);
     static Clustream cluStream;
     static int cluster_number;
