@@ -2,6 +2,7 @@ package com.espertech.esper.example.IOT.helpers;
 
 import com.espertech.esper.common.client.EventBean;
 import com.espertech.esper.example.IOT.EventEPLUtil;
+import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPStatement;
 import com.yahoo.labs.samoa.instances.*;
 import moa.cluster.Cluster;
@@ -31,41 +32,43 @@ public class ClustersListeners {
             cluStream.resetLearningImpl();
         }
 
+        public void cluStreamListener(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime) {
+            if (newEvents != null) {
+                if (cluStreamHeader == null) {
+                    List<Float> firstFeature = (List<Float>) newEvents[0].get("features");
+                    cluStreamHeader = createHeader(firstFeature.size());
+                    cluStream.setModelContext(cluStreamHeader);
+                }
+
+                for (EventBean e : newEvents) {
+                    List<Float> featureList = (List<Float>) e.get("features");
+                    Integer id = (Integer) e.get("UNum");
+                    Instance instance = convertFeatureToInstance(featureList, cluStreamHeader);
+                    long start = System.nanoTime();
+                    cluStream.trainOnInstance(instance);
+                    long durationMs = (System.nanoTime() - start) / 1_000_000;
+                    clustream_clustering_time_tracker += durationMs;
+                    Clustering clustering = cluStream.getMicroClusteringResult();
+                    int assignedCluster = getNearestCluster(clustering, instance);
+                    if(assignedCluster == -1){
+                        assignedCluster = cluster_number;
+                    }
+                    clusterToDataIds.computeIfAbsent(assignedCluster, k -> new ArrayList<>()).add(id);
+                    if ((clustering == null) || (clustering.getClustering().isEmpty())) {
+                        System.out.println(("CluStream Initializing id number " + id + " as cluster " + cluster_number));
+                        cluster_number++;
+                        continue;
+                    }
+
+                    System.out.println("CluStream Data ID: " + id + " assigned to cluster: " + assignedCluster);
+                }
+                System.out.println("CluStream Clustering Time: " + clustream_clustering_time_tracker + " ms");
+            }
+        }
+
         public void addListener(EPStatement statement) {
             if (statement != null) {
-                statement.addListener((newData, oldData, stat, rt) -> {
-                    if (newData != null) {
-                        if (cluStreamHeader == null) {
-                            List<Float> firstFeature = (List<Float>) newData[0].get("features");
-                            cluStreamHeader = createHeader(firstFeature.size());
-                            cluStream.setModelContext(cluStreamHeader);
-                        }
-
-                        for (EventBean e : newData) {
-                            List<Float> featureList = (List<Float>) e.get("features");
-                            Integer id = (Integer) e.get("UNum");
-                            Instance instance = convertFeatureToInstance(featureList, cluStreamHeader);
-                            long start = System.nanoTime();
-                            cluStream.trainOnInstance(instance);
-                            long durationMs = (System.nanoTime() - start) / 1_000_000;
-                            clustream_clustering_time_tracker += durationMs;
-                            Clustering clustering = cluStream.getMicroClusteringResult();
-                            int assignedCluster = getNearestCluster(clustering, instance);
-                            if(assignedCluster == -1){
-                                assignedCluster = cluster_number;
-                            }
-                            clusterToDataIds.computeIfAbsent(assignedCluster, k -> new ArrayList<>()).add(id);
-                            if ((clustering == null) || (clustering.getClustering().isEmpty())) {
-                                System.out.println(("CluStream Initializing id number " + id + " as cluster " + cluster_number));
-                                cluster_number++;
-                                continue;
-                            }
-
-                            System.out.println("CluStream Data ID: " + id + " assigned to cluster: " + assignedCluster);
-                        }
-                        System.out.println("CluStream Clustering Time: " + clustream_clustering_time_tracker + " ms");
-                    }
-                });
+                statement.addListener(this::cluStreamListener);
             } else {
                 log.error("Statement not found.");
             }
@@ -74,33 +77,35 @@ public class ClustersListeners {
 
     public static class AgglomerativeClusteringListener {
         private long agglomerative_clustering_time_tracker = 0;
+
+        public void agglomerativeListener(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime) {
+            if (newEvents != null) {
+                List<double[]> featureList = new ArrayList<>();
+                List<Integer> idList = new ArrayList<>();
+
+                long start = System.nanoTime();
+                for (EventBean e : newEvents) {
+                    List<Float> feature = (List<Float>) e.get("features");
+                    Integer id = (Integer) e.get("UNum");
+                    featureList.add(feature.stream().mapToDouble(Float::doubleValue).toArray());
+                    idList.add(id);
+                }
+
+                double[][] distanceMatrix = computeCosineDistanceMatrix(featureList.toArray(new double[0][]));
+                HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
+                int[] clusterLabels = hc.partition(0.1);
+                long durationMs = (System.nanoTime() - start) / 1_000_000;
+                agglomerative_clustering_time_tracker += durationMs;
+                System.out.println("Agglomerative Clustering Time: " + agglomerative_clustering_time_tracker + " ms");
+
+                for (int i = 0; i < clusterLabels.length; i++) {
+                    System.out.printf("Agglomerative ID %d => Cluster %d\n", idList.get(i), clusterLabels[i]);
+                }
+            }
+        }
         public void addListener(EPStatement statement) {
             if (statement != null) {
-                statement.addListener((newData, oldData, stmt1, rt) -> {
-                    if (newData != null) {
-                        List<double[]> featureList = new ArrayList<>();
-                        List<Integer> idList = new ArrayList<>();
-
-                        long start = System.nanoTime();
-                        for (EventBean e : newData) {
-                            List<Float> feature = (List<Float>) e.get("features");
-                            Integer id = (Integer) e.get("UNum");
-                            featureList.add(feature.stream().mapToDouble(Float::doubleValue).toArray());
-                            idList.add(id);
-                        }
-
-                        double[][] distanceMatrix = computeCosineDistanceMatrix(featureList.toArray(new double[0][]));
-                        HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
-                        int[] clusterLabels = hc.partition(0.1);
-                        long durationMs = (System.nanoTime() - start) / 1_000_000;
-                        agglomerative_clustering_time_tracker += durationMs;
-                        System.out.println("Agglomerative Clustering Time: " + agglomerative_clustering_time_tracker + " ms");
-
-                        for (int i = 0; i < clusterLabels.length; i++) {
-                            System.out.printf("Agglomerative ID %d => Cluster %d\n", idList.get(i), clusterLabels[i]);
-                        }
-                    }
-                });
+                statement.addListener(this::agglomerativeListener);
             } else {
                 log.error("Statement not found.");
             }
@@ -114,21 +119,23 @@ public class ClustersListeners {
             clusTree.prepareForUse();
         }
 
-        public void addListener(EPStatement statement) {
+        public void clusTreeListener(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime) {
+            if (newEvents != null) {
+                for (EventBean e : newEvents) {
+                    List<Float> feature = (List<Float>) e.get("features");
+                    Integer id = (Integer) e.get("UNum");
+                    Instance instance = convertFeatureToInstance(feature, createHeader(feature.size()));
+                    clusTree.trainOnInstance(instance);
+                    Clustering microClusters = clusTree.getMicroClusteringResult();
+                    int assignedCluster = getNearestCluster(microClusters, instance);
+                    System.out.println("ClusTree Data ID: " + id + " -> Cluster: " + assignedCluster);
+                }
+            }
+        }
+
+            public void addListener(EPStatement statement) {
             if (statement != null) {
-                statement.addListener((newData, oldData, stmt1, rt) -> {
-                    if (newData != null) {
-                        for (EventBean e : newData) {
-                            List<Float> feature = (List<Float>) e.get("features");
-                            Integer id = (Integer) e.get("UNum");
-                            Instance instance = convertFeatureToInstance(feature, createHeader(feature.size()));
-                            clusTree.trainOnInstance(instance);
-                            Clustering microClusters = clusTree.getMicroClusteringResult();
-                            int assignedCluster = getNearestCluster(microClusters, instance);
-                            System.out.println("ClusTree Data ID: " + id + " -> Cluster: " + assignedCluster);
-                        }
-                    }
-                });
+                statement.addListener(this::clusTreeListener);
             } else {
                 log.error("Statement not found.");
             }
