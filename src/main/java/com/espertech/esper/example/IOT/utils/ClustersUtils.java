@@ -1,6 +1,8 @@
 package com.espertech.esper.example.IOT.utils;
 
 import com.espertech.esper.common.client.EventBean;
+import com.espertech.esper.runtime.client.EPRuntime;
+import com.espertech.esper.runtime.client.EPStatement;
 import com.yahoo.labs.samoa.instances.*;
 import moa.cluster.Cluster;
 import moa.cluster.Clustering;
@@ -29,8 +31,7 @@ public class ClustersUtils {
             cluStream.resetLearningImpl();
         }
 
-        public UpdateListener cluStreamListener() {
-            return (newEvents, oldEvents,  statement,  runtime) -> {
+        private void processStreamingClusters(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime) {
                 if (newEvents != null) {
                     if (cluStreamHeader == null) {
                         List<Float> firstFeature = (List<Float>) newEvents[0].get("features");
@@ -62,6 +63,12 @@ public class ClustersUtils {
                     }
                     System.out.println("CluStream Clustering Time: " + clustream_clustering_time_tracker + " ms");
                 }
+        }
+
+        public UpdateListener getListener(){
+            return (newEvents, oldEvents,  statement,  runtime) ->
+            {
+                processStreamingClusters(newEvents, oldEvents,  statement,  runtime);
             };
         }
     }
@@ -69,9 +76,7 @@ public class ClustersUtils {
     public static class AgglomerativeClustering {
         private long agglomerative_clustering_time_tracker = 0;
 
-        public UpdateListener agglomerativeListener() {
-            return (newEvents, oldEvents,  statement,  runtime) ->
-            {
+        private void processStreamingClusters(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime){
                 if (newEvents != null) {
                     List<double[]> featureList = new ArrayList<>();
                     List<Integer> idList = new ArrayList<>();
@@ -95,6 +100,11 @@ public class ClustersUtils {
                         System.out.printf("Agglomerative ID %d => Cluster %d\n", idList.get(i), clusterLabels[i]);
                     }
                 }
+        }
+        public UpdateListener getListener(){
+            return (newEvents, oldEvents,  statement,  runtime) ->
+            {
+                processStreamingClusters(newEvents, oldEvents,  statement,  runtime);
             };
         }
     }
@@ -106,9 +116,7 @@ public class ClustersUtils {
             clusTree.prepareForUse();
         }
 
-        public UpdateListener clusTreeListener() {
-            return (newEvents, oldEvents,  statement,  runtime) ->
-            {
+        private void processStreamingClusters(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime) {
                 if (newEvents != null) {
                     for (EventBean e : newEvents) {
                         List<Float> feature = (List<Float>) e.get("features");
@@ -120,6 +128,12 @@ public class ClustersUtils {
                         System.out.println("ClusTree Data ID: " + id + " -> Cluster: " + assignedCluster);
                     }
                 }
+        }
+
+        public UpdateListener getListener(){
+            return (newEvents, oldEvents,  statement,  runtime) ->
+            {
+                processStreamingClusters(newEvents, oldEvents,  statement,  runtime);
             };
         }
     }
