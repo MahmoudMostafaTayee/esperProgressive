@@ -1,5 +1,7 @@
 /*
     mvn clean install -Dcheckstyle.skip=true
+    mvn clean install -U -DskipTests
+
  */
 package com.espertech.esper.example.IOT;
 
@@ -61,6 +63,24 @@ public class IotMain implements Runnable {
                                                 listener);
     }
 
+    private static void compileDeployAddListener_with_Agglomerative_clustering(String eplQuery, UpdateListener listener){
+        EventEPLUtil.compileDeployAddListener_with_Agglomerative_clustering(  runtime,
+                eplQuery,
+                listener);
+    }
+
+    private static void compileDeployAddListener_with_clu_clustering(String eplQuery, UpdateListener listener){
+        EventEPLUtil.compileDeployAddListener_with_clu_clustering(  runtime,
+                eplQuery,
+                listener);
+    }
+
+    private static void compileDeployAddListener_with_ClusTree(String eplQuery, UpdateListener listener){
+        EventEPLUtil.compileDeployAddListener_with_ClusTree(  runtime,
+                eplQuery,
+                listener);
+    }
+
     private static void compileDeploy(String eplQuery){
         EventEPLUtil.compileDeploy(  runtime, eplQuery);
     }
@@ -82,6 +102,18 @@ public class IotMain implements Runnable {
         String batchEpl = "insert into EmbeddingWindow select * from embeddingFeature#time_batch(2 sec)";
 //        compileDeploy(batchEpl);
         compileDeployAddListener(batchEpl, new GenericIotEventListener("Embedding features Time Batch"));
+
+        String featureBatchEPL =
+                "select features, UNum " +
+                "from embeddingFeature#time_batch(30 sec)";
+
+        compileDeployAddListener_with_Agglomerative_clustering(featureBatchEPL, new GenericIotEventListener("FeatureBatch agglomerative clustering"));
+        compileDeployAddListener_with_clu_clustering(featureBatchEPL, new GenericIotEventListener("FeatureStream clu"));
+
+        String featureStreamEPL =
+                "select features, UNum " +
+                        "from embeddingFeature";
+        compileDeployAddListener_with_ClusTree(featureStreamEPL, new GenericIotEventListener("FeatureStream ClusTree"));
 
         String similarityEpl = "insert into SimilarityPairs " +
                 "select a.curFrame as frame1, a.UNum as id1, " +

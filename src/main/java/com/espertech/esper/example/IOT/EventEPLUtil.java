@@ -14,6 +14,8 @@ import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPStatement;
 import com.espertech.esper.runtime.client.UpdateListener;
 
+import com.espertech.esper.example.IOT.helpers.ClustreamListener;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,6 +35,27 @@ public class EventEPLUtil {
         EPStatement statement;
         statement = EventEPLUtil.compileDeploy(runtime, eplQuery);
         EventEPLUtil.add_listener(statement, listener);
+    }
+
+    public static void compileDeployAddListener_with_Agglomerative_clustering(EPRuntime runtime, String eplQuery, UpdateListener listener){
+        EPStatement statement;
+        statement = EventEPLUtil.compileDeploy(runtime, eplQuery);
+        ClustreamListener clusterListener = new ClustreamListener();
+        clusterListener.add_listener_with_Agglomerative_clustering(statement, listener);
+    }
+
+    public static void compileDeployAddListener_with_clu_clustering(EPRuntime runtime, String eplQuery, UpdateListener listener){
+        EPStatement statement;
+        statement = EventEPLUtil.compileDeploy(runtime, eplQuery);
+        ClustreamListener clusterListener = new ClustreamListener();
+        clusterListener.add_listener_with_clu_clustering(statement, listener);
+    }
+
+    public static void compileDeployAddListener_with_ClusTree(EPRuntime runtime, String eplQuery, UpdateListener listener){
+        EPStatement statement;
+        statement = EventEPLUtil.compileDeploy(runtime, eplQuery);
+        ClustreamListener clusterListener = new ClustreamListener();
+        clusterListener.add_listener_with_ClusTree(statement, listener);
     }
 
     public static EPStatement compileDeploy(EPRuntime runtime, String epl) {
