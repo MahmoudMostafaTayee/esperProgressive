@@ -8,7 +8,7 @@ package com.espertech.esper.example.IOT;
 import com.espertech.esper.common.client.configuration.Configuration;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.example.IOT.utils.IotStreamGenerator;
-import com.espertech.esper.example.IOT.utils.ClustersListeners;
+import com.espertech.esper.example.IOT.utils.ClustersUtils;
 import com.espertech.esper.example.IOT.listeners.GenericIotEventListener;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPRuntimeProvider;
@@ -96,16 +96,16 @@ public class IotMain implements Runnable {
                 "select features, UNum " +
                 "from embeddingFeature#time_batch(2 sec)";
 
-        ClustersListeners.AgglomerativeClusteringListener agglomerativeListener = new ClustersListeners.AgglomerativeClusteringListener();
+        ClustersUtils.AgglomerativeClusteringListener agglomerativeListener = new ClustersUtils.AgglomerativeClusteringListener();
         compileDeployAddListener(featureBatchEPL, agglomerativeListener.agglomerativeListener());
 
-        ClustersListeners.CluStreamListener cluStreamListener = new ClustersListeners.CluStreamListener(7);
+        ClustersUtils.CluStreamListener cluStreamListener = new ClustersUtils.CluStreamListener(7);
         compileDeployAddListener(featureBatchEPL, cluStreamListener.cluStreamListener());
 
         String featureStreamEPL =
                 "select features, UNum " +
                         "from embeddingFeature";
-        ClustersListeners.ClusTreeListener clusTreeListener = new ClustersListeners.ClusTreeListener();
+        ClustersUtils.ClusTreeListener clusTreeListener = new ClustersUtils.ClusTreeListener();
         compileDeployAddListener(featureStreamEPL,clusTreeListener.clusTreeListener());
 
         String similarityEpl = "insert into SimilarityPairs " +

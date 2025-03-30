@@ -14,7 +14,7 @@ import com.espertech.esper.runtime.client.UpdateListener;
 
 import java.util.*;
 
-public class ClustersListeners {
+public class ClustersUtils {
     private static final Logger log = LoggerFactory.getLogger(EventEPLUtil.class);
 
     public static class CluStreamListener {
