@@ -6,13 +6,13 @@
 package com.espertech.esper.example.IOT;
 
 import com.espertech.esper.common.client.configuration.Configuration;
+import com.espertech.esper.example.IOT.listeners.GenericIotEventListener;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPRuntimeProvider;
 import com.espertech.esper.runtime.client.UpdateListener;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.List;
 
 public class IotMain implements Runnable {
     private static final Logger log = LoggerFactory.getLogger(IotMain.class);
