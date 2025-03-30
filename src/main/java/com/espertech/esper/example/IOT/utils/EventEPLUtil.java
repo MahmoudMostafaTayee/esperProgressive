@@ -1,4 +1,4 @@
-package com.espertech.esper.example.IOT.helpers;
+package com.espertech.esper.example.IOT.utils;
 
 import com.espertech.esper.example.IOT.streams.SensorData;
 import com.espertech.esper.example.IOT.streams.DeviceCommand;
@@ -9,9 +9,6 @@ import com.espertech.esper.common.client.configuration.Configuration;
 import com.espertech.esper.common.client.util.NameAccessModifier;
 import com.espertech.esper.compiler.client.CompilerArguments;
 import com.espertech.esper.compiler.client.EPCompilerProvider;
-import com.espertech.esper.example.IOT.listeners.ClustersListeners.CluStreamListener;
-import com.espertech.esper.example.IOT.listeners.ClustersListeners.AgglomerativeClusteringListener;
-import com.espertech.esper.example.IOT.listeners.ClustersListeners.ClusTreeListener;
 import com.espertech.esper.runtime.client.EPDeployment;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPStatement;

@@ -1,5 +1,6 @@
-package com.espertech.esper.example.IOT.helpers;
+package com.espertech.esper.example.IOT.utils;
 
+import com.espertech.esper.example.IOT.helpers.JsonReader;
 import com.espertech.esper.example.IOT.streams.SensorData;
 
 import java.util.List;

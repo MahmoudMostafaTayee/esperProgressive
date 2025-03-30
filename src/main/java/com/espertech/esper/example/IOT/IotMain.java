@@ -6,9 +6,9 @@
 package com.espertech.esper.example.IOT;
 
 import com.espertech.esper.common.client.configuration.Configuration;
-import com.espertech.esper.example.IOT.helpers.EventEPLUtil;
-import com.espertech.esper.example.IOT.helpers.IotStreamGenerator;
-import com.espertech.esper.example.IOT.listeners.ClustersListeners;
+import com.espertech.esper.example.IOT.utils.EventEPLUtil;
+import com.espertech.esper.example.IOT.utils.IotStreamGenerator;
+import com.espertech.esper.example.IOT.utils.ClustersListeners;
 import com.espertech.esper.example.IOT.listeners.GenericIotEventListener;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPRuntimeProvider;
