@@ -1,4 +1,4 @@
-package com.espertech.esper.example.IOT.SensorData;
+package com.espertech.esper.example.IOT.streams;
 
 public class SensorData {
     private int value;

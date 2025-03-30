@@ -1,6 +1,6 @@
 package com.espertech.esper.example.IOT.helpers;
 
-import com.espertech.esper.example.IOT.SensorData.SensorData;
+import com.espertech.esper.example.IOT.streams.SensorData;
 import com.espertech.esper.example.IOT.streams.DeviceCommand;
 import com.espertech.esper.example.IOT.streams.PersonView;
 import com.espertech.esper.example.IOT.streams.EmbeddingFeature;

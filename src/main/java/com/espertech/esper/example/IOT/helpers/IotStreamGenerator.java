@@ -1,6 +1,6 @@
 package com.espertech.esper.example.IOT.helpers;
 
-import com.espertech.esper.example.IOT.SensorData.SensorData;
+import com.espertech.esper.example.IOT.streams.SensorData;
 
 import java.util.List;
 import java.nio.file.*;
