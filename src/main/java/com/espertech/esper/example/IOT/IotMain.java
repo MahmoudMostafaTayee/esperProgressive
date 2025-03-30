@@ -96,7 +96,7 @@ public class IotMain implements Runnable {
                 "select features, UNum " +
                 "from embeddingFeature#time_batch(2 sec)";
 
-        ClustersUtils.AgglomerativeClustering agglomerativeListener = new ClustersUtils.AgglomerativeClustering();
+        ClustersUtils.AgglomerativeClustering agglomerativeListener = new ClustersUtils.AgglomerativeClustering(0.1);
         compileDeployAddListener(featureBatchEPL, agglomerativeListener.getListener());
 
         ClustersUtils.CluStream cluStream = new ClustersUtils.CluStream(7);

@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import smile.clustering.HierarchicalClustering;
 import smile.clustering.linkage.SingleLinkage;
 import com.espertech.esper.runtime.client.UpdateListener;
+import com.espertech.esper.example.IOT.helpers.SimilarityUtils;
 
 import java.util.*;
 
@@ -75,7 +76,11 @@ public class ClustersUtils {
 
     public static class AgglomerativeClustering {
         private long agglomerative_clustering_time_tracker = 0;
+        private final double epsilon;
 
+        public AgglomerativeClustering(double epsilon){
+            this.epsilon = epsilon;
+        }
         private void processStreamingClusters(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime){
                 if (newEvents != null) {
                     List<double[]> featureList = new ArrayList<>();
@@ -89,9 +94,9 @@ public class ClustersUtils {
                         idList.add(id);
                     }
 
-                    double[][] distanceMatrix = computeCosineDistanceMatrix(featureList.toArray(new double[0][]));
+                    double[][] distanceMatrix = SimilarityUtils.computeCosineDistanceMatrix(featureList.toArray(new double[0][]), this.epsilon);
                     HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
-                    int[] clusterLabels = hc.partition(0.1);
+                    int[] clusterLabels = hc.partition(this.epsilon);
                     long durationMs = (System.nanoTime() - start) / 1_000_000;
                     agglomerative_clustering_time_tracker += durationMs;
                     System.out.println("Agglomerative Clustering Time: " + agglomerative_clustering_time_tracker + " ms");
@@ -138,20 +143,6 @@ public class ClustersUtils {
         }
     }
 
-    private static double[][] computeCosineDistanceMatrix(double[][] features) {
-        int n = features.length;
-        double[][] dist = new double[n][n];
-
-        for (int i = 0; i < n; i++) {
-            for (int j = i; j < n; j++) {
-                double sim = cosineDistance(features[i], features[j]);
-                dist[i][j] = sim;
-                dist[j][i] = sim;
-            }
-        }
-        return dist;
-    }
-
     private static double euclideanDistance(double[] a, double[] b) {
         double sum = 0.0;
         for (int i = 0; i < a.length; i++) {
@@ -159,16 +150,6 @@ public class ClustersUtils {
             sum += diff * diff;
         }
         return Math.sqrt(sum);
-    }
-
-    public static double cosineDistance(double[] a, double[] b) {
-        double dot = 0.0, normA = 0.0, normB = 0.0;
-        for (int i = 0; i < a.length; i++) {
-            dot += a[i] * b[i];
-            normA += a[i] * a[i];
-            normB += b[i] * b[i];
-        }
-        return 1.0 - (dot / (Math.sqrt(normA) * Math.sqrt(normB)));
     }
 
     private static int getNearestCluster(Clustering clustering, Instance instance) {
