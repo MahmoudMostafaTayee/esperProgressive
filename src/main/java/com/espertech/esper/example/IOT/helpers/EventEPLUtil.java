@@ -38,27 +38,6 @@ public class EventEPLUtil {
         EventEPLUtil.add_listener(statement, listener);
     }
 
-    public static void compileDeployAddListener_with_Agglomerative_clustering(EPRuntime runtime, String eplQuery){
-        EPStatement statement;
-        statement = EventEPLUtil.compileDeploy(runtime, eplQuery);
-        AgglomerativeClusteringListener clusterListener = new AgglomerativeClusteringListener();
-        statement.addListener(clusterListener.agglomerativeListener());
-    }
-
-    public static void compileDeployAddListener_with_clu_clustering(EPRuntime runtime, String eplQuery, int numClusters){
-        EPStatement statement;
-        statement = EventEPLUtil.compileDeploy(runtime, eplQuery);
-        CluStreamListener clusterListener = new CluStreamListener(numClusters);
-        statement.addListener(clusterListener.cluStreamListener());
-    }
-
-    public static void compileDeployAddListener_with_ClusTree(EPRuntime runtime, String eplQuery){
-        EPStatement statement;
-        statement = EventEPLUtil.compileDeploy(runtime, eplQuery);
-        ClusTreeListener clusterListener = new ClusTreeListener();
-        statement.addListener(clusterListener.clusTreeListener());
-    }
-
     public static EPStatement compileDeploy(EPRuntime runtime, String epl) {
         try {
             CompilerArguments args = new CompilerArguments();

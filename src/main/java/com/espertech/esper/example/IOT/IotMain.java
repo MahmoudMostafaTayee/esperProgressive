@@ -8,6 +8,7 @@ package com.espertech.esper.example.IOT;
 import com.espertech.esper.common.client.configuration.Configuration;
 import com.espertech.esper.example.IOT.helpers.EventEPLUtil;
 import com.espertech.esper.example.IOT.helpers.IotStreamGenerator;
+import com.espertech.esper.example.IOT.listeners.ClustersListeners;
 import com.espertech.esper.example.IOT.listeners.GenericIotEventListener;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPRuntimeProvider;
@@ -55,37 +56,18 @@ public class IotMain implements Runnable {
 
 
     /**
-     * Compile-deploy the given EPL query and add the listener to the resulting EPStatement.
+     * Compiles and deploys the given EPL query, attaching the provided listener to the resulting EPStatement.
      *
-     * @param eplQuery    the EPL query to compile and deploy
-     * @param streamName  the name of the stream to which the listener will listen
+     * @param eplQuery  the EPL query to compile and deploy
+     * @param listener  the listener to attach to the EPStatement
      */
     private static void compileDeployAddListener(String eplQuery, UpdateListener listener) {
-        // Compile and deploy the given EPL query
+        // Compile and deploy the given EPL query using the runtime
         EventEPLUtil.compileDeployAddListener(
-                runtime,
-                eplQuery,
-                listener
+                runtime,  // The EPRuntime instance to use for deployment
+                eplQuery, // The EPL query string to compile
+                listener  // The listener to attach to the EPStatement
         );
-    }
-
-    private static void compileDeployAddListener_with_Agglomerative_clustering(String eplQuery, String streamName){
-        new GenericIotEventListener(streamName);
-        EventEPLUtil.compileDeployAddListener_with_Agglomerative_clustering(  runtime,
-                eplQuery);
-    }
-
-    private static void compileDeployAddListener_with_clu_clustering(String eplQuery, String streamName, int numClusters){
-        new GenericIotEventListener(streamName);
-        EventEPLUtil.compileDeployAddListener_with_clu_clustering(  runtime,
-                eplQuery,
-                numClusters);
-    }
-
-    private static void compileDeployAddListener_with_ClusTree(String eplQuery, String streamName){
-        new GenericIotEventListener(streamName);
-        EventEPLUtil.compileDeployAddListener_with_ClusTree(  runtime,
-                eplQuery);
     }
 
     private static void compileDeploy(String eplQuery){
@@ -114,13 +96,17 @@ public class IotMain implements Runnable {
                 "select features, UNum " +
                 "from embeddingFeature#time_batch(2 sec)";
 
-        compileDeployAddListener_with_Agglomerative_clustering(featureBatchEPL,"FeatureBatch agglomerative clustering");
-        compileDeployAddListener_with_clu_clustering(featureBatchEPL, "FeatureStream clu", 7);
+        ClustersListeners.AgglomerativeClusteringListener agglomerativeListener = new ClustersListeners.AgglomerativeClusteringListener();
+        compileDeployAddListener(featureBatchEPL, agglomerativeListener.agglomerativeListener());
+
+        ClustersListeners.CluStreamListener cluStreamListener = new ClustersListeners.CluStreamListener(7);
+        compileDeployAddListener(featureBatchEPL, cluStreamListener.cluStreamListener());
 
         String featureStreamEPL =
                 "select features, UNum " +
                         "from embeddingFeature";
-        compileDeployAddListener_with_ClusTree(featureStreamEPL,"FeatureStream ClusTree");
+        ClustersListeners.ClusTreeListener clusTreeListener = new ClustersListeners.ClusTreeListener();
+        compileDeployAddListener(featureStreamEPL,clusTreeListener.clusTreeListener());
 
         String similarityEpl = "insert into SimilarityPairs " +
                 "select a.curFrame as frame1, a.UNum as id1, " +
