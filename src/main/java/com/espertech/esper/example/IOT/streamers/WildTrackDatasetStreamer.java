@@ -3,8 +3,10 @@ package com.espertech.esper.example.IOT.streamers;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.example.IOT.streams.PersonView;
-import com.espertech.esper.example.IOT.helpers.JsonReader;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.List;
@@ -28,7 +30,7 @@ public class WildTrackDatasetStreamer {
         try {
             String fileName = entry.getFileName().toString();
             int frameNumber = Integer.parseInt(fileName.replace(".json", ""));
-            List<PersonView> personViews = JsonReader.readPersonViewsFromJson(entry.toString());
+            List<PersonView> personViews = readPersonViewsFromJson(entry.toString());
             for (PersonView personView : personViews) {
                 personView.setFrameNumber(frameNumber);
                 personView.setTimeStamp(timeTracker);
@@ -39,6 +41,11 @@ public class WildTrackDatasetStreamer {
             System.err.println("Error reading JSON file: " + entry + " - " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    public static List<PersonView> readPersonViewsFromJson(String filePath) throws IOException {
+        ObjectMapper objectMapper = new ObjectMapper();
+        return objectMapper.readValue(new File(filePath), new TypeReference<List<PersonView>>() {});
     }
 }
 
