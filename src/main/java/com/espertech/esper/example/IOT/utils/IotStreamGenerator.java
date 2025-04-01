@@ -1,5 +1,6 @@
 package com.espertech.esper.example.IOT.utils;
 
+import com.espertech.esper.example.IOT.generators.WildTrackDatasetGenerator;
 import com.espertech.esper.example.IOT.helpers.JsonReader;
 import com.espertech.esper.example.IOT.streams.SensorData;
 
@@ -45,40 +46,6 @@ public class IotStreamGenerator {
         return timeTracker;
 
     }
-    /**
-     * Streams the Wildtrack dataset to the runtime, one event per frame.
-     * <p>
-     * This method reads all the JSON files in the specified directory, parses them as PersonView objects,
-     * and sends them to the runtime as events. The timestamp of each event is set to the current time,
-     * and the frame number is set to the number in the filename.
-     * <p>
-     * The time is advanced by one second after each event.
-     * @param runtime the runtime to which the events are sent.
-     */
-    private void streamWildTrackDataset(EPRuntime runtime){
-        String directoryPath = "./Dataset/Wildtrack_dataset/annotations_positions";
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(Paths.get(directoryPath), "*.json")) {
-            for (Path entry : stream) {
-                try {
-                    String fileName = entry.getFileName().toString();
-                    int frameNumber = Integer.parseInt(fileName.replace(".json", ""));
-                    List<PersonView> personViews = JsonReader.readPersonViewsFromJson(entry.toString());
-                    for (PersonView personView : personViews) {
-                        personView.setFrameNumber(frameNumber);
-                        personView.setTimeStamp(timeTracker);
-                        runtime.getEventService().sendEventBean(personView, "personView");
-                    }
-                    timeTracker = advanceTime(runtime);
-                } catch (IOException e) {
-                    System.err.println("Error reading JSON file: " + entry + " - " + e.getMessage());
-                    e.printStackTrace();
-                }
-            }
-        } catch (IOException e) {
-            System.err.println("Error accessing directory: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
 
     /**
      * Streams a series of predefined sensor data and device command events to the EPRuntime.
@@ -119,6 +86,6 @@ public class IotStreamGenerator {
 
     public void generateEvents(EPRuntime runtime) {
 //        streamDeviceCommands(runtime);
-//        streamWildTrackDataset(runtime);
+//        WildTrackDatasetGenerator.streamWildTrackDataset(runtime);
         EmbeddingFeatureGenerator.streamEmbeddingFeatures(runtime);
     }}
