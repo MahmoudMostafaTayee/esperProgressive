@@ -19,6 +19,8 @@ import org.slf4j.LoggerFactory;
 
 public class EventEPLUtil {
     private static final Logger log = LoggerFactory.getLogger(EventEPLUtil.class);
+    private static final long ONE_SEC_TIME_STEP = 1000L;  // 1 second (in milliseconds)
+    private static long timeTracker = System.currentTimeMillis();  // Shared time tracker
 
     public static Configuration getConfiguration() {
         Configuration configuration = new Configuration();
@@ -56,5 +58,25 @@ public class EventEPLUtil {
         } else {
             log.error("Statement not found: 'out'");
         }
+    }
+
+    /**
+     * Advances the given runtime's time by the specified time step.
+     *
+     * @param runtime The EPRuntime instance whose time is to be advanced.
+     * @param timeStep The time step in milliseconds by which to advance the time.
+     */
+    public static long advanceTime(EPRuntime runtime, long timeStep) {
+        timeTracker += timeStep;
+        runtime.getEventService().advanceTime(timeTracker);
+        System.out.println("Time advanced to: " + timeTracker + " ms");
+        return timeTracker;
+    }
+
+    // Overloaded method for default time step
+    public static long advanceTime(EPRuntime runtime) {
+        advanceTime(runtime, ONE_SEC_TIME_STEP);
+        return timeTracker;
+
     }
 }

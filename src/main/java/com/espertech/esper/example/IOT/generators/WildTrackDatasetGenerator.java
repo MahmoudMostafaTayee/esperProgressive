@@ -1,5 +1,6 @@
 package com.espertech.esper.example.IOT.generators;
 
+import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.example.IOT.streams.PersonView;
 import com.espertech.esper.example.IOT.helpers.JsonReader;
@@ -34,7 +35,7 @@ public class WildTrackDatasetGenerator {
                 personView.setTimeStamp(timeTracker);
                 runtime.getEventService().sendEventBean(personView, "personView");
             }
-            timeTracker = IotStreamGenerator.advanceTime(runtime);
+            timeTracker = EventEPLUtil.advanceTime(runtime);
         } catch (IOException e) {
             System.err.println("Error reading JSON file: " + entry + " - " + e.getMessage());
             e.printStackTrace();

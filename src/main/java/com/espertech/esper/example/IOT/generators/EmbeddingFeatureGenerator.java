@@ -1,5 +1,6 @@
 package com.espertech.esper.example.IOT.generators;
 
+import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.example.IOT.streams.EmbeddingFeature;
 import org.nd4j.linalg.api.ndarray.INDArray;
@@ -83,7 +84,7 @@ public class EmbeddingFeatureGenerator {
             int y2 = Integer.parseInt(matcher.group(6));
             float conf = Float.parseFloat(matcher.group(7));
             if (curFrame != prevFrame) {
-                timeTracker = IotStreamGenerator.advanceTime(runtime);
+                timeTracker = EventEPLUtil.advanceTime(runtime);
             }
             runtime.getEventService().sendEventBean(
                     new EmbeddingFeature(timeTracker, featureList, curFrame, uNum, x1, x2, y1, y2, conf),

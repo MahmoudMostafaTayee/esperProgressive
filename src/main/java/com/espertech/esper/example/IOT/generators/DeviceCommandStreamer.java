@@ -1,5 +1,6 @@
 package com.espertech.esper.example.IOT.generators;
 
+import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.runtime.client.EPRuntime;
 import java.util.List;
 import com.espertech.esper.example.IOT.streams.SensorData;
@@ -26,7 +27,7 @@ public class DeviceCommandStreamer {
 
     private static void sendEvent(EPRuntime runtime, Object event, String eventType) {
         runtime.getEventService().sendEventBean(event, eventType);
-        timeTracker = IotStreamGenerator.advanceTime(runtime);
+        timeTracker = EventEPLUtil.advanceTime(runtime);
     }
 }
 
