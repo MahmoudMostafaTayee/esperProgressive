@@ -6,7 +6,6 @@ import java.util.List;
 import com.espertech.esper.example.IOT.streams.SensorData;
 import com.espertech.esper.example.IOT.streams.DeviceCommand;
 import com.espertech.esper.example.IOT.streams.PersonView;
-import com.espertech.esper.example.IOT.utils.IotStreamGenerator;
 
 public class DeviceCommandStreamer {
     private static long timeTracker = System.currentTimeMillis();

@@ -6,8 +6,6 @@ import com.espertech.esper.example.IOT.streams.EmbeddingFeature;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 
-import com.espertech.esper.example.IOT.utils.IotStreamGenerator;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;

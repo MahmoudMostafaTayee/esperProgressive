@@ -4,7 +4,6 @@ import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.example.IOT.streams.PersonView;
 import com.espertech.esper.example.IOT.helpers.JsonReader;
-import com.espertech.esper.example.IOT.utils.IotStreamGenerator;
 
 import java.io.IOException;
 import java.nio.file.*;

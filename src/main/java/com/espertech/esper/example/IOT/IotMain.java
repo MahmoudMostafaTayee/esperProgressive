@@ -6,8 +6,10 @@
 package com.espertech.esper.example.IOT;
 
 import com.espertech.esper.common.client.configuration.Configuration;
+import com.espertech.esper.example.IOT.generators.DeviceCommandStreamer;
+import com.espertech.esper.example.IOT.generators.EmbeddingFeatureGenerator;
+import com.espertech.esper.example.IOT.generators.WildTrackDatasetGenerator;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
-import com.espertech.esper.example.IOT.utils.IotStreamGenerator;
 import com.espertech.esper.example.IOT.utils.ClustersUtils;
 import com.espertech.esper.example.IOT.listeners.GenericIotEventListener;
 import com.espertech.esper.runtime.client.EPRuntime;
@@ -47,13 +49,13 @@ public class IotMain implements Runnable {
 
     /**
      * Adds a generator to send events to the runtime.
-     * @param generator the generator to add
      */
-    private void add_generator(IotStreamGenerator generator){
+    private void launchStreams(){
         log.info("Generating and sending events with time advancement");
-        generator.generateEvents(runtime);
+//        DeviceCommandStreamer.streamDeviceCommands(runtime);
+//        WildTrackDatasetGenerator.streamWildTrackDataset(runtime);
+        EmbeddingFeatureGenerator.streamEmbeddingFeatures(runtime);
     }
-
 
     /**
      * Compiles and deploys the given EPL query, attaching the provided listener to the resulting EPStatement.
@@ -82,7 +84,7 @@ public class IotMain implements Runnable {
 
         embeddingFeatureQueries();
 
-        add_generator(new IotStreamGenerator());
+        launchStreams();
         
         log.info("Done.");
     }
