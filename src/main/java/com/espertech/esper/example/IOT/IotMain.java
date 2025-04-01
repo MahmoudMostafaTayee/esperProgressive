@@ -51,7 +51,7 @@ public class IotMain implements Runnable {
     private void launchStreams(){
         log.info("Generating and sending events with time advancement");
 //        SomeExamplesStreamer.streamSomeExamples(runtime);
-//        WildTrackDatasetGenerator.streamWildTrackDataset(runtime);
+//        WildTrackDatasetStreamer.streamWildTrackDataset(runtime);
         EmbeddingFeatureStreamer.streamEmbeddingFeatures(runtime);
     }
 

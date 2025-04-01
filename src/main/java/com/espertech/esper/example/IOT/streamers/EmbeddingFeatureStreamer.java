@@ -3,6 +3,7 @@ package com.espertech.esper.example.IOT.streamers;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.example.IOT.streams.EmbeddingFeature;
+import com.espertech.esper.example.IOT.helpers.HelperUtils;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 
@@ -20,7 +21,8 @@ public class EmbeddingFeatureStreamer {
     private static final long ONE_SEC_TIME_STEP = 1000L;
 
     public static void streamEmbeddingFeatures(EPRuntime runtime) {
-        try (DirectoryStream<Path> scenes = Files.newDirectoryStream(Paths.get(BASE_PATH))) {
+        try {
+            List<Path> scenes = HelperUtils.getSortedDirectories(Paths.get(BASE_PATH));
             for (Path scene : scenes) {
                 if (!Files.isDirectory(scene)) continue;
                 processScene(runtime, scene);
@@ -32,12 +34,8 @@ public class EmbeddingFeatureStreamer {
     }
 
     private static void processScene(EPRuntime runtime, Path scene) {
-        try (DirectoryStream<Path> camerasStream = Files.newDirectoryStream(scene)) {
-            List<Path> cameras = new ArrayList<>();
-            for (Path camera : camerasStream) {
-                if (Files.isDirectory(camera)) cameras.add(camera);
-            }
-            cameras.sort(Comparator.naturalOrder());
+        try {
+            List<Path> cameras = HelperUtils.getSortedDirectories(scene);
             for (Path camera : cameras) {
                 if (!Files.isDirectory(camera)) continue;
                 processCamera(runtime, scene, camera);
@@ -48,17 +46,14 @@ public class EmbeddingFeatureStreamer {
     }
 
     private static void processCamera(EPRuntime runtime, Path scene, Path camera) {
-        List<Path> files = new ArrayList<>();
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(camera, "*.npy")) {
-            for (Path entry : stream) files.add(entry);
+        try {
+            List<Path> files = HelperUtils.getSortedFiles(camera, "*.npy");
+            int prevFrame = 1;
+            for (Path entry : files) {
+                prevFrame = processFile(runtime, scene, camera, entry, prevFrame);
+            }
         } catch (IOException e) {
             System.err.println("Error accessing camera directory: " + camera + " - " + e.getMessage());
-            return;
-        }
-        files.sort(Comparator.comparing(p -> p.getFileName().toString()));
-        int prevFrame = 1;
-        for (Path entry : files) {
-            prevFrame = processFile(runtime, scene, camera, entry, prevFrame);
         }
     }
 
@@ -84,6 +79,7 @@ public class EmbeddingFeatureStreamer {
             if (curFrame != prevFrame) {
                 timeTracker = EventEPLUtil.advanceTime(runtime);
             }
+//            System.out.println("Prcoessed: " + npyFile);
             runtime.getEventService().sendEventBean(
                     new EmbeddingFeature(timeTracker, featureList, curFrame, uNum, x1, x2, y1, y2, conf),
                     "embeddingFeature"
