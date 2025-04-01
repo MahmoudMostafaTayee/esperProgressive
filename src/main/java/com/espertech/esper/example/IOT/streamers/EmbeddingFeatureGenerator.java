@@ -1,4 +1,4 @@
-package com.espertech.esper.example.IOT.generators;
+package com.espertech.esper.example.IOT.streamers;
 
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.runtime.client.EPRuntime;
