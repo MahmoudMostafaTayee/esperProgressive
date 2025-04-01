@@ -9,7 +9,7 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.util.List;
 
-public class WildTrackDatasetGenerator {
+public class WildTrackDatasetStreamer {
     private static final String DIRECTORY_PATH = "./Dataset/Wildtrack_dataset/annotations_positions";
     private static long timeTracker = System.currentTimeMillis();
 

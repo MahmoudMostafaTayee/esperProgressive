@@ -6,9 +6,7 @@
 package com.espertech.esper.example.IOT;
 
 import com.espertech.esper.common.client.configuration.Configuration;
-import com.espertech.esper.example.IOT.streamers.DeviceCommandStreamer;
-import com.espertech.esper.example.IOT.streamers.EmbeddingFeatureGenerator;
-import com.espertech.esper.example.IOT.streamers.WildTrackDatasetGenerator;
+import com.espertech.esper.example.IOT.streamers.*;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.example.IOT.utils.ClustersUtils;
 import com.espertech.esper.example.IOT.listeners.GenericIotEventListener;
@@ -54,7 +52,7 @@ public class IotMain implements Runnable {
         log.info("Generating and sending events with time advancement");
 //        DeviceCommandStreamer.streamDeviceCommands(runtime);
 //        WildTrackDatasetGenerator.streamWildTrackDataset(runtime);
-        EmbeddingFeatureGenerator.streamEmbeddingFeatures(runtime);
+        EmbeddingFeatureStreamer.streamEmbeddingFeatures(runtime);
     }
 
     /**
