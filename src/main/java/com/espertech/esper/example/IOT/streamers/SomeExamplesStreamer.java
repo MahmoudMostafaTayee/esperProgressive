@@ -7,10 +7,10 @@ import com.espertech.esper.example.IOT.streams.SensorData;
 import com.espertech.esper.example.IOT.streams.DeviceCommand;
 import com.espertech.esper.example.IOT.streams.PersonView;
 
-public class DeviceCommandStreamer {
+public class SomeExamplesStreamer {
     private static long timeTracker = System.currentTimeMillis();
 
-    public static void streamDeviceCommands(EPRuntime runtime) {
+    public static void streamSomeExamples(EPRuntime runtime) {
         sendEvent(runtime, new SensorData(10, "101", "temp_sensor", 18002000L), "sensorData");
         sendEvent(runtime, new PersonView(timeTracker, 122, 0, 456826, List.of(new PersonView.View(0, 1561, 1510, 299, 139))), "personView");
         sendEvent(runtime, new SensorData(5, "102", "camera", 18001000L), "sensorData");
