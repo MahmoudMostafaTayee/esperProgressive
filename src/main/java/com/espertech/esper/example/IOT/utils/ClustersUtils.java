@@ -13,8 +13,11 @@ import smile.clustering.HierarchicalClustering;
 import smile.clustering.linkage.SingleLinkage;
 import com.espertech.esper.runtime.client.UpdateListener;
 import com.espertech.esper.example.IOT.helpers.SimilarityUtils;
+import java.util.AbstractMap;
 
 import java.util.*;
+
+import static java.lang.System.exit;
 
 public class ClustersUtils {
     private static final Logger logger = LoggerFactory.getLogger(ClustersUtils.class);
@@ -25,10 +28,16 @@ public class ClustersUtils {
         private InstancesHeader cluStreamHeader;
         private long clustream_clustering_time_tracker = 0;
         private int cluster_number = 0;
+        private int numberOfClusters;
+
+        // Buffer for instances during initialization
+        private final List<AbstractMap.SimpleEntry<Integer, Instance>> initializationBuffer = new ArrayList<>();
+        private boolean isInitialized = false;
 
         public CluStream(int numClusters) {
             cluStream.prepareForUse();
-            cluStream.maxNumKernelsOption.setValue(numClusters);
+            this.numberOfClusters = numClusters;
+//            cluStream.maxNumKernelsOption.setValue(numClusters);
             cluStream.resetLearningImpl();
         }
 
@@ -43,27 +52,57 @@ public class ClustersUtils {
                     for (EventBean e : newEvents) {
                         List<Float> featureList = (List<Float>) e.get("features");
                         Integer id = (Integer) e.get("UNum");
+
                         Instance instance = convertFeatureToInstance(featureList, cluStreamHeader);
                         long start = System.nanoTime();
                         cluStream.trainOnInstance(instance);
                         long durationMs = (System.nanoTime() - start) / 1_000_000;
                         clustream_clustering_time_tracker += durationMs;
-                        Clustering clustering = cluStream.getMicroClusteringResult();
-                        int assignedCluster = getNearestCluster(clustering, instance);
+
+                        // Step 1: Get micro-clustering result
+                        Clustering microClusters = cluStream.getMicroClusteringResult();
+                        if(!isInitialized && (microClusters == null || microClusters.getClustering().isEmpty())){
+                            // Store using SimpleEntry
+                            initializationBuffer.add(new AbstractMap.SimpleEntry<>(id, instance));
+
+                            System.out.println(("CluStream Initializing cluster number " + cluster_number));
+                            cluster_number++;
+                            continue;
+                        }
+
+                        // Step 2: Extract list of clusters from micro-clustering
+                        List<? extends Cluster> microClusterList = microClusters.getClustering();
+
+                        // Step 3: Apply k-Means on the extracted list
+                        Clustering macroClusters = Clustream.kMeans(numberOfClusters, microClusterList);
+
+                        if (!isInitialized) {
+                            isInitialized = true;
+                            System.out.println("Initialization complete - processing buffered instances");
+                            processBufferedInstances(macroClusters);
+                        }
+
+                        // Step 4: Assign instance to the nearest macro-cluster
+                        int assignedCluster = getNearestCluster(macroClusters, instance);
                         if (assignedCluster == -1) {
                             assignedCluster = cluster_number;
                         }
                         clusterToDataIds.computeIfAbsent(assignedCluster, k -> new ArrayList<>()).add(id);
-                        if ((clustering == null) || (clustering.getClustering().isEmpty())) {
-                            System.out.println(("CluStream Initializing id number " + id + " as cluster " + cluster_number));
-                            cluster_number++;
-                            continue;
-                        }
 
                         System.out.println("CluStream Data ID: " + id + " assigned to cluster: " + assignedCluster);
                     }
                     System.out.println("CluStream Clustering Time: " + clustream_clustering_time_tracker + " ms");
                 }
+        }
+
+        private void processBufferedInstances(Clustering clustering) {
+            for (AbstractMap.SimpleEntry<Integer, Instance> buffered : initializationBuffer) {
+
+                int assignedCluster = getNearestCluster(clustering, buffered.getValue());
+                clusterToDataIds.computeIfAbsent(assignedCluster, k -> new ArrayList<>()).add(buffered.getKey());
+                System.out.println("Processed buffered instance " + buffered.getKey() + " as cluster " + assignedCluster);
+            }
+            initializationBuffer.clear();
         }
 
         public UpdateListener getListener(){
@@ -153,6 +192,10 @@ public class ClustersUtils {
     }
 
     private static int getNearestCluster(Clustering clustering, Instance instance) {
+        if (clustering == null || clustering.getClustering().isEmpty()) {
+            return -1;
+        }
+
         int bestClusterIndex = -1;
         double bestDistance = Double.MAX_VALUE;
         double[] instanceVector = instance.toDoubleArray();

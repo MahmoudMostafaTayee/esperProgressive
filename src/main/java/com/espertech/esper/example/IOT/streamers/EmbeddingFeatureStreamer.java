@@ -70,7 +70,7 @@ public class EmbeddingFeatureStreamer {
             List<Path> files = HelperUtils.getSortedFiles(camera, "*.npy");
 
             // Get the last processed index for this camera, or start at 0
-            int startIndex = cameraOffsets.getOrDefault(camera, 0);
+            int startIndex = cameraOffsets.getOrDefault(camera, 0); // 10704 is the index to start from the 1000th frame.
 
             int curFrame = -1;
             int fileIndex = startIndex;
