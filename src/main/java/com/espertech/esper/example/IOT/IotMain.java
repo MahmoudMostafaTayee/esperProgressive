@@ -110,8 +110,8 @@ public class IotMain implements Runnable {
                 "from embeddingFeature_camera_0001#time_batch(" + TrackingParameters.timePeriod + " sec) as a, embeddingFeature_camera_0001#time_batch(" + TrackingParameters.timePeriod + " sec) as b " +
                 "where a.UNum < b.UNum " + /* Avoid duplicate comparisons */
                 "and a.curFrame != b.curFrame "; /* Avoid comparing same individuals from the same frame */
-
         EventEPLUtil.compileDeployAddListener(similarityEpl, new GenericIotEventListener("cosine similarity calculation"));
+
         String clusterEpl = "insert into PotentialClusters " +
                 "select * from SimilarityPairs " +
                 "match_recognize ( " +
