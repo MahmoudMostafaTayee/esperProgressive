@@ -17,6 +17,9 @@ import com.espertech.esper.example.IOT.streams.DeviceCommand;
 import com.espertech.esper.example.IOT.streams.PersonView;
 import com.espertech.esper.example.IOT.streams.EmbeddingFeature;
 
+import com.espertech.esper.example.IOT.clusterers.AgglomerativeClusterer;
+import com.espertech.esper.example.IOT.clusterers.ClusTreeClusterer;
+import com.espertech.esper.example.IOT.clusterers.CluStreamClusterer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,16 +94,16 @@ public class IotMain implements Runnable {
                         "from embeddingFeature_camera_0001#time_batch(" + TrackingParameters.timePeriod + " sec) " +
                         "group by curFrame";
 
-        ClustersUtils.AgglomerativeClustering agglomerativeListener = new ClustersUtils.AgglomerativeClustering(TrackingParameters.epsilonScpt);
+        AgglomerativeClusterer agglomerativeListener = new AgglomerativeClusterer(TrackingParameters.epsilonScpt);
         EventEPLUtil.compileDeployAddListener(featureBatchEPL, agglomerativeListener.getListener());
 
-        ClustersUtils.CluStream cluStream = new ClustersUtils.CluStream();
+        CluStreamClusterer cluStream = new CluStreamClusterer();
         EventEPLUtil.compileDeployAddListener(featureBatchEPL, cluStream.getListener());
 
         String featureStreamEPL =
                 "select features, UNum , curFrame " +
                         "from embeddingFeature_camera_0001";
-        ClustersUtils.ClusTree clusTree = new ClustersUtils.ClusTree();
+        ClusTreeClusterer clusTree = new ClusTreeClusterer();
         EventEPLUtil.compileDeployAddListener(featureStreamEPL, clusTree.getListener());
 
         String similarityEpl = "insert into SimilarityPairs " +
