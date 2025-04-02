@@ -5,7 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class TrackingParameters {
-    private static final Logger log = LoggerFactory.getLogger(TrackingParameters.class);
+    private static final Logger logger = LoggerFactory.getLogger(TrackingParameters.class);
     public enum exec_level { ALL, SCPT, MCPT };
 
     public static double epsilonScpt = 0.10;
@@ -95,7 +95,7 @@ public class TrackingParameters {
     }
 
     public static void printArgs() {
-        log.info(   "TrackingParameters{" +
+        logger.info(   "TrackingParameters{" +
                     "epsilonScpt=" + epsilonScpt +
                     ", timePeriod=" + timePeriod +
                     ", epsilonMcpt=" + epsilonMcpt +

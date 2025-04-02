@@ -21,7 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class IotMain implements Runnable {
-    private static final Logger log = LoggerFactory.getLogger(IotMain.class);
+    private static final Logger logger = LoggerFactory.getLogger(IotMain.class);
 
     public IotMain(String runtimeURI) {
         EventEPLUtil.setRuntimeURI(runtimeURI);
@@ -35,7 +35,7 @@ public class IotMain implements Runnable {
                 new IotMain("IotEventRuntime").run();
             }
         else {
-            log.error("Error Code: " + retval.getCode() + " - " + retval.getMessage());
+            logger.error("Error Code: " + retval.getCode() + " - " + retval.getMessage());
         }
 
     }
@@ -54,7 +54,7 @@ public class IotMain implements Runnable {
         EventEPLUtil.addEventType("embeddingFeature" + "_" + "camera_0003", EmbeddingFeature.class);
         EventEPLUtil.addEventType("embeddingFeature" + "_" + "camera_0004", EmbeddingFeature.class);
 
-        log.info("Setting up runtime");
+        logger.info("Setting up runtime");
         EventEPLUtil.initiateRuntime();
     }
 
@@ -62,7 +62,7 @@ public class IotMain implements Runnable {
      * Adds a generator to send events to the runtime.
      */
     private void launchStreams(){
-        log.info("Generating and sending events with time advancement");
+        logger.info("Generating and sending events with time advancement");
 //        SomeExamplesStreamer.streamSomeExamples();
 //        WildTrackDatasetStreamer.streamWildTrackDataset();
         EmbeddingFeatureStreamer.streamEmbeddingFeatures();
@@ -78,7 +78,7 @@ public class IotMain implements Runnable {
 
         launchStreams();
         
-        log.info("Done.");
+        logger.info("Done.");
     }
 
     private void embeddingFeatureQueries(){

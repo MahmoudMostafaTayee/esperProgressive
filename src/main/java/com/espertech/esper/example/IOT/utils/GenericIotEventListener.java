@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 
 public class GenericIotEventListener implements UpdateListener {
 
-    private static final Logger log = LoggerFactory.getLogger(GenericIotEventListener.class);
+    private static final Logger logger = LoggerFactory.getLogger(GenericIotEventListener.class);
     private final String name;
 
     public GenericIotEventListener(String name) {

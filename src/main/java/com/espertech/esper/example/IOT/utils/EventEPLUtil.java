@@ -11,7 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class EventEPLUtil {
-    private static final Logger log = LoggerFactory.getLogger(EventEPLUtil.class);
+    private static final Logger logger = LoggerFactory.getLogger(EventEPLUtil.class);
     private static final long ONE_SEC_TIME_STEP = 1000L;  // 1 second (in milliseconds)
     private static long timeTracker = System.currentTimeMillis();  // Shared time tracker
     private static final Configuration configuration = new Configuration();
@@ -64,7 +64,7 @@ public class EventEPLUtil {
         if (statement != null) {
             statement.addListener(listener);
         } else {
-            log.error("Statement not found: 'out'");
+            logger.error("Statement not found: 'out'");
         }
     }
 

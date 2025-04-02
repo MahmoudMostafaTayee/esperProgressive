@@ -17,7 +17,7 @@ import com.espertech.esper.example.IOT.helpers.SimilarityUtils;
 import java.util.*;
 
 public class ClustersUtils {
-    private static final Logger log = LoggerFactory.getLogger(EventEPLUtil.class);
+    private static final Logger logger = LoggerFactory.getLogger(ClustersUtils.class);
 
     public static class CluStream {
         private final Clustream cluStream = new Clustream();
