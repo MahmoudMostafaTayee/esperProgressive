@@ -21,17 +21,14 @@ public class EventEPLUtil {
     private static final Logger log = LoggerFactory.getLogger(EventEPLUtil.class);
     private static final long ONE_SEC_TIME_STEP = 1000L;  // 1 second (in milliseconds)
     private static long timeTracker = System.currentTimeMillis();  // Shared time tracker
+    private static final Configuration configuration = new Configuration();
 
     public static Configuration getConfiguration() {
-        Configuration configuration = new Configuration();
-        configuration.getCommon().addEventType("sensorData", SensorData.class);
-        configuration.getCommon().addEventType("deviceCommand", DeviceCommand.class);
-        configuration.getCommon().addEventType("personView", PersonView.class);
-        configuration.getCommon().addEventType("embeddingFeature" + "_" + "camera_0001", EmbeddingFeature.class);
-        configuration.getCommon().addEventType("embeddingFeature" + "_" + "camera_0002", EmbeddingFeature.class);
-        configuration.getCommon().addEventType("embeddingFeature" + "_" + "camera_0003", EmbeddingFeature.class);
-        configuration.getCommon().addEventType("embeddingFeature" + "_" + "camera_0004", EmbeddingFeature.class);
         return configuration;
+    }
+
+    public static void addEventType(String eventName, Class<?> eventClass) {
+        configuration.getCommon().addEventType(eventName, eventClass);
     }
 
     public static void compileDeployAddListener(EPRuntime runtime, String eplQuery, UpdateListener listener){

@@ -16,6 +16,11 @@ import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPRuntimeProvider;
 import com.espertech.esper.runtime.client.UpdateListener;
 
+import com.espertech.esper.example.IOT.streams.SensorData;
+import com.espertech.esper.example.IOT.streams.DeviceCommand;
+import com.espertech.esper.example.IOT.streams.PersonView;
+import com.espertech.esper.example.IOT.streams.EmbeddingFeature;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,6 +130,14 @@ public class IotMain implements Runnable {
      */
     private void initiateRunTime(){
         Configuration configuration = EventEPLUtil.getConfiguration();
+        EventEPLUtil.addEventType("personView", PersonView.class);
+        EventEPLUtil.addEventType("sensorData", SensorData.class);
+        EventEPLUtil.addEventType("deviceCommand", DeviceCommand.class);
+        EventEPLUtil.addEventType("embeddingFeature" + "_" + "camera_0001", EmbeddingFeature.class);
+        EventEPLUtil.addEventType("embeddingFeature" + "_" + "camera_0002", EmbeddingFeature.class);
+        EventEPLUtil.addEventType("embeddingFeature" + "_" + "camera_0003", EmbeddingFeature.class);
+        EventEPLUtil.addEventType("embeddingFeature" + "_" + "camera_0004", EmbeddingFeature.class);
+
         log.info("Setting up runtime");
 
         runtime = EPRuntimeProvider.getRuntime(runtimeURI, configuration);
