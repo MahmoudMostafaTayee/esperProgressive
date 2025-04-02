@@ -22,12 +22,12 @@ public class EmbeddingFeatureStreamer {
     private static final long ONE_SEC_TIME_STEP = 1000L;
     private static final Map<Path, Integer> cameraOffsets = new HashMap<>();
 
-    public static void streamEmbeddingFeatures(TrackingParameters trackingParameters) {
+    public static void streamEmbeddingFeatures() {
         try {
             List<Path> scenes = HelperUtils.getSortedDirectories(Paths.get(BASE_PATH));
             for (Path scene : scenes) {
                 if (!Files.isDirectory(scene)) continue;
-                processScene(scene, trackingParameters);
+                processScene(scene);
             }
         } catch (IOException e) {
             System.err.println("Error accessing base directory: " + BASE_PATH + " - " + e.getMessage());
@@ -35,8 +35,8 @@ public class EmbeddingFeatureStreamer {
         }
     }
 
-    private static void processScene(Path scene, TrackingParameters trackingParameters) {
-        int framesPerWindow = trackingParameters.timePeriod * trackingParameters.fps;
+    private static void processScene(Path scene) {
+        int framesPerWindow = TrackingParameters.timePeriod * TrackingParameters.fps;
         try {
             List<Path> cameras = HelperUtils.getSortedDirectories(scene);
             Map<Path, Boolean> processingStatus = new HashMap<>();
@@ -55,7 +55,7 @@ public class EmbeddingFeatureStreamer {
                     // Update processing status
                     processingStatus.put(camera, cameraHasMoreFiles);
                 }
-                timeTracker = EventEPLUtil.advanceTime(trackingParameters.timePeriod * ONE_SEC_TIME_STEP);
+                timeTracker = EventEPLUtil.advanceTime(TrackingParameters.timePeriod * ONE_SEC_TIME_STEP);
 
                 // Check if any camera still has files left to process
                 hasMoreFiles = processingStatus.values().stream().anyMatch(status -> status);
