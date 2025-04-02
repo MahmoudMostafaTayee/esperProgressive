@@ -6,6 +6,8 @@
 package com.espertech.esper.example.IOT;
 
 import com.espertech.esper.common.client.configuration.Configuration;
+import com.espertech.esper.example.IOT.helpers.ErrorCode;
+import com.espertech.esper.example.IOT.helpers.TrackingParameters;
 import com.espertech.esper.example.IOT.streamers.*;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.example.IOT.utils.ClustersUtils;
@@ -17,18 +19,102 @@ import com.espertech.esper.runtime.client.UpdateListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.commons.cli.*;
+
 public class IotMain implements Runnable {
     private static final Logger log = LoggerFactory.getLogger(IotMain.class);
 
     private final String runtimeURI;
     static private EPRuntime runtime;
-
-    public static void main(String[] args) {
-        new IotMain("IotEventRuntime").run();
-    }
+    private static TrackingParameters trackingParameters = new TrackingParameters(); // Default tracking parameters
 
     public IotMain(String runtimeURI) {
         this.runtimeURI = runtimeURI;
+    }
+
+    public static void main(String[] args) {
+        ErrorCode retval = getTrackingParams(args);
+
+        if (retval == ErrorCode.SUCCESS) {
+                new IotMain("IotEventRuntime").run();
+            }
+        else {
+            log.error("Error Code: " + retval.getCode() + " - " + retval.getMessage());
+        }
+
+    }
+
+    private static ErrorCode getTrackingParams(String[] args)
+    {
+        // Parse arguments
+        CommandLine cmd = parseArguments(args);
+
+        if (cmd == null) {
+            return ErrorCode.INVALID_INPUT;
+        }
+
+        // Extracting values
+        int scene = Integer.parseInt(cmd.getOptionValue("scene"));
+        String output = cmd.getOptionValue("output", "Tracking");
+        boolean execAll = cmd.hasOption("exec_all");
+        boolean execScpt = cmd.hasOption("exec_scpt");
+        boolean execMcpt = cmd.hasOption("exec_mcpt");
+
+        // Load scene-specific parameters
+        TrackingParameters sceneTrackingParameters = getParametersForScene(scene);
+
+        // If no parameters found, use defaults
+        if (sceneTrackingParameters != null) {
+            trackingParameters = sceneTrackingParameters;
+        }
+
+        // Print parsed values (for testing)
+        System.out.println("Scene: " + scene);
+        System.out.println("Output: " + output);
+        System.out.println("Exec All: " + execAll);
+        System.out.println("Exec SCPT: " + execScpt);
+        System.out.println("Exec MCPT: " + execMcpt);
+        System.out.println("Tracking Parameters: " + trackingParameters);
+
+        return ErrorCode.SUCCESS;
+    }
+    private static CommandLine parseArguments(String[] args) {
+        Options options = new Options();
+
+        options.addOption(Option.builder("s")
+                .longOpt("scene")
+                .desc("Scene ID")
+                .hasArg()
+                .required()
+                .type(Number.class)
+                .build());
+
+        options.addOption(Option.builder("o")
+                .longOpt("output")
+                .desc("Output directory")
+                .hasArg()
+                .type(String.class)
+                .build());
+
+        options.addOption("all", "exec_all", false, "Execute all tracking modes");
+        options.addOption("scpt", "exec_scpt", false, "Execute SCPT tracking mode");
+        options.addOption("mcpt", "exec_mcpt", false, "Execute MCPT tracking mode");
+
+        CommandLineParser parser = new DefaultParser();
+        HelpFormatter formatter = new HelpFormatter();
+
+        try {
+            return parser.parse(options, args);
+        } catch (ParseException e) {
+            System.err.println("Error: " + e.getMessage());
+            formatter.printHelp("java ArgumentParser", options);
+            return null;
+        }
+    }
+
+    private static TrackingParameters getParametersForScene(int scene) {
+        // TODO: Implement logic to load parameters based on scene
+        return null;
     }
 
     /**
@@ -52,7 +138,7 @@ public class IotMain implements Runnable {
         log.info("Generating and sending events with time advancement");
 //        SomeExamplesStreamer.streamSomeExamples(runtime);
 //        WildTrackDatasetStreamer.streamWildTrackDataset(runtime);
-        EmbeddingFeatureStreamer.streamEmbeddingFeatures(runtime);
+        EmbeddingFeatureStreamer.streamEmbeddingFeatures(runtime, trackingParameters);
     }
 
     /**
@@ -88,15 +174,15 @@ public class IotMain implements Runnable {
     }
 
     private void embeddingFeatureQueries(){
-        String batchEpl = "insert into EmbeddingWindow select * from embeddingFeature#time_batch(2 sec)";
+        String batchEpl = "insert into EmbeddingWindow select * from embeddingFeature_camera_0001#time_batch(" + trackingParameters.timePeriod + " sec)";
 //        compileDeploy(batchEpl);
         compileDeployAddListener(batchEpl, new GenericIotEventListener("Embedding features Time Batch"));
 
         String featureBatchEPL =
                 "select features, UNum " +
-                "from embeddingFeature#time_batch(2 sec)";
+                "from embeddingFeature_camera_0001#time_batch(" + trackingParameters.timePeriod + " sec)";
 
-        ClustersUtils.AgglomerativeClustering agglomerativeListener = new ClustersUtils.AgglomerativeClustering(0.1);
+        ClustersUtils.AgglomerativeClustering agglomerativeListener = new ClustersUtils.AgglomerativeClustering(trackingParameters.epsilonScpt);
         compileDeployAddListener(featureBatchEPL, agglomerativeListener.getListener());
 
         ClustersUtils.CluStream cluStream = new ClustersUtils.CluStream(7);
@@ -104,7 +190,7 @@ public class IotMain implements Runnable {
 
         String featureStreamEPL =
                 "select features, UNum " +
-                        "from embeddingFeature";
+                        "from embeddingFeature_camera_0001";
         ClustersUtils.ClusTree clusTree = new ClustersUtils.ClusTree();
         compileDeployAddListener(featureStreamEPL, clusTree.getListener());
 
@@ -113,7 +199,7 @@ public class IotMain implements Runnable {
                 "       b.curFrame as frame2, b.UNum as id2, " +
                 "       com.espertech.esper.example.IOT.helpers.SimilarityUtils.cosineSimilarity(a.features, b.features) as similarity, " +
                 "       com.espertech.esper.example.IOT.helpers.SpatialFunctions.iou(a, b) as iou " +
-                "from embeddingFeature#time_batch(2 sec) as a, embeddingFeature#time_batch(2 sec) as b " +
+                "from embeddingFeature_camera_0001#time_batch(" + trackingParameters.timePeriod + " sec) as a, embeddingFeature_camera_0001#time_batch(" + trackingParameters.timePeriod + " sec) as b " +
                 "where a.UNum < b.UNum " + /* Avoid duplicate comparisons */
                 "and a.curFrame != b.curFrame "; /* Avoid comparing same individuals from the same frame */
 

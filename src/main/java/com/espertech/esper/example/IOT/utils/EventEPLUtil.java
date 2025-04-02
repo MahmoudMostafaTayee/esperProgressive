@@ -27,7 +27,10 @@ public class EventEPLUtil {
         configuration.getCommon().addEventType("sensorData", SensorData.class);
         configuration.getCommon().addEventType("deviceCommand", DeviceCommand.class);
         configuration.getCommon().addEventType("personView", PersonView.class);
-        configuration.getCommon().addEventType("embeddingFeature", EmbeddingFeature.class);
+        configuration.getCommon().addEventType("embeddingFeature" + "_" + "camera_0001", EmbeddingFeature.class);
+        configuration.getCommon().addEventType("embeddingFeature" + "_" + "camera_0002", EmbeddingFeature.class);
+        configuration.getCommon().addEventType("embeddingFeature" + "_" + "camera_0003", EmbeddingFeature.class);
+        configuration.getCommon().addEventType("embeddingFeature" + "_" + "camera_0004", EmbeddingFeature.class);
         return configuration;
     }
 
