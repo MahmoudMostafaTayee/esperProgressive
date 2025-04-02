@@ -28,15 +28,14 @@ public class ClustersUtils {
         private InstancesHeader cluStreamHeader;
         private long clustream_clustering_time_tracker = 0;
         private int cluster_number = 0;
-        private int numberOfClusters;
+        private int numberOfClusters = 1;
 
         // Buffer for instances during initialization
         private final List<AbstractMap.SimpleEntry<Integer, Instance>> initializationBuffer = new ArrayList<>();
         private boolean isInitialized = false;
 
-        public CluStream(int numClusters) {
+        public CluStream() {
             cluStream.prepareForUse();
-            this.numberOfClusters = numClusters;
 //            cluStream.maxNumKernelsOption.setValue(numClusters);
             cluStream.resetLearningImpl();
         }
@@ -51,7 +50,13 @@ public class ClustersUtils {
 
                     for (EventBean e : newEvents) {
                         List<Float> featureList = (List<Float>) e.get("features");
+                        Long frameRecordCount = (Long) e.get("frameRecordCount");
+                        if(numberOfClusters < frameRecordCount){
+                            numberOfClusters = frameRecordCount.intValue();
+                        }
                         Integer id = (Integer) e.get("UNum");
+                        Integer curFrame = (Integer) e.get("curFrame");
+                        logger.info("Current Frame: " + curFrame + " -> Frame Record Count: " + frameRecordCount + " -> Number of Clusters: " + numberOfClusters);
 
                         Instance instance = convertFeatureToInstance(featureList, cluStreamHeader);
                         long start = System.nanoTime();
@@ -74,7 +79,8 @@ public class ClustersUtils {
                         List<? extends Cluster> microClusterList = microClusters.getClustering();
 
                         // Step 3: Apply k-Means on the extracted list
-                        Clustering macroClusters = Clustream.kMeans(numberOfClusters, microClusterList);
+                        Clustering macroClusters = Clustream.kMeans(numberOfClusters+2, microClusterList);
+                        logger.info("Actual Clusters Found: " + macroClusters.size());
 
                         if (!isInitialized) {
                             isInitialized = true;

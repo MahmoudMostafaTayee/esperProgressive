@@ -87,17 +87,18 @@ public class IotMain implements Runnable {
         EventEPLUtil.compileDeployAddListener(batchEpl, new GenericIotEventListener("Embedding features Time Batch"));
 
         String featureBatchEPL =
-                "select features, UNum " +
-                "from embeddingFeature_camera_0001#time_batch(" + TrackingParameters.timePeriod + " sec)";
+                "select features, UNum, curFrame, count(*) as frameRecordCount " +
+                        "from embeddingFeature_camera_0001#time_batch(" + TrackingParameters.timePeriod + " sec) " +
+                        "group by curFrame";
 
         ClustersUtils.AgglomerativeClustering agglomerativeListener = new ClustersUtils.AgglomerativeClustering(TrackingParameters.epsilonScpt);
         EventEPLUtil.compileDeployAddListener(featureBatchEPL, agglomerativeListener.getListener());
 
-        ClustersUtils.CluStream cluStream = new ClustersUtils.CluStream(7);
+        ClustersUtils.CluStream cluStream = new ClustersUtils.CluStream();
         EventEPLUtil.compileDeployAddListener(featureBatchEPL, cluStream.getListener());
 
         String featureStreamEPL =
-                "select features, UNum " +
+                "select features, UNum , curFrame " +
                         "from embeddingFeature_camera_0001";
         ClustersUtils.ClusTree clusTree = new ClustersUtils.ClusTree();
         EventEPLUtil.compileDeployAddListener(featureStreamEPL, clusTree.getListener());
