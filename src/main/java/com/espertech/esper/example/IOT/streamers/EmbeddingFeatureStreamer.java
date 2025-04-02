@@ -22,12 +22,12 @@ public class EmbeddingFeatureStreamer {
     private static final long ONE_SEC_TIME_STEP = 1000L;
     private static final Map<Path, Integer> cameraOffsets = new HashMap<>();
 
-    public static void streamEmbeddingFeatures(EPRuntime runtime, TrackingParameters trackingParameters) {
+    public static void streamEmbeddingFeatures(TrackingParameters trackingParameters) {
         try {
             List<Path> scenes = HelperUtils.getSortedDirectories(Paths.get(BASE_PATH));
             for (Path scene : scenes) {
                 if (!Files.isDirectory(scene)) continue;
-                processScene(runtime, scene, trackingParameters);
+                processScene(scene, trackingParameters);
             }
         } catch (IOException e) {
             System.err.println("Error accessing base directory: " + BASE_PATH + " - " + e.getMessage());
@@ -35,7 +35,7 @@ public class EmbeddingFeatureStreamer {
         }
     }
 
-    private static void processScene(EPRuntime runtime, Path scene, TrackingParameters trackingParameters) {
+    private static void processScene(Path scene, TrackingParameters trackingParameters) {
         int framesPerWindow = trackingParameters.timePeriod * trackingParameters.fps;
         try {
             List<Path> cameras = HelperUtils.getSortedDirectories(scene);
@@ -50,12 +50,12 @@ public class EmbeddingFeatureStreamer {
             do{
                 for (Path camera : cameras) {
                     if (!Files.isDirectory(camera)) continue;
-                    boolean cameraHasMoreFiles = processCamera(runtime, scene, camera, framesPerWindow);
+                    boolean cameraHasMoreFiles = processCamera(scene, camera, framesPerWindow);
 
                     // Update processing status
                     processingStatus.put(camera, cameraHasMoreFiles);
                 }
-                timeTracker = EventEPLUtil.advanceTime(runtime, trackingParameters.timePeriod * ONE_SEC_TIME_STEP);
+                timeTracker = EventEPLUtil.advanceTime(trackingParameters.timePeriod * ONE_SEC_TIME_STEP);
 
                 // Check if any camera still has files left to process
                 hasMoreFiles = processingStatus.values().stream().anyMatch(status -> status);
@@ -65,7 +65,7 @@ public class EmbeddingFeatureStreamer {
         }
     }
 
-    private static boolean processCamera(EPRuntime runtime, Path scene, Path camera, int framesPerWindow) {
+    private static boolean processCamera(Path scene, Path camera, int framesPerWindow) {
         try {
             List<Path> files = HelperUtils.getSortedFiles(camera, "*.npy");
 
@@ -97,7 +97,7 @@ public class EmbeddingFeatureStreamer {
                     }
 
                     if(curFrame == parsedFile.curFrame) {
-                        processFile(runtime, scene, camera, entry, parsedFile, curFrame);
+                        processFile(scene, camera, entry, parsedFile, curFrame);
                     }
                     else {
                         System.out.println("End of frame");
@@ -117,7 +117,7 @@ public class EmbeddingFeatureStreamer {
         }
     }
 
-    private static void processFile(EPRuntime runtime, Path scene, Path camera, Path entry, ParsedFileInfo parsedFile, int prevFrame) {
+    private static void processFile(Path scene, Path camera, Path entry, ParsedFileInfo parsedFile, int prevFrame) {
         String fileName = entry.getFileName().toString();
 
         try {
@@ -126,7 +126,7 @@ public class EmbeddingFeatureStreamer {
             List<Float> featureList = convertToFloatList(data.toFloatVector());
 
             System.out.println("Prcoessed: " + npyFile);
-            runtime.getEventService().sendEventBean(
+            EventEPLUtil.streamEvent(
                     new EmbeddingFeature(timeTracker,
                             featureList,
                             parsedFile.curFrame,

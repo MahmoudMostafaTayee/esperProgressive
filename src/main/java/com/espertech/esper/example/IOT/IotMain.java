@@ -5,16 +5,12 @@
  */
 package com.espertech.esper.example.IOT;
 
-import com.espertech.esper.common.client.configuration.Configuration;
 import com.espertech.esper.example.IOT.helpers.ErrorCode;
 import com.espertech.esper.example.IOT.helpers.TrackingParameters;
 import com.espertech.esper.example.IOT.streamers.*;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.example.IOT.utils.ClustersUtils;
 import com.espertech.esper.example.IOT.listeners.GenericIotEventListener;
-import com.espertech.esper.runtime.client.EPRuntime;
-import com.espertech.esper.runtime.client.EPRuntimeProvider;
-import com.espertech.esper.runtime.client.UpdateListener;
 
 import com.espertech.esper.example.IOT.streams.SensorData;
 import com.espertech.esper.example.IOT.streams.DeviceCommand;
@@ -29,12 +25,10 @@ import org.apache.commons.cli.*;
 public class IotMain implements Runnable {
     private static final Logger log = LoggerFactory.getLogger(IotMain.class);
 
-    private final String runtimeURI;
-    static private EPRuntime runtime;
     private static TrackingParameters trackingParameters = new TrackingParameters(); // Default tracking parameters
 
     public IotMain(String runtimeURI) {
-        this.runtimeURI = runtimeURI;
+        EventEPLUtil.setRuntimeURI(runtimeURI);
     }
 
     public static void main(String[] args) {
@@ -124,12 +118,10 @@ public class IotMain implements Runnable {
 
     /**
      * Initiates the Esper runtime with the provided runtime URI and configuration.
-     * This method gets the configuration from {@link EventEPLUtil#getConfiguration()},
      * Gets the runtime from the
      * configuration and initializes it.
      */
     private void initiateRunTime(){
-        Configuration configuration = EventEPLUtil.getConfiguration();
         EventEPLUtil.addEventType("personView", PersonView.class);
         EventEPLUtil.addEventType("sensorData", SensorData.class);
         EventEPLUtil.addEventType("deviceCommand", DeviceCommand.class);
@@ -139,9 +131,7 @@ public class IotMain implements Runnable {
         EventEPLUtil.addEventType("embeddingFeature" + "_" + "camera_0004", EmbeddingFeature.class);
 
         log.info("Setting up runtime");
-
-        runtime = EPRuntimeProvider.getRuntime(runtimeURI, configuration);
-        runtime.initialize();
+        EventEPLUtil.initiateRuntime();
     }
 
     /**
@@ -149,28 +139,9 @@ public class IotMain implements Runnable {
      */
     private void launchStreams(){
         log.info("Generating and sending events with time advancement");
-//        SomeExamplesStreamer.streamSomeExamples(runtime);
-//        WildTrackDatasetStreamer.streamWildTrackDataset(runtime);
-        EmbeddingFeatureStreamer.streamEmbeddingFeatures(runtime, trackingParameters);
-    }
-
-    /**
-     * Compiles and deploys the given EPL query, attaching the provided listener to the resulting EPStatement.
-     *
-     * @param eplQuery  the EPL query to compile and deploy
-     * @param listener  the listener to attach to the EPStatement
-     */
-    private static void compileDeployAddListener(String eplQuery, UpdateListener listener) {
-        // Compile and deploy the given EPL query using the runtime
-        EventEPLUtil.compileDeployAddListener(
-                runtime,  // The EPRuntime instance to use for deployment
-                eplQuery, // The EPL query string to compile
-                listener  // The listener to attach to the EPStatement
-        );
-    }
-
-    private static void compileDeploy(String eplQuery){
-        EventEPLUtil.compileDeploy(  runtime, eplQuery);
+//        SomeExamplesStreamer.streamSomeExamples();
+//        WildTrackDatasetStreamer.streamWildTrackDataset();
+        EmbeddingFeatureStreamer.streamEmbeddingFeatures(trackingParameters);
     }
 
     public void run() {
@@ -188,24 +159,24 @@ public class IotMain implements Runnable {
 
     private void embeddingFeatureQueries(){
         String batchEpl = "insert into EmbeddingWindow select * from embeddingFeature_camera_0001#time_batch(" + trackingParameters.timePeriod + " sec)";
-//        compileDeploy(batchEpl);
-        compileDeployAddListener(batchEpl, new GenericIotEventListener("Embedding features Time Batch"));
+//        EventEPLUtil.compileDeploy(batchEpl);
+        EventEPLUtil.compileDeployAddListener(batchEpl, new GenericIotEventListener("Embedding features Time Batch"));
 
         String featureBatchEPL =
                 "select features, UNum " +
                 "from embeddingFeature_camera_0001#time_batch(" + trackingParameters.timePeriod + " sec)";
 
         ClustersUtils.AgglomerativeClustering agglomerativeListener = new ClustersUtils.AgglomerativeClustering(trackingParameters.epsilonScpt);
-        compileDeployAddListener(featureBatchEPL, agglomerativeListener.getListener());
+        EventEPLUtil.compileDeployAddListener(featureBatchEPL, agglomerativeListener.getListener());
 
         ClustersUtils.CluStream cluStream = new ClustersUtils.CluStream(7);
-        compileDeployAddListener(featureBatchEPL, cluStream.getListener());
+        EventEPLUtil.compileDeployAddListener(featureBatchEPL, cluStream.getListener());
 
         String featureStreamEPL =
                 "select features, UNum " +
                         "from embeddingFeature_camera_0001";
         ClustersUtils.ClusTree clusTree = new ClustersUtils.ClusTree();
-        compileDeployAddListener(featureStreamEPL, clusTree.getListener());
+        EventEPLUtil.compileDeployAddListener(featureStreamEPL, clusTree.getListener());
 
         String similarityEpl = "insert into SimilarityPairs " +
                 "select a.curFrame as frame1, a.UNum as id1, " +
@@ -216,7 +187,7 @@ public class IotMain implements Runnable {
                 "where a.UNum < b.UNum " + /* Avoid duplicate comparisons */
                 "and a.curFrame != b.curFrame "; /* Avoid comparing same individuals from the same frame */
 
-        compileDeployAddListener(similarityEpl, new GenericIotEventListener("cosine similarity calculation"));
+        EventEPLUtil.compileDeployAddListener(similarityEpl, new GenericIotEventListener("cosine similarity calculation"));
         String clusterEpl = "insert into PotentialClusters " +
                 "select * from SimilarityPairs " +
                 "match_recognize ( " +
@@ -226,12 +197,12 @@ public class IotMain implements Runnable {
                 "  and iou > 0.3" + /* Spatial overlap threshold */
                 ")";
 
-        compileDeployAddListener(clusterEpl,new GenericIotEventListener("Potential Cluster"));
+        EventEPLUtil.compileDeployAddListener(clusterEpl,new GenericIotEventListener("Potential Cluster"));
     }
     private void wildTrackDatasetQueries(){
         String eplQuery;
         eplQuery = "select * from personView;";
-        compileDeployAddListener(
+        EventEPLUtil.compileDeployAddListener(
                 eplQuery,
                 new GenericIotEventListener("personView raw event")
         );
@@ -249,7 +220,7 @@ public class IotMain implements Runnable {
                     "  views[" + viewNumberCounter + "].ymin as ymin, " +
                     "  views[" + viewNumberCounter + "].ymax as ymax " +
                     "from personView;";
-            compileDeploy(PersonViewExtracted);
+            EventEPLUtil.compileDeploy(PersonViewExtracted);
 
             String OverlapCandidates =  "insert into OverlapCandidates " +
                     "select " +
@@ -272,7 +243,7 @@ public class IotMain implements Runnable {
                     "  A.personID != B.personID " +
                     "  and (min(A.xmax, B.xmax) > max(A.xmin, B.xmin)) " +
                     "  and (min(A.ymax, B.ymax) > max(A.ymin, B.ymin));";
-            compileDeploy(OverlapCandidates);
+            EventEPLUtil.compileDeploy(OverlapCandidates);
 
             String OverlappingDetections =  "insert into OverlappingDetections " +
                     "select " +
@@ -289,7 +260,7 @@ public class IotMain implements Runnable {
                     "  and (overlapX * overlapY) / (areaA + areaB - (overlapX * overlapY)) > 0.5;";
 
             // Deploy the query and add the listener with the dynamically generated name
-            compileDeployAddListener(
+            EventEPLUtil.compileDeployAddListener(
                     OverlappingDetections,
                     new GenericIotEventListener("OverlappingDetections for view Number " + viewNumberCounter)
             );
@@ -303,7 +274,7 @@ public class IotMain implements Runnable {
         // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData output last every 2 seconds;";
         // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(4);";
         // String eplQuery = "@name('out') select count(*) as count_num, sum(value) as total from sensorData#time(5);";
-        compileDeployAddListener(
+        EventEPLUtil.compileDeployAddListener(
                 eplQuery,
                 new GenericIotEventListener("Out sensorData every 4 seconds Event")
         );
@@ -331,7 +302,7 @@ public class IotMain implements Runnable {
          "where D.deviceId = C.deviceId;";
          */
 
-        compileDeployAddListener(
+        EventEPLUtil.compileDeployAddListener(
                 eplQuery,
                 new GenericIotEventListener("Combined event")
         );

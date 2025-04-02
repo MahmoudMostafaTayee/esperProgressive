@@ -1,18 +1,11 @@
 package com.espertech.esper.example.IOT.utils;
 
-import com.espertech.esper.example.IOT.streams.SensorData;
-import com.espertech.esper.example.IOT.streams.DeviceCommand;
-import com.espertech.esper.example.IOT.streams.PersonView;
-import com.espertech.esper.example.IOT.streams.EmbeddingFeature;
 import com.espertech.esper.common.client.EPCompiled;
 import com.espertech.esper.common.client.configuration.Configuration;
 import com.espertech.esper.common.client.util.NameAccessModifier;
 import com.espertech.esper.compiler.client.CompilerArguments;
 import com.espertech.esper.compiler.client.EPCompilerProvider;
-import com.espertech.esper.runtime.client.EPDeployment;
-import com.espertech.esper.runtime.client.EPRuntime;
-import com.espertech.esper.runtime.client.EPStatement;
-import com.espertech.esper.runtime.client.UpdateListener;
+import com.espertech.esper.runtime.client.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,22 +15,37 @@ public class EventEPLUtil {
     private static final long ONE_SEC_TIME_STEP = 1000L;  // 1 second (in milliseconds)
     private static long timeTracker = System.currentTimeMillis();  // Shared time tracker
     private static final Configuration configuration = new Configuration();
+    private static String runtimeURI;
+    private static EPRuntime runtime;
 
-    public static Configuration getConfiguration() {
-        return configuration;
+    private EventEPLUtil() {
+        /* Prevent instantiation */
+    }
+
+    public static void setRuntimeURI(String runtimeURI) {
+        EventEPLUtil.runtimeURI = runtimeURI;
+    }
+
+    public static void initiateRuntime() {
+        runtime = EPRuntimeProvider.getRuntime(runtimeURI, configuration);
+        runtime.initialize();
     }
 
     public static void addEventType(String eventName, Class<?> eventClass) {
         configuration.getCommon().addEventType(eventName, eventClass);
     }
 
-    public static void compileDeployAddListener(EPRuntime runtime, String eplQuery, UpdateListener listener){
+    public static void streamEvent(Object event, String eventName) {
+        runtime.getEventService().sendEventBean(event, eventName);
+    }
+
+    public static void compileDeployAddListener(String eplQuery, UpdateListener listener){
         EPStatement statement;
-        statement = EventEPLUtil.compileDeploy(runtime, eplQuery);
+        statement = EventEPLUtil.compileDeploy(eplQuery);
         EventEPLUtil.add_listener(statement, listener);
     }
 
-    public static EPStatement compileDeploy(EPRuntime runtime, String epl) {
+    public static EPStatement compileDeploy(String epl) {
         try {
             CompilerArguments args = new CompilerArguments();
             args.getPath().add(runtime.getRuntimePath());
@@ -63,10 +71,9 @@ public class EventEPLUtil {
     /**
      * Advances the given runtime's time by the specified time step.
      *
-     * @param runtime The EPRuntime instance whose time is to be advanced.
      * @param timeStep The time step in milliseconds by which to advance the time.
      */
-    public static long advanceTime(EPRuntime runtime, long timeStep) {
+    public static long advanceTime(long timeStep) {
         timeTracker += timeStep;
         runtime.getEventService().advanceTime(timeTracker);
         System.out.println("Time advanced to: " + timeTracker + " ms");
@@ -74,8 +81,8 @@ public class EventEPLUtil {
     }
 
     // Overloaded method for default time step
-    public static long advanceTime(EPRuntime runtime) {
-        advanceTime(runtime, ONE_SEC_TIME_STEP);
+    public static long advanceTime() {
+        advanceTime(ONE_SEC_TIME_STEP);
         return timeTracker;
 
     }
