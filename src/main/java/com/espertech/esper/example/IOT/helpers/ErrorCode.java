@@ -2,6 +2,9 @@ package com.espertech.esper.example.IOT.helpers;
 
 public enum ErrorCode {
     SUCCESS(0, "Success"),
+    // Clustering error.
+    CLUSTERING_HAS_FAILED(100, "Cannot divide by zero"),
+
     DIVISION_BY_ZERO(1001, "Cannot divide by zero"),
     NEGATIVE_VALUE(1002, "Negative value not allowed"),
     FILE_NOT_FOUND(1003, "File not found"),
