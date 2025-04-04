@@ -1,7 +1,6 @@
 package com.espertech.esper.example.IOT.clusterers;
 
 import com.espertech.esper.common.client.EventBean;
-import com.espertech.esper.example.IOT.utils.ClustersUtils;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPStatement;
 import com.espertech.esper.runtime.client.UpdateListener;

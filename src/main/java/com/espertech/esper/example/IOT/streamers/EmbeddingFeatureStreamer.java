@@ -1,9 +1,7 @@
 package com.espertech.esper.example.IOT.streamers;
 
 import com.espertech.esper.example.IOT.helpers.TrackingParameters;
-import com.espertech.esper.example.IOT.utils.ClustersUtils;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
-import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.example.IOT.streams.EmbeddingFeature;
 import com.espertech.esper.example.IOT.helpers.HelperUtils;
 import org.nd4j.linalg.api.ndarray.INDArray;

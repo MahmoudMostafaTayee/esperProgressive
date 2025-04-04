@@ -1,4 +1,4 @@
-package com.espertech.esper.example.IOT.utils;
+package com.espertech.esper.example.IOT.clusterers;
 
 import com.yahoo.labs.samoa.instances.*;
 import moa.cluster.Cluster;

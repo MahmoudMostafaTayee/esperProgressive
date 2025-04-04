@@ -9,7 +9,6 @@ import com.espertech.esper.example.IOT.helpers.ErrorCode;
 import com.espertech.esper.example.IOT.helpers.TrackingParameters;
 import com.espertech.esper.example.IOT.streamers.*;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
-import com.espertech.esper.example.IOT.utils.ClustersUtils;
 import com.espertech.esper.example.IOT.utils.GenericIotEventListener;
 
 import com.espertech.esper.example.IOT.streams.SensorData;

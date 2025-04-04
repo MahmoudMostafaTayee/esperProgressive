@@ -1,7 +1,6 @@
 package com.espertech.esper.example.IOT.clusterers;
 
 import com.espertech.esper.common.client.EventBean;
-import com.espertech.esper.example.IOT.utils.ClustersUtils;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPStatement;
 import com.espertech.esper.runtime.client.UpdateListener;
@@ -14,8 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-
-import static java.lang.System.exit;
 
 public class CluStreamClusterer {
     private static final Logger logger = LoggerFactory.getLogger(ClustersUtils.class);
