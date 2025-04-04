@@ -9,8 +9,8 @@ public class TrackingParameters {
     public enum exec_level { ALL, SCPT, MCPT };
 
     public static double epsilonScpt = 0.10;
-    public static int timePeriod = 2;
-    public static int fps = 1;
+    public static int timePeriod = 3;
+    public static int fps = 30;
     public static double epsilonMcpt = 0.37;
     public static int shortTrackTh = 120;
     public static int keypointConditionTh = 1;

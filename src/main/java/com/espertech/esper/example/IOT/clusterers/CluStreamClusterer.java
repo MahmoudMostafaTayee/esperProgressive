@@ -74,7 +74,7 @@ public class CluStreamClusterer {
             List<? extends Cluster> microClusterList = microClusters.getClustering();
 
             // Step 3: Apply k-Means on the extracted list
-            Clustering macroClusters = Clustream.kMeans(numberOfClusters + 2, microClusterList);
+            Clustering macroClusters = Clustream.kMeans(numberOfClusters, microClusterList);
             logger.info("Actual Clusters Found: " + macroClusters.size());
 
             logger.info("Processing to which clusters each instance has been assigned");
