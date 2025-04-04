@@ -1,12 +1,15 @@
 package com.espertech.esper.example.IOT.streamers;
 
 import com.espertech.esper.example.IOT.helpers.TrackingParameters;
+import com.espertech.esper.example.IOT.utils.ClustersUtils;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.example.IOT.streams.EmbeddingFeature;
 import com.espertech.esper.example.IOT.helpers.HelperUtils;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -16,6 +19,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class EmbeddingFeatureStreamer {
+    private static final Logger logger = LoggerFactory.getLogger(EmbeddingFeatureStreamer.class);
+
     private static final String BASE_PATH = "/home/mahmoud-tayee/Masters/AIC24_Track1_YACHIYO_RIIPS/EmbedFeature";
     private static final Pattern FILE_PATTERN = Pattern.compile("feature_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+\\.?\\d*)\\.npy");
     private static long timeTracker = System.currentTimeMillis();
@@ -50,6 +55,7 @@ public class EmbeddingFeatureStreamer {
             do{
                 for (Path camera : cameras) {
                     if (!Files.isDirectory(camera)) continue;
+                    if (!processingStatus.get(camera)) continue; // Skip if already processed.
                     boolean cameraHasMoreFiles = processCamera(scene, camera, framesPerWindow);
 
                     // Update processing status
