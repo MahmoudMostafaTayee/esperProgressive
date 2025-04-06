@@ -85,8 +85,8 @@ public class IotMain implements Runnable {
 
     private void embeddingFeatureQueries(){
         String batchEpl = "insert into EmbeddingWindow select * from embeddingFeature_camera_0001#time_batch(" + TrackingParameters.timePeriod + " sec)";
-//        EventEPLUtil.compileDeploy(batchEpl);
-        EventEPLUtil.compileDeployAddListener(batchEpl, new GenericIotEventListener("Embedding features Time Batch"));
+        EventEPLUtil.compileDeploy(batchEpl);
+//        EventEPLUtil.compileDeployAddListener(batchEpl, new GenericIotEventListener("Embedding features Time Batch"));
 
         String featureBatchEPL =
                 "select features, UNum, curFrame, count(*) as frameRecordCount " +
@@ -94,7 +94,8 @@ public class IotMain implements Runnable {
                         "group by curFrame";
 
         AgglomerativeClusterer agglomerativeListener = new AgglomerativeClusterer(TrackingParameters.epsilonScpt);
-        EventEPLUtil.compileDeployAddListener(featureBatchEPL, agglomerativeListener.getListener());
+        EventEPLUtil.compileDeploy(featureBatchEPL);
+//        EventEPLUtil.compileDeployAddListener(featureBatchEPL, agglomerativeListener.getListener());
 
         CluStreamClusterer cluStream = new CluStreamClusterer();
         EventEPLUtil.compileDeployAddListener(featureBatchEPL, cluStream.getListener());
@@ -103,7 +104,8 @@ public class IotMain implements Runnable {
                 "select features, UNum , curFrame " +
                         "from embeddingFeature_camera_0001";
         ClusTreeClusterer clusTree = new ClusTreeClusterer();
-        EventEPLUtil.compileDeployAddListener(featureStreamEPL, clusTree.getListener());
+        EventEPLUtil.compileDeploy(featureStreamEPL);
+//        EventEPLUtil.compileDeployAddListener(featureStreamEPL, clusTree.getListener());
 
         String similarityEpl = "insert into SimilarityPairs " +
                 "select a.curFrame as frame1, a.UNum as id1, " +
@@ -113,7 +115,8 @@ public class IotMain implements Runnable {
                 "from embeddingFeature_camera_0001#time_batch(" + TrackingParameters.timePeriod + " sec) as a, embeddingFeature_camera_0001#time_batch(" + TrackingParameters.timePeriod + " sec) as b " +
                 "where a.UNum < b.UNum " + /* Avoid duplicate comparisons */
                 "and a.curFrame != b.curFrame "; /* Avoid comparing same individuals from the same frame */
-        EventEPLUtil.compileDeployAddListener(similarityEpl, new GenericIotEventListener("cosine similarity calculation"));
+        EventEPLUtil.compileDeploy(similarityEpl);
+//        EventEPLUtil.compileDeployAddListener(similarityEpl, new GenericIotEventListener("cosine similarity calculation"));
 
         String clusterEpl = "insert into PotentialClusters " +
                 "select * from SimilarityPairs " +
@@ -124,7 +127,8 @@ public class IotMain implements Runnable {
                 "  and iou > 0.3" + /* Spatial overlap threshold */
                 ")";
 
-        EventEPLUtil.compileDeployAddListener(clusterEpl,new GenericIotEventListener("Potential Cluster"));
+        EventEPLUtil.compileDeploy(clusterEpl);
+//        EventEPLUtil.compileDeployAddListener(clusterEpl,new GenericIotEventListener("Potential Cluster"));
     }
     private void wildTrackDatasetQueries(){
         String eplQuery;

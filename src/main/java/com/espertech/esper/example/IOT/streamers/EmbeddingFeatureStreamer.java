@@ -104,7 +104,7 @@ public class EmbeddingFeatureStreamer {
                         processFile(scene, camera, entry, parsedFile, curFrame);
                     }
                     else {
-                        System.out.println("End of frame");
+                        logger.debug("End of frame");
                         break;
                     }
                 }while(true);
@@ -116,7 +116,7 @@ public class EmbeddingFeatureStreamer {
             return (fileIndex) < files.size(); // Returns true if more files are left
 
         } catch (IOException e) {
-            System.err.println("Error accessing camera directory: " + camera + " - " + e.getMessage());
+            logger.error("Error accessing camera directory: " + camera + " - " + e.getMessage());
             return false;
         }
     }
@@ -129,7 +129,7 @@ public class EmbeddingFeatureStreamer {
             INDArray data = Nd4j.createFromNpyFile(npyFile);
             List<Float> featureList = convertToFloatList(data.toFloatVector());
 
-            System.out.println("Prcoessed: " + npyFile);
+            logger.debug("Prcoessed: " + npyFile);
             EventEPLUtil.streamEvent(
                     new EmbeddingFeature(timeTracker,
                             featureList,
@@ -143,7 +143,7 @@ public class EmbeddingFeatureStreamer {
                     "embeddingFeature" + "_" + camera.getFileName().toString()
             );
         } catch (Exception e) {
-            System.err.println("Error processing file: " + fileName + " - " + e.getMessage());
+            logger.error("Error processing file: " + fileName + " - " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -172,7 +172,7 @@ public class EmbeddingFeatureStreamer {
 
             return new ParsedFileInfo(curFrame, uNum, x1, x2, y1, y2, conf);
         } catch (NumberFormatException e) {
-            System.err.println("Error parsing filename: " + fileName + " - " + e.getMessage());
+            logger.error("Error parsing filename: " + fileName + " - " + e.getMessage());
             return null;
         }
     }

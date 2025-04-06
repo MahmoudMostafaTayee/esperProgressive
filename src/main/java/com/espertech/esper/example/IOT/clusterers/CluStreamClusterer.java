@@ -26,9 +26,6 @@ public class CluStreamClusterer {
     private long clustream_clustering_time_tracker = 0;
     private int numberOfClusters = 1;
 
-    // Buffer for instances during initialization
-    private final List<AbstractMap.SimpleEntry<Integer, Instance>> windowInstancesBuffer = new ArrayList<>();
-
     public CluStreamClusterer() {
         cluStream.prepareForUse();
 //            cluStream.maxNumKernelsOption.setValue(numClusters);
@@ -37,6 +34,7 @@ public class CluStreamClusterer {
 
     private void processStreamingClusters(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime) {
         if (newEvents != null) {
+            List<AbstractMap.SimpleEntry<Integer, Instance>> windowInstancesBuffer = new ArrayList<>();
             if (cluStreamHeader == null) {
                 List<Float> firstFeature = (List<Float>) newEvents[0].get("features");
                 cluStreamHeader = ClustersUtils.createHeader(firstFeature.size());
@@ -75,23 +73,25 @@ public class CluStreamClusterer {
 
             // Step 3: Apply k-Means on the extracted list
             Clustering macroClusters = Clustream.kMeans(numberOfClusters, microClusterList);
-            logger.info("Actual Clusters Found: " + macroClusters.size());
+            logger.debug("Actual Clusters Found: " + macroClusters.size());
 
-            logger.info("Processing to which clusters each instance has been assigned");
-            getAssignedClustersPerWindow(macroClusters);
+            logger.debug("Processing to which clusters each instance has been assigned");
+            getAssignedClustersPerWindow(macroClusters, clusterToDataIds, windowInstancesBuffer);
 
-            System.out.println("CluStream Clustering Time: " + clustream_clustering_time_tracker + " ms");
+            logger.info("CluStream Clustering Time: " + clustream_clustering_time_tracker + " ms");
         }
     }
 
-    private void getAssignedClustersPerWindow(Clustering clustering) {
+    private void getAssignedClustersPerWindow(Clustering clustering,
+                                              Map<Integer, List<Integer>> localClusterToDataIds,
+                                              List<AbstractMap.SimpleEntry<Integer, Instance>> windowInstancesBuffer) {
         for (AbstractMap.SimpleEntry<Integer, Instance> buffered : windowInstancesBuffer) {
             int assignedCluster = ClustersUtils.getNearestCluster(clustering, buffered.getValue());
-            clusterToDataIds.computeIfAbsent(assignedCluster, k -> new ArrayList<>()).add(buffered.getKey());
+            localClusterToDataIds.computeIfAbsent(assignedCluster, k -> new ArrayList<>()).add(buffered.getKey());
         }
         windowInstancesBuffer.clear();
-        for (Map.Entry<Integer, List<Integer>> entry : clusterToDataIds.entrySet()) {
-            System.out.println("Cluster " + entry.getKey() + " has data ids: " + entry.getValue());
+        for (Map.Entry<Integer, List<Integer>> entry : localClusterToDataIds.entrySet()) {
+            logger.info("Cluster " + entry.getKey() + " has data ids: " + entry.getValue());
         }
     }
 
