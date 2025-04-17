@@ -21,7 +21,6 @@ public class EmbeddingFeatureStreamer {
 
     private static final String BASE_PATH = "/home/mahmoud-tayee/Masters/AIC24_Track1_YACHIYO_RIIPS/EmbedFeature";
     private static final Pattern FILE_PATTERN = Pattern.compile("feature_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+\\.?\\d*)\\.npy");
-    private static long timeTracker = System.currentTimeMillis();
     private static final long ONE_SEC_TIME_STEP = 1000L;
     private static final Map<Path, Integer> cameraOffsets = new HashMap<>();
 
@@ -52,6 +51,8 @@ public class EmbeddingFeatureStreamer {
             boolean hasMoreFiles;
             do{
                 for (Path camera : cameras) {
+                    if (!camera.toString().equals("/home/mahmoud-tayee/Masters/AIC24_Track1_YACHIYO_RIIPS/EmbedFeature/scene_001/camera_0001"))
+                        continue;
                     if (!Files.isDirectory(camera)) continue;
                     if (!processingStatus.get(camera)) continue; // Skip if already processed.
                     boolean cameraHasMoreFiles = processCamera(scene, camera, framesPerWindow);
@@ -59,7 +60,7 @@ public class EmbeddingFeatureStreamer {
                     // Update processing status
                     processingStatus.put(camera, cameraHasMoreFiles);
                 }
-                timeTracker = EventEPLUtil.advanceTime(TrackingParameters.timePeriod * ONE_SEC_TIME_STEP);
+//                EventEPLUtil.advanceTime(TrackingParameters.timePeriod * ONE_SEC_TIME_STEP);
 
                 // Check if any camera still has files left to process
                 hasMoreFiles = processingStatus.values().stream().anyMatch(status -> status);
@@ -104,6 +105,10 @@ public class EmbeddingFeatureStreamer {
                         processFile(scene, camera, entry, parsedFile, curFrame);
                     }
                     else {
+//                        logger.info("curFrame: {}", curFrame);
+//                        logger.info("Old time: {}", EventEPLUtil.getCurrentTime());
+                        EventEPLUtil.advanceTime((TrackingParameters.timePeriod * 1.0)/TrackingParameters.fps);
+//                        logger.info("New time: {}", EventEPLUtil.getCurrentTime());
                         logger.debug("End of frame");
                         break;
                     }
@@ -129,9 +134,9 @@ public class EmbeddingFeatureStreamer {
             INDArray data = Nd4j.createFromNpyFile(npyFile);
             List<Float> featureList = convertToFloatList(data.toFloatVector());
 
-            logger.debug("Prcoessed: " + npyFile);
+            logger.debug("Processed: {}", npyFile);
             EventEPLUtil.streamEvent(
-                    new EmbeddingFeature(timeTracker,
+                    new EmbeddingFeature(EventEPLUtil.getCurrentTime(),
                             featureList,
                             parsedFile.curFrame,
                             parsedFile.uNum,
@@ -139,11 +144,12 @@ public class EmbeddingFeatureStreamer {
                             parsedFile.x2,
                             parsedFile.y1,
                             parsedFile.y2,
-                            parsedFile.conf),
+                            parsedFile.conf
+                    ),
                     "embeddingFeature" + "_" + camera.getFileName().toString()
             );
         } catch (Exception e) {
-            logger.error("Error processing file: " + fileName + " - " + e.getMessage());
+            logger.error("Error processing file: {} - {}", fileName, e.getMessage());
             e.printStackTrace();
         }
     }
@@ -172,7 +178,7 @@ public class EmbeddingFeatureStreamer {
 
             return new ParsedFileInfo(curFrame, uNum, x1, x2, y1, y2, conf);
         } catch (NumberFormatException e) {
-            logger.error("Error parsing filename: " + fileName + " - " + e.getMessage());
+            logger.error("Error parsing filename: {} - {}", fileName, e.getMessage());
             return null;
         }
     }

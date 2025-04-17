@@ -73,11 +73,18 @@ public class EventEPLUtil {
      *
      * @param timeStep The time step in milliseconds by which to advance the time.
      */
-    public static long advanceTime(long timeStep) {
+    public static void advanceTime(long timeStep) {
         timeTracker += timeStep;
         runtime.getEventService().advanceTime(timeTracker);
-        System.out.println("Time advanced to: " + timeTracker + " ms");
-        return timeTracker;
+        logger.debug("Time advanced to: {} ms", timeTracker);
+    }
+
+    public static void advanceTime(double percentage) {
+        long timeStep = (long) (ONE_SEC_TIME_STEP * percentage);
+//        System.out.println("Time step: " + timeStep);
+        timeTracker += timeStep;
+        runtime.getEventService().advanceTime(timeTracker);
+        logger.debug("Time advanced to: {} ms", timeTracker);
     }
 
     // Overloaded method for default time step
@@ -85,5 +92,9 @@ public class EventEPLUtil {
         advanceTime(ONE_SEC_TIME_STEP);
         return timeTracker;
 
+    }
+
+    public static long getCurrentTime() {
+        return timeTracker;
     }
 }
