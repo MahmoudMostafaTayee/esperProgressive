@@ -107,7 +107,7 @@ public class EmbeddingFeatureStreamer {
                     else {
 //                        logger.info("curFrame: {}", curFrame);
 //                        logger.info("Old time: {}", EventEPLUtil.getCurrentTime());
-                        EventEPLUtil.advanceTime((TrackingParameters.timePeriod * 1.0)/TrackingParameters.fps);
+                        EventEPLUtil.advanceTime((1.0)/TrackingParameters.fps);
 //                        logger.info("New time: {}", EventEPLUtil.getCurrentTime());
                         logger.debug("End of frame");
                         break;
