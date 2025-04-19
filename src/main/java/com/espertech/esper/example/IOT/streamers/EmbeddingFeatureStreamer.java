@@ -13,6 +13,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -23,18 +26,24 @@ public class EmbeddingFeatureStreamer {
     private static final Pattern FILE_PATTERN = Pattern.compile("feature_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+\\.?\\d*)\\.npy");
     private static final long ONE_SEC_TIME_STEP = 1000L;
     private static final Map<Path, Integer> cameraOffsets = new HashMap<>();
+    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     public static void streamEmbeddingFeatures() {
-        try {
-            List<Path> scenes = HelperUtils.getSortedDirectories(Paths.get(BASE_PATH));
+        long frameIntervalMillis = (long)((ONE_SEC_TIME_STEP*1.0) / TrackingParameters.fps);
+        scheduler.scheduleAtFixedRate(() ->{
+            List<Path> scenes = null;
+            try {
+                scenes = HelperUtils.getSortedDirectories(Paths.get(BASE_PATH));
+            } catch (IOException e) {
+                System.err.println("Error accessing base directory: " + BASE_PATH + " - " + e.getMessage());
+                e.printStackTrace();
+            }
+            assert scenes != null;
             for (Path scene : scenes) {
                 if (!Files.isDirectory(scene)) continue;
                 processScene(scene);
             }
-        } catch (IOException e) {
-            System.err.println("Error accessing base directory: " + BASE_PATH + " - " + e.getMessage());
-            e.printStackTrace();
-        }
+        }, 0, TrackingParameters.timePeriod * frameIntervalMillis, TimeUnit.MILLISECONDS);
     }
 
     private static void processScene(Path scene) {
@@ -80,42 +89,36 @@ public class EmbeddingFeatureStreamer {
             int curFrame = -1;
             int fileIndex = startIndex;
             ParsedFileInfo parsedFile;
-            for (int i = 0; i < framesPerWindow; i++) {
-                do{
-                    if (fileIndex >= files.size()) {
-                        cameraOffsets.put(camera, fileIndex + startIndex);
-                        System.out.println("All files processed for camera: " + camera);
-                        return false; // No more files to process
-                    }
+            do{
+                if (fileIndex >= files.size()) {
+                    cameraOffsets.put(camera, fileIndex + startIndex);
+                    System.out.println("All files processed for camera: " + camera);
+                    return false; // No more files to process
+                }
 
-                    Path entry = files.get(fileIndex++);
-                    String fileName = entry.getFileName().toString();
-                    parsedFile = parseFileName(fileName);
+                Path entry = files.get(fileIndex++);
+                String fileName = entry.getFileName().toString();
+                parsedFile = parseFileName(fileName);
 
-                    if (parsedFile == null) {
-                        System.err.println("Skipping file (invalid format): " + fileName);
-                        continue;
-                    }
+                if (parsedFile == null) {
+                    System.err.println("Skipping file (invalid format): " + fileName);
+                    continue;
+                }
 
-                    if (curFrame == -1) {
-                        curFrame = parsedFile.curFrame;
-                    }
+                if (curFrame == -1) {
+                    curFrame = parsedFile.curFrame;
+                }
 
-                    if(curFrame == parsedFile.curFrame) {
-                        processFile(scene, camera, entry, parsedFile, curFrame);
-                    }
-                    else {
-//                        logger.info("curFrame: {}", curFrame);
-//                        logger.info("Old time: {}", EventEPLUtil.getCurrentTime());
-                        EventEPLUtil.advanceTime((1.0)/TrackingParameters.fps);
-//                        logger.info("New time: {}", EventEPLUtil.getCurrentTime());
-                        logger.debug("End of frame");
-                        break;
-                    }
-                }while(true);
-                fileIndex--;
-                curFrame = -1;
-            }
+                if(curFrame == parsedFile.curFrame) {
+                    processFile(scene, camera, entry, parsedFile, curFrame);
+                }
+                else {
+//                        EventEPLUtil.pseudoAdvanceTime((1.0)/TrackingParameters.fps);
+                    logger.debug("End of frame");
+                    break;
+                }
+            }while(true);
+            fileIndex--;
             // Update offset for next batch
             cameraOffsets.put(camera, fileIndex);
             return (fileIndex) < files.size(); // Returns true if more files are left
@@ -136,7 +139,7 @@ public class EmbeddingFeatureStreamer {
 
             logger.debug("Processed: {}", npyFile);
             EventEPLUtil.streamEvent(
-                    new EmbeddingFeature(EventEPLUtil.getCurrentTime(),
+                    new EmbeddingFeature(System.currentTimeMillis(),
                             featureList,
                             parsedFile.curFrame,
                             parsedFile.uNum,
