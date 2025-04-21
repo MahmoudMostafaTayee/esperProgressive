@@ -29,104 +29,93 @@ public class EmbeddingFeatureStreamer {
     private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     public static void streamEmbeddingFeatures() {
+        Map<Path, Map<Path, List<Path>>> sceneData = initScenesData(Paths.get(BASE_PATH));
         long frameIntervalMillis = (long)((ONE_SEC_TIME_STEP*1.0) / TrackingParameters.fps);
-        scheduler.scheduleAtFixedRate(() ->{
-            List<Path> scenes = null;
-            try {
-                scenes = HelperUtils.getSortedDirectories(Paths.get(BASE_PATH));
-            } catch (IOException e) {
-                System.err.println("Error accessing base directory: " + BASE_PATH + " - " + e.getMessage());
-                e.printStackTrace();
-            }
-            assert scenes != null;
-            for (Path scene : scenes) {
+
+        scheduler.scheduleWithFixedDelay(() -> {
+            for (Map.Entry<Path, Map<Path, List<Path>>> sceneEntry : sceneData.entrySet()) {
+                Path scene = sceneEntry.getKey();
                 if (!Files.isDirectory(scene)) continue;
-                processScene(scene);
+                processScene(sceneEntry);
             }
-        }, 0, TrackingParameters.timePeriod * frameIntervalMillis, TimeUnit.MILLISECONDS);
+        }, 0, frameIntervalMillis, TimeUnit.MILLISECONDS);
     }
 
-    private static void processScene(Path scene) {
-        int framesPerWindow = TrackingParameters.timePeriod * TrackingParameters.fps;
-        try {
-            List<Path> cameras = HelperUtils.getSortedDirectories(scene);
-            Map<Path, Boolean> processingStatus = new HashMap<>();
+    private static void processScene(Map.Entry<Path, Map<Path, List<Path>>> sceneEntry) {
+        Path scene = sceneEntry.getKey();
+        Map<Path, List<Path>> cameras = sceneEntry.getValue();
+        Map<Path, Boolean> processingStatus = new HashMap<>();
 
-            // Initialize processing status for each camera
-            for (Path camera : cameras) {
-                processingStatus.put(camera, true);
+        // Initialize processing status for each camera
+        for (Map.Entry<Path, List<Path>> cameraEntry : cameras.entrySet()) {
+            Path camera = cameraEntry.getKey();
+            processingStatus.put(camera, true);
+        }
+
+        boolean hasMoreFiles;
+//        do{
+            for (Map.Entry<Path, List<Path>> cameraEntry : cameras.entrySet()) {
+                Path camera = cameraEntry.getKey();
+//                System.out.println("Processing camera: " + camera);
+                if (!camera.toString().equals("/home/mahmoud-tayee/Masters/AIC24_Track1_YACHIYO_RIIPS/EmbedFeature/scene_001/camera_0001"))
+                    continue;
+                if (!Files.isDirectory(camera)) continue;
+                if (!processingStatus.get(camera)) continue; // Skip if already processed.
+                boolean cameraHasMoreFiles = processCamera(scene, cameraEntry);
+
+                // Update processing status
+                processingStatus.put(camera, cameraHasMoreFiles);
             }
-
-            boolean hasMoreFiles;
-            do{
-                for (Path camera : cameras) {
-                    if (!camera.toString().equals("/home/mahmoud-tayee/Masters/AIC24_Track1_YACHIYO_RIIPS/EmbedFeature/scene_001/camera_0001"))
-                        continue;
-                    if (!Files.isDirectory(camera)) continue;
-                    if (!processingStatus.get(camera)) continue; // Skip if already processed.
-                    boolean cameraHasMoreFiles = processCamera(scene, camera, framesPerWindow);
-
-                    // Update processing status
-                    processingStatus.put(camera, cameraHasMoreFiles);
-                }
 //                EventEPLUtil.advanceTime(TrackingParameters.timePeriod * ONE_SEC_TIME_STEP);
 
-                // Check if any camera still has files left to process
-                hasMoreFiles = processingStatus.values().stream().anyMatch(status -> status);
-            } while (hasMoreFiles); // Continue until all cameras are fully processed
-        } catch (IOException e) {
-            System.err.println("Error accessing scene directory: " + scene + " - " + e.getMessage());
-        }
+            // Check if any camera still has files left to process
+            hasMoreFiles = processingStatus.values().stream().anyMatch(status -> status);
+//        } while (hasMoreFiles); // Continue until all cameras are fully processed
     }
 
-    private static boolean processCamera(Path scene, Path camera, int framesPerWindow) {
-        try {
-            List<Path> files = HelperUtils.getSortedFiles(camera, "*.npy");
+    private static boolean processCamera(Path scene, Map.Entry<Path, List<Path>> cameraEntry ) {
+        Path camera = cameraEntry.getKey();
+        List<Path> files = cameraEntry.getValue();
+        // Get the last processed index for this camera, or start at 0
+        int startIndex = cameraOffsets.getOrDefault(camera, 10704); // 10704 is the index to start from the 1000th frame.
 
-            // Get the last processed index for this camera, or start at 0
-            int startIndex = cameraOffsets.getOrDefault(camera, 0); // 10704 is the index to start from the 1000th frame.
+        int curFrame = -1;
+        int fileIndex = startIndex;
+        ParsedFileInfo parsedFile;
+        do{
+            if (fileIndex >= files.size()) {
+                cameraOffsets.put(camera, fileIndex + startIndex);
+                System.out.println("All files processed for camera: " + camera);
+                return false; // No more files to process
+            }
 
-            int curFrame = -1;
-            int fileIndex = startIndex;
-            ParsedFileInfo parsedFile;
-            do{
-                if (fileIndex >= files.size()) {
-                    cameraOffsets.put(camera, fileIndex + startIndex);
-                    System.out.println("All files processed for camera: " + camera);
-                    return false; // No more files to process
-                }
+            Path entry = files.get(fileIndex++);
+            String fileName = entry.getFileName().toString();
+            parsedFile = parseFileName(fileName);
 
-                Path entry = files.get(fileIndex++);
-                String fileName = entry.getFileName().toString();
-                parsedFile = parseFileName(fileName);
+            if (parsedFile == null) {
+                System.err.println("Skipping file (invalid format): " + fileName);
+                continue;
+            }
 
-                if (parsedFile == null) {
-                    System.err.println("Skipping file (invalid format): " + fileName);
-                    continue;
-                }
+            if (curFrame == -1) {
+                curFrame = parsedFile.curFrame;
+            }
 
-                if (curFrame == -1) {
-                    curFrame = parsedFile.curFrame;
-                }
-
-                if(curFrame == parsedFile.curFrame) {
-                    processFile(scene, camera, entry, parsedFile, curFrame);
-                }
-                else {
+            if(curFrame == parsedFile.curFrame) {
+                processFile(scene, camera, entry, parsedFile, curFrame);
+            }
+            else {
 //                        EventEPLUtil.pseudoAdvanceTime((1.0)/TrackingParameters.fps);
-                    logger.debug("End of frame");
-                    break;
-                }
-            }while(true);
-            fileIndex--;
-            // Update offset for next batch
-            cameraOffsets.put(camera, fileIndex);
-            return (fileIndex) < files.size(); // Returns true if more files are left
+                logger.debug("End of frame");
+                break;
+            }
+        }while(true);
+        fileIndex--;
+        // Update offset for next batch
+        cameraOffsets.put(camera, fileIndex);
+        return (fileIndex) < files.size(); // Returns true if more files are left
 
-        } catch (IOException e) {
-            logger.error("Error accessing camera directory: " + camera + " - " + e.getMessage());
-            return false;
-        }
     }
 
     private static void processFile(Path scene, Path camera, Path entry, ParsedFileInfo parsedFile, int prevFrame) {
@@ -155,6 +144,25 @@ public class EmbeddingFeatureStreamer {
             logger.error("Error processing file: {} - {}", fileName, e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    public static Map<Path, Map<Path, List<Path>>> initScenesData(Path basePath) {
+        Map<Path, Map<Path, List<Path>>> result = new HashMap<>();
+        try {
+            List<Path> scenes = HelperUtils.getSortedDirectories(basePath);
+            for (Path scene : scenes) {
+                Map<Path, List<Path>> cameraMap = new HashMap<>();
+                List<Path> cameras = HelperUtils.getSortedDirectories(scene);
+                for (Path camera : cameras) {
+                    List<Path> files = HelperUtils.getSortedFiles(camera, "*.npy");
+                    cameraMap.put(camera, files);
+                }
+                result.put(scene, cameraMap);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return result;
     }
 
     private static List<Float> convertToFloatList(float[] featureArray) {
