@@ -77,7 +77,7 @@ public class EmbeddingFeatureStreamer {
         Path camera = cameraEntry.getKey();
         List<Path> files = cameraEntry.getValue();
         // Get the last processed index for this camera, or start at 0
-        int startIndex = cameraOffsets.getOrDefault(camera, 10704); // 10704 is the index to start from the 1000th frame.
+        int startIndex = cameraOffsets.getOrDefault(camera, 0); // 10704 is the index to start from the 1000th frame.
 
         int curFrame = -1;
         int fileIndex = startIndex;
