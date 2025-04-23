@@ -93,9 +93,9 @@ public class IotMain implements Runnable {
 //        String featureBatchEPL = "select UNum, curFrame, timestamp from embeddingFeature_camera_0001#ext_timed(timestamp, 6 sec) group by curFrame output snapshot every 3 seconds";
 //        EventEPLUtil.compileDeployAddListener(featureBatchEPL, new GenericIotEventListener("Embedding features Time Batch"));
 
-        String featureBatchEPL = "select features, UNum, curFrame, count(*) as frameRecordCount, timestamp " +
-                "from embeddingFeature_camera_0001#ext_timed(timestamp, " +  2 * TrackingParameters.timePeriod + " sec)  " +
-                "group by curFrame output snapshot every " + TrackingParameters.timePeriod + " seconds";
+//        String featureBatchEPL = "select features, UNum, curFrame, count(*) as frameRecordCount, timestamp " +
+//                "from embeddingFeature_camera_0001#ext_timed(timestamp, " +  2 * TrackingParameters.timePeriod + " sec)  " +
+//                "group by curFrame output snapshot every " + TrackingParameters.timePeriod + " seconds";
 //        EventEPLUtil.compileDeployAddListener(featureBatchEPL, new GenericIotEventListener("Embedding features Time Batch"));
 
 //        /* Working sliding window */
@@ -104,12 +104,12 @@ public class IotMain implements Runnable {
 //                "group by curFrame ";
 
 
-////        /* Working sliding window with isOverlapping flag. */
-//        String featureBatchEPL = "select features, UNum, curFrame, count(*) as frameRecordCount, timestamp, " +
-//                "       case when timestamp < current_timestamp() - " + TrackingParameters.timePeriod * 1000 +
-//                "            then true else false end as isOverlapping " +
-//                "from embeddingFeature_camera_0001#ext_timed(timestamp, " +  2 * TrackingParameters.timePeriod + " sec)  " +
-//                "group by curFrame output snapshot every " + TrackingParameters.timePeriod + " seconds";
+//        /* Working sliding window with isOverlapping flag. */
+        String featureBatchEPL = "select features, UNum, curFrame, count(*) as frameRecordCount, timestamp, " +
+                "       case when timestamp < current_timestamp() - " + TrackingParameters.timePeriod * 1000 +
+                "            then true else false end as isOverlapping " +
+                "from embeddingFeature_camera_0001#ext_timed(timestamp, " +  2 * TrackingParameters.timePeriod + " sec)  " +
+                "group by curFrame output snapshot every " + TrackingParameters.timePeriod + " seconds";
 
 //        String minTimestampEPL =
 //                "insert into BatchWindow " +
