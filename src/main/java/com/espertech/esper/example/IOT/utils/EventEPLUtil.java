@@ -22,8 +22,16 @@ public class EventEPLUtil {
     private static String runtimeURI;
     private static EPRuntime runtime;
 
-    // Buffer to hold EPL statements before deployment
-    private static final List<String> pendingEpls = new ArrayList<>();
+    // Holds each EPL with an optional listener
+    private static class EplEntry {
+        final String epl;
+        final UpdateListener listener;
+        EplEntry(String epl, UpdateListener listener) {
+            this.epl = epl;
+            this.listener = listener;
+        }
+    }
+    private static final List<EplEntry> pendingEpls = new ArrayList<>();
 
     private EventEPLUtil() {
         /* Prevent instantiation */
@@ -52,62 +60,47 @@ public class EventEPLUtil {
     }
 
     /**
-     * Collects an EPL statement for later deployment.
+     * Collects an EPL statement for later deployment, with an optional listener.
      */
     public static void addEpl(String epl) {
-        pendingEpls.add(epl.trim());
+        pendingEpls.add(new EplEntry(epl.trim(), null));
+    }
+
+    public static void addEpl(String epl, UpdateListener listener) {
+        pendingEpls.add(new EplEntry(epl.trim(), listener));
     }
 
     /**
-     * Deploys all pending EPL statements in one batch.
+     * Deploys all buffered EPL statements in one batch,
+     * and attaches each listener to its corresponding statement.
      */
-    public static void compileDeployPendingEpls(UpdateListener listener) {
+    public static void deployAll() {
         if (pendingEpls.isEmpty()) {
             logger.warn("No EPL statements to deploy");
             return;
         }
+        // Build batch EPL
         StringBuilder batch = new StringBuilder();
-        pendingEpls.forEach(stmt -> batch.append(stmt).append("\n"));
-
+        for (EplEntry entry : pendingEpls) {
+            batch.append(entry.epl).append("\n");
+        }
         try {
             CompilerArguments args = new CompilerArguments(configuration);
-            // Ensure compiler sees registered event types
+            // ensure visibility of types and tables
             args.getPath().add(runtime.getRuntimePath());
             args.getOptions().setAccessModifierEventType(env -> NameAccessModifier.PUBLIC);
 
             EPCompiled compiled = EPCompilerProvider.getCompiler().compile(batch.toString(), args);
             EPDeployment deployment = runtime.getDeploymentService().deploy(compiled);
-        } catch (Exception e) {
-            logger.error("Failed to batch deploy EPLs", e);
-            throw new RuntimeException(e);
-        } finally {
-            pendingEpls.clear();
-        }
-    }
-
-    /**
-     * Deploys all pending EPL statements in one batch and attaches the listener to the last statement.
-     */
-    public static void compileDeployPendingEplsAddListener(UpdateListener listener) {
-        if (pendingEpls.isEmpty()) {
-            logger.warn("No EPL statements to deploy");
-            return;
-        }
-        StringBuilder batch = new StringBuilder();
-        pendingEpls.forEach(stmt -> batch.append(stmt).append("\n"));
-
-        try {
-            CompilerArguments args = new CompilerArguments(configuration);
-            // Ensure compiler sees registered event types
-            args.getPath().add(runtime.getRuntimePath());
-            args.getOptions().setAccessModifierEventType(env -> NameAccessModifier.PUBLIC);
-
-            EPCompiled compiled = EPCompilerProvider.getCompiler().compile(batch.toString(), args);
-            EPDeployment deployment = runtime.getDeploymentService().deploy(compiled);
-            // Attach listener to the last statement in the deployment
             EPStatement[] statements = deployment.getStatements();
-            EPStatement last = statements[statements.length - 1];
-            last.addListener(listener);
+
+            // Attach listeners in order
+            for (int i = 0; i < statements.length && i < pendingEpls.size(); i++) {
+                UpdateListener listener = pendingEpls.get(i).listener;
+                if (listener != null) {
+                    statements[i].addListener(listener);
+                }
+            }
         } catch (Exception e) {
             logger.error("Failed to batch deploy EPLs", e);
             throw new RuntimeException(e);
