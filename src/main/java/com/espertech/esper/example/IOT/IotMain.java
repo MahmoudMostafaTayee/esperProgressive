@@ -5,20 +5,19 @@
  */
 package com.espertech.esper.example.IOT;
 
+import com.espertech.esper.common.client.EventBean;
 import com.espertech.esper.example.IOT.helpers.ErrorCode;
 import com.espertech.esper.example.IOT.helpers.TrackingParameters;
 import com.espertech.esper.example.IOT.streamers.*;
+import com.espertech.esper.example.IOT.streams.*;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.example.IOT.utils.GenericIotEventListener;
-
-import com.espertech.esper.example.IOT.streams.SensorData;
-import com.espertech.esper.example.IOT.streams.DeviceCommand;
-import com.espertech.esper.example.IOT.streams.PersonView;
-import com.espertech.esper.example.IOT.streams.EmbeddingFeature;
 
 import com.espertech.esper.example.IOT.clusterers.AgglomerativeClusterer;
 import com.espertech.esper.example.IOT.clusterers.ClusTreeClusterer;
 import com.espertech.esper.example.IOT.clusterers.CluStreamClusterer;
+import com.espertech.esper.runtime.client.EPRuntime;
+import com.espertech.esper.runtime.client.EPStatement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +47,7 @@ public class IotMain implements Runnable {
      * configuration and initializes it.
      */
     private void initiateRunTime(){
+        EventEPLUtil.setConfiguration();
         EventEPLUtil.addEventType("personView", PersonView.class);
         EventEPLUtil.addEventType("sensorData", SensorData.class);
         EventEPLUtil.addEventType("deviceCommand", DeviceCommand.class);
@@ -55,6 +55,8 @@ public class IotMain implements Runnable {
         EventEPLUtil.addEventType("embeddingFeature" + "_" + "camera_0002", EmbeddingFeature.class);
         EventEPLUtil.addEventType("embeddingFeature" + "_" + "camera_0003", EmbeddingFeature.class);
         EventEPLUtil.addEventType("embeddingFeature" + "_" + "camera_0004", EmbeddingFeature.class);
+        EventEPLUtil.addEventType("PersonTracker", PersonTracker.class);
+        EventEPLUtil.addEventType("TriggerEvent", TriggerEvent.class);
 
         logger.info("Setting up runtime");
         EventEPLUtil.initiateRuntime();
@@ -77,6 +79,7 @@ public class IotMain implements Runnable {
 //        wildTrackDatasetQueries();
 
         embeddingFeatureQueries();
+        afterClusteringQueries();
 
         launchStreams();
         
@@ -139,6 +142,7 @@ public class IotMain implements Runnable {
 
         CluStreamClusterer cluStream = new CluStreamClusterer();
         EventEPLUtil.compileDeployAddListener(featureBatchEPL, cluStream.getListener());
+//        EventEPLUtil.compileDeploy(featureBatchEPL);
 
         String featureStreamEPL =
                 "select features, UNum , curFrame " +
@@ -170,6 +174,86 @@ public class IotMain implements Runnable {
 //        EventEPLUtil.compileDeploy(clusterEpl);
 ////        EventEPLUtil.compileDeployAddListener(clusterEpl,new GenericIotEventListener("Potential Cluster"));
     }
+
+    private void afterClusteringQueries(){
+//        String eplTable = """
+//            create table PersonTable (
+//                personId string primary key,
+//                features float[],
+//                lastSeen long
+//            );
+//        """;
+
+
+//        String eplInsertOrUpdate = """
+//            on PersonTracker as pd
+//            merge PersonTable as pt
+//            where pt.personId = pd.personId
+//            when matched then
+//                update set pt.features = pd.features, pt.lastSeen = pd.timestamp
+//            when not matched then
+//                insert (personId, features, lastSeen) values (pd.personId, pd.features, pd.timestamp);
+//        """;
+
+
+//        String eplSchema = """
+//            create schema PersonTracker(personId string, timestamp long);
+//        """;
+//        EventEPLUtil.addEpl(eplSchema);
+
+//        EventEPLUtil.addEpl("""
+//                                create schema TriggerEvent();
+//                            """);
+
+
+        EventEPLUtil.addEpl("""
+                                create table PersonTable (
+                                    personId int primary key,
+                                    lastSeen long
+                                );
+                            """);
+
+        EventEPLUtil.addEpl("""
+                                on PersonTracker as pd
+                                merge into PersonTable as pt
+                                where pt.personId = pd.personId
+                                when matched then
+                                    update set pt.lastSeen = pd.timestamp
+                                when not matched then
+                                    insert select pd.personId as personId, pd.timestamp as lastSeen;
+                            """);
+
+        // Clean up persons who haven’t been seen in 5 seconds
+        EventEPLUtil.addEpl("on pattern [every timer:interval(1000)]\n" +
+                            "delete from PersonTable\n" +
+                            "where current_timestamp() - lastSeen > 50000;");
+
+        String eplSelect = """
+                                on TriggerEvent
+                                select personId, lastSeen from PersonTable;
+                            """;
+        EventEPLUtil.addEpl(
+                eplSelect,
+                (EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime) -> {
+                    String listenerName = "Tracking persons table";
+                    if (newEvents != null) {
+                        for (EventBean event : newEvents) {
+                            int personId = (int) event.get("personId");
+                            long lastSeen = (long) event.get("lastSeen");
+                            System.out.printf("%s: Person %d last seen at %d (Current Time: %d)%n",
+                                    listenerName,
+                                    personId,
+                                    lastSeen,
+                                    EventEPLUtil.getCurrentTime()
+                            );
+                        }
+                    }
+                }
+        );
+        EventEPLUtil.deployAll();
+
+    }
+
     private void wildTrackDatasetQueries(){
         String eplQuery;
         eplQuery = "select * from personView;";
