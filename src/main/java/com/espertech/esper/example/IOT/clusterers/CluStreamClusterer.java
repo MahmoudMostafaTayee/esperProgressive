@@ -5,6 +5,7 @@ import com.espertech.esper.example.IOT.helpers.ClusterAssociator;
 import com.espertech.esper.example.IOT.streams.PersonTracker;
 import com.espertech.esper.example.IOT.streams.SensorData;
 import com.espertech.esper.example.IOT.streams.TriggerEvent;
+import com.espertech.esper.example.IOT.utils.ClusterJsonLogger;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPStatement;
@@ -35,7 +36,7 @@ public class CluStreamClusterer {
     private Map<Integer, List<List<Float>>> CurrentClusterIdsToFeatures = null;
 
     public CluStreamClusterer() {
-
+        ClusterJsonLogger.initializeJsonFile();  // Reset at start
     }
 
     private void processStreamingClusters(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime) {
@@ -127,6 +128,7 @@ public class CluStreamClusterer {
         Map<Integer, List<Integer>> localClusterToDataIds           = new HashMap<>();
         Map<Integer, List<Integer>> localClusterToFrames            = new HashMap<>();
         CurrentClusterIdsToFeatures = new HashMap<>();
+        Map<Integer, Integer> associations = null;
 
         for (AbstractMap.SimpleEntry<Integer, AbstractMap.SimpleEntry<Integer, Instance>> buffered : windowInstancesBuffer) {
             Integer serial = buffered.getKey(); // Outer key = ID
@@ -144,15 +146,18 @@ public class CluStreamClusterer {
 
             // Optional debug logging
             logger.debug("ID: {}, Frame: {}, Assigned Cluster: {}", serial, frameNumber, assignedCluster);
+
+            ClusterJsonLogger.updateFrames(frameNumber);
         }
 
         if(PrevClusterIdsToFeatures != null){
             /*Here all the logic for similarity and centrality goes to generate a unique id per user.*/
-            clusterAssociator();
+            associations = clusterAssociator();
         }
 
         PrevClusterIdsToFeatures = CurrentClusterIdsToFeatures;
 
+        ClusterJsonLogger.appendClusterSnapshot(localClusterToDataIds, associations);
         for (Map.Entry<Integer, List<Integer>> entry : localClusterToDataIds.entrySet()) {
             logger.info("Cluster {} has data ids: {}", entry.getKey(), entry.getValue());
         }
@@ -166,7 +171,7 @@ public class CluStreamClusterer {
 //        exit(0);
     }
 
-    private void clusterAssociator(){
+    private Map<Integer, Integer> clusterAssociator(){
         // Initialize with parameters from paper (ε = 0.3)
         ClusterAssociator associator = new ClusterAssociator(0.3f);
 
@@ -203,6 +208,8 @@ public class CluStreamClusterer {
             EventEPLUtil.streamEvent(new PersonTracker(entry.getKey(), now), "PersonTracker");
         }
         EventEPLUtil.streamEvent(new TriggerEvent(), "TriggerEvent");
+
+        return associations;
     }
 
     public UpdateListener getListener(){
