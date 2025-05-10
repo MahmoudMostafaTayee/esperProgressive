@@ -2,6 +2,10 @@ package com.espertech.esper.example.IOT.clusterers;
 
 import com.espertech.esper.common.client.EventBean;
 import com.espertech.esper.example.IOT.helpers.ClusterAssociator;
+import com.espertech.esper.example.IOT.streams.PersonTracker;
+import com.espertech.esper.example.IOT.streams.SensorData;
+import com.espertech.esper.example.IOT.streams.TriggerEvent;
+import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPStatement;
 import com.espertech.esper.runtime.client.UpdateListener;
@@ -16,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 
 import com.espertech.esper.example.IOT.helpers.ErrorCode;
+
 import static java.lang.System.exit;
 
 public class CluStreamClusterer {
@@ -194,7 +199,10 @@ public class CluStreamClusterer {
         System.out.println("Cluster Mappings (Previous → Current):");
         for (Map.Entry<Integer, Integer> entry : associations.entrySet()) {
             System.out.printf("  Cluster %d → Cluster %d%n", entry.getKey(), entry.getValue());
+            long now = System.currentTimeMillis();
+            EventEPLUtil.streamEvent(new PersonTracker(entry.getKey(), now), "PersonTracker");
         }
+        EventEPLUtil.streamEvent(new TriggerEvent(), "TriggerEvent");
     }
 
     public UpdateListener getListener(){

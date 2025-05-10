@@ -12,7 +12,7 @@ import java.nio.file.*;
 import java.util.List;
 
 public class WildTrackDatasetStreamer {
-    private static final String DIRECTORY_PATH = "./Dataset/Wildtrack_dataset/annotations_positions";
+    private static final String DIRECTORY_PATH = "/mnt/hdd1/Masters/Dataset/Wildtrack_dataset/annotations_positions";
     private static long timeTracker = System.currentTimeMillis();
 
     public static void streamWildTrackDataset() {
