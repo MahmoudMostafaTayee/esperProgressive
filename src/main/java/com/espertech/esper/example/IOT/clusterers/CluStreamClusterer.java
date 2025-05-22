@@ -34,6 +34,7 @@ public class CluStreamClusterer {
     private int windowNumber = 0;
     private Map<Integer, List<List<Float>>> PrevClusterIdsToFeatures = null;
     private Map<Integer, List<List<Float>>> CurrentClusterIdsToFeatures = null;
+    private Long latestTimestamp = 0L;
 
     public CluStreamClusterer() {
         ClusterJsonLogger.initializeJsonFile();  // Reset at start
@@ -66,19 +67,20 @@ public class CluStreamClusterer {
             windowNumber++;
             int __windowNumber = windowNumber;
             for (EventBean e : newEvents) {
-                boolean isOverlapping = (boolean) e.get("isOverlapping");
+//                boolean isOverlapping = (boolean) e.get("isOverlapping");
                 Integer serial = (Integer) e.get("UNum");
                 Integer curFrame = (Integer) e.get("curFrame");
                 Long timestamp = (Long) e.get("timestamp");
-                System.out.println("Serial: " + serial + ", Frame: " + curFrame  + ", windowNumber: " + __windowNumber + ", timestamp: " + timestamp + ", isOverlapping: " + isOverlapping);
+                System.out.println("Serial: " + serial + ", Frame: " + curFrame  + ", windowNumber: " + __windowNumber + ", timestamp: " + timestamp);
 
-                if (isOverlapping) {
+                if (timestamp <= latestTimestamp) {
                     /* Skip overlapping events
                     (Events that have overlap with previous events
                         - Previously processed events-)*/
                     continue;
 //                    break; // I think break could be used in case the events are sorted by timestamp.
                 }
+                latestTimestamp = timestamp;
                 int x1 = (Integer) e.get("x1");
                 int x2 = (Integer) e.get("x2");
                 int y1 = (Integer) e.get("y1");

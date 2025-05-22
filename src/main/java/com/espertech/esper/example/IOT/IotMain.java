@@ -108,9 +108,9 @@ public class IotMain implements Runnable {
 
 
 //        /* Working sliding window with isOverlapping flag. */
-        String featureBatchEPL = "select features, UNum, curFrame, x1, x2, y1, y2, count(*) as frameRecordCount, timestamp, " +
-                "       case when timestamp < current_timestamp() - " + TrackingParameters.timePeriod * 1000 +
-                "            then true else false end as isOverlapping " +
+        String featureBatchEPL = "select features, UNum, curFrame, x1, x2, y1, y2, count(*) as frameRecordCount, timestamp " +
+//                "       case when timestamp < current_timestamp() - " + TrackingParameters.timePeriod * 1000 +
+//                "            then true else false end as isOverlapping " +
                 "from embeddingFeature_camera_0001#ext_timed(timestamp, " +  2 * TrackingParameters.timePeriod + " sec)  " +
                 "group by curFrame output snapshot every " + TrackingParameters.timePeriod + " seconds";
 
@@ -239,6 +239,7 @@ public class IotMain implements Runnable {
                     if (newEvents != null) {
                         for (EventBean event : newEvents) {
                             int personId = (int) event.get("personId");
+                            personId += 1;
                             long lastSeen = (long) event.get("lastSeen");
                             System.out.printf("%s: Person %d last seen at %d (Current Time: %d)%n",
                                     listenerName,
