@@ -79,7 +79,22 @@ public class CluStreamClusterer {
                     continue;
 //                    break; // I think break could be used in case the events are sorted by timestamp.
                 }
+                int x1 = (Integer) e.get("x1");
+                int x2 = (Integer) e.get("x2");
+                int y1 = (Integer) e.get("y1");
+                int y2 = (Integer) e.get("y2");
                 List<Float> featureList = (List<Float>) e.get("features");
+
+                // Add bounding box at the end
+                List<Double> fullVector = new ArrayList<>();
+                for (float f : featureList) fullVector.add((double) f);
+                fullVector.add((double) x1);
+                fullVector.add((double) y1);
+                fullVector.add((double) x2);
+                fullVector.add((double) y2);
+
+                // Then convert to array for clustering
+                double[] vector = fullVector.stream().mapToDouble(Double::doubleValue).toArray();
                 Long frameRecordCount = (Long) e.get("frameRecordCount");
                 if(numberOfClusters < frameRecordCount){
                     numberOfClusters = frameRecordCount.intValue();
@@ -87,7 +102,7 @@ public class CluStreamClusterer {
 
                 currentFeaturesPerSerial.computeIfAbsent(serial, k -> new ArrayList<>()).addAll(featureList);
 
-                Instance instance = ClustersUtils.convertFeatureToInstance(featureList, cluStreamHeader);
+                Instance instance = ClustersUtils.convertFeatureToInstance(vector, cluStreamHeader);
                 long start = System.nanoTime();
                 cluStream.trainOnInstance(instance);
                 long durationMs = (System.nanoTime() - start) / 1_000_000;

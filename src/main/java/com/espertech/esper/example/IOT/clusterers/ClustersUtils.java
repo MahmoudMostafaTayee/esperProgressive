@@ -63,4 +63,10 @@ public class ClustersUtils {
         instance.setDataset(header);
         return instance;
     }
+
+    public static Instance convertFeatureToInstance(double[] values, InstancesHeader header) {
+        Instance instance = new DenseInstance(1.0, values);
+        instance.setDataset(header);
+        return instance;
+    }
 }

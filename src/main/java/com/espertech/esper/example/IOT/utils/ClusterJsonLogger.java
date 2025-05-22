@@ -3,12 +3,16 @@ package com.espertech.esper.example.IOT.utils;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.lang.reflect.Type;
 import java.util.*;
 
 public class ClusterJsonLogger {
+    private static final Logger logger = LoggerFactory.getLogger(ClusterJsonLogger.class);
+
     private static final String FILE_PATH = "clusters.json";
     private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private static final Type LIST_OF_MAP_TYPE = new TypeToken<List<Map<String, Object>>>() {}.getType();
@@ -34,9 +38,9 @@ public class ClusterJsonLogger {
 
             // Merge new cluster data
             for (Map.Entry<Integer, List<Integer>> entry : localClusterToDataIds.entrySet()) {
-                int personID = entry.getKey();
-                if (associations != null && associations.containsKey(personID)) {
-                    personID = associations.get(personID);
+                String personID = String.valueOf(entry.getKey());
+                if (associations != null && associations.containsKey(entry.getKey())) {
+                    personID = String.valueOf(associations.get(entry.getKey()));
                 }
 
                 boolean personFound = false;
@@ -44,7 +48,7 @@ public class ClusterJsonLogger {
                 // Check if person already exists and add new IDs
                 for (Map<String, Object> cluster : currentClusters) {
                     if (cluster.containsKey("persons")) {
-                        Map<Integer, List<Integer>> persons = (Map<Integer, List<Integer>>) cluster.get("persons");
+                        Map<String, List<Integer>> persons = (Map<String, List<Integer>>) cluster.get("persons");
                         List<Integer> existingIds = persons.getOrDefault(personID, new ArrayList<>());
                         existingIds.addAll(entry.getValue());
                         persons.put(personID, existingIds);
@@ -57,7 +61,7 @@ public class ClusterJsonLogger {
                 if (!personFound) {
                     Map<String, Object> newCluster = new LinkedHashMap<>();
                     newCluster.put("frames", new ArrayList<>());  // Empty frame list to be updated
-                    Map<Integer, List<Integer>> newPersons = new LinkedHashMap<>();
+                    Map<String, List<Integer>> newPersons = new LinkedHashMap<>();
                     newPersons.put(personID, entry.getValue());
                     newCluster.put("persons", newPersons);
                     currentClusters.add(newCluster);

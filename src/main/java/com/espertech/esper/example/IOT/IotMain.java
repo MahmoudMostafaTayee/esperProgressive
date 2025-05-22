@@ -108,7 +108,7 @@ public class IotMain implements Runnable {
 
 
 //        /* Working sliding window with isOverlapping flag. */
-        String featureBatchEPL = "select features, UNum, curFrame, count(*) as frameRecordCount, timestamp, " +
+        String featureBatchEPL = "select features, UNum, curFrame, x1, x2, y1, y2, count(*) as frameRecordCount, timestamp, " +
                 "       case when timestamp < current_timestamp() - " + TrackingParameters.timePeriod * 1000 +
                 "            then true else false end as isOverlapping " +
                 "from embeddingFeature_camera_0001#ext_timed(timestamp, " +  2 * TrackingParameters.timePeriod + " sec)  " +
@@ -226,7 +226,7 @@ public class IotMain implements Runnable {
         // Clean up persons who haven’t been seen in 5 seconds
         EventEPLUtil.addEpl("on pattern [every timer:interval(1000)]\n" +
                             "delete from PersonTable\n" +
-                            "where current_timestamp() - lastSeen > 50000;");
+                            "where current_timestamp() - lastSeen > 5000;");
 
         String eplSelect = """
                                 on TriggerEvent
