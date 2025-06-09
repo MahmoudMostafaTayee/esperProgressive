@@ -1,9 +1,17 @@
 package com.espertech.esper.example.IOT.helpers;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 import org.apache.commons.math3.linear.RealVector;
 import org.apache.commons.math3.linear.ArrayRealVector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SimilarityUtils {
+    private static final Logger logger = LoggerFactory.getLogger(SimilarityUtils.class);
+
     public static double cosineSimilarity(List<Float> features1, List<Float> features2) {
         if (features1 == null || features2 == null || features1.size() != features2.size()) {
             throw new IllegalArgumentException("Feature lists must be non-null and of the same size");
@@ -26,50 +34,58 @@ public class SimilarityUtils {
 
     public static double[][] computeCosineDistanceMatrix(double[][] features, double epsilon) {
         int n = features.length;
-        double[][] similarityMatrix = new double[n][n];
-
-        // Compute cosine similarity
-        for (int i = 0; i < n; i++) {
-            for (int j = i; j < n; j++) {
-                double similarity = cosineSimilarity(features[i], features[j]);
-                similarityMatrix[i][j] = similarity;
-                similarityMatrix[j][i] = similarity;
-            }
-        }
-
-        // Apply epsilon threshold
+        double[][] distMatrix = new double[n][n];
         double threshold = 1 - epsilon;
+
         for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n; j++) {
-                if (similarityMatrix[i][j] < threshold) {
-                    similarityMatrix[i][j] = 0;
-                }
+            distMatrix[i][i] = 0;  // Zero diagonal
+
+            for (int j = i + 1; j < n; j++) {
+                double similarity = cosineSimilarity(features[i], features[j]);
+                double distance = 1.0 - similarity;
+
+                // Apply epsilon threshold
+                distMatrix[i][j] = distMatrix[j][i] =
+                        (similarity < threshold) ? 1.0 : distance;
             }
         }
-
-        // Fill diagonal with 1 (ensuring self-similarity)
-        for (int i = 0; i < n; i++) {
-            similarityMatrix[i][i] = 1.0;
-        }
-
-        // Convert similarity to distance (distance = 1 - similarity)
-        double[][] distanceMatrix = new double[n][n];
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n; j++) {
-                distanceMatrix[i][j] = 1.0 - similarityMatrix[i][j];
-            }
-        }
-
-        return distanceMatrix;
+        return distMatrix;
     }
 
     // Compute cosine similarity between two vectors
-    private static double cosineSimilarity(double[] vec1, double[] vec2) {
-        RealVector v1 = new ArrayRealVector(vec1);
-        RealVector v2 = new ArrayRealVector(vec2);
-        double dotProduct = v1.dotProduct(v2);
-        double norm1 = v1.getNorm();
-        double norm2 = v2.getNorm();
-        return dotProduct / (norm1 * norm2);
+    private static double cosineSimilarity(double[] a, double[] b) {
+        double dot = 0.0, normA = 0.0, normB = 0.0;
+        for (int i = 0; i < a.length; i++) {
+            dot += a[i] * b[i];
+            normA += a[i] * a[i];
+            normB += b[i] * b[i];
+        }
+
+        if (normA == 0 && normB == 0) return 1.0;  // Both zero vectors
+        if (normA == 0 || normB == 0) return 0.0;   // One zero vector
+
+        return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+
+    // Helper for debugging
+    private String matrixToString(double[][] matrix) {
+        StringBuilder sb = new StringBuilder();
+        for (double[] row : matrix) {
+            for (double val : row) {
+                sb.append(String.format("%.2f ", val));
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
+    private void logAssignments(List<Integer> ids, int[] labels) {
+        Map<Integer, List<Integer>> clusterMap = new HashMap<>();
+        for (int i = 0; i < labels.length; i++) {
+            clusterMap.computeIfAbsent(labels[i], k -> new ArrayList<>()).add(ids.get(i));
+        }
+
+        clusterMap.forEach((cluster, members) ->
+                logger.info("Cluster {}: {}", cluster, members));
     }
 }
