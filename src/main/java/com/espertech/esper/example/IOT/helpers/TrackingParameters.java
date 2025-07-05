@@ -20,6 +20,10 @@ public class TrackingParameters {
     public static double simTh = 0.85;
     public static int deleteGidTh = 5000;
     public static exec_level exec_lvl = exec_level.ALL;
+    public static double iouTh = 0.9;
+    public static boolean overlap_suppression = true;
+    public static boolean isDebug = true;
+
 
     private TrackingParameters() {
         /* Prevent instantiation */
