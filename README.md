@@ -85,17 +85,4 @@ This project tackles the problem of tracking people across multiple camera views
 - `numMacroClusters`: Used in batch cluster summarization (for evaluation or merging)
 - `overlapThreshold`: Spatial threshold to filter overlapping tracks
 
----
-
-## 🧪 Running the Project
-
-```bash
-# Clone the repo
-git clone https://github.com/your-username/your-repo-name.git
-
-# Make sure to set BASE_PATH in TrackingParameters.java
-# Then compile and run
-cd your-repo-name
-javac -cp ".:lib/*" src/*.java
-java -cp ".:lib/*:src" Main
 
