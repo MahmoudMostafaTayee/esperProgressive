@@ -46,20 +46,39 @@ public class EmbeddingFeatureStreamer {
         Map<Path, List<Path>> cameras = sceneEntry.getValue();
         Map<Path, Boolean> processingStatus = new HashMap<>();
 
+        Map<Path, List<Path>> selectedCameras = new HashMap<>();
+
+        String selectedCamera = TrackingParameters.CAMERA_FILTER;
+
+        for (Map.Entry<Path, List<Path>> entry : cameras.entrySet()) {
+
+            Path camera = entry.getKey();
+
+            if (!Files.isDirectory(camera)) continue;
+
+            if (!selectedCamera.equalsIgnoreCase("all")) {
+                if (!camera.getFileName().toString()
+                        .equals("camera_" + selectedCamera)) {
+                    continue;
+                }
+            }
+
+            System.out.println("Selected Camera: " + selectedCamera);
+            selectedCameras.put(camera, entry.getValue());
+        }
+
+
         // Initialize processing status for each camera
-        for (Map.Entry<Path, List<Path>> cameraEntry : cameras.entrySet()) {
+        for (Map.Entry<Path, List<Path>> cameraEntry : selectedCameras.entrySet()) {
             Path camera = cameraEntry.getKey();
             processingStatus.put(camera, true);
         }
 
         boolean hasMoreFiles;
 //        do{
-            for (Map.Entry<Path, List<Path>> cameraEntry : cameras.entrySet()) {
+            for (Map.Entry<Path, List<Path>> cameraEntry : selectedCameras.entrySet()) {
                 Path camera = cameraEntry.getKey();
 //                System.out.println("Processing camera: " + camera);
-                if (!camera.toString().equals(TrackingParameters.FEATURES_BASE_DIR + "\\scene_001\\camera_0001"))
-                    continue;
-                if (!Files.isDirectory(camera)) continue;
                 if (!processingStatus.get(camera)) continue; // Skip if already processed.
                 boolean cameraHasMoreFiles = processCamera(scene, cameraEntry);
 
