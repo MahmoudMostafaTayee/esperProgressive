@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
 public class EmbeddingFeatureStreamer {
     private static final Logger logger = LoggerFactory.getLogger(EmbeddingFeatureStreamer.class);
 
-    private static final String BASE_PATH = "/mnt/hdd1/Masters/AIC24_Track1_YACHIYO_RIIPS/EmbedFeature";
+    private static final String BASE_PATH = TrackingParameters.FEATURES_BASE_DIR;
     private static final Pattern FILE_PATTERN = Pattern.compile("feature_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+\\.?\\d*)\\.npy");
     private static final long ONE_SEC_TIME_STEP = 1000L;
     private static final Map<Path, Integer> cameraOffsets = new HashMap<>();
@@ -57,7 +57,7 @@ public class EmbeddingFeatureStreamer {
             for (Map.Entry<Path, List<Path>> cameraEntry : cameras.entrySet()) {
                 Path camera = cameraEntry.getKey();
 //                System.out.println("Processing camera: " + camera);
-                if (!camera.toString().equals("/mnt/hdd1/Masters/AIC24_Track1_YACHIYO_RIIPS/EmbedFeature/scene_001/camera_0001"))
+                if (!camera.toString().equals(TrackingParameters.FEATURES_BASE_DIR + "\\scene_001\\camera_0001"))
                     continue;
                 if (!Files.isDirectory(camera)) continue;
                 if (!processingStatus.get(camera)) continue; // Skip if already processed.

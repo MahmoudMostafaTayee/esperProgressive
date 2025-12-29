@@ -30,6 +30,7 @@ public class IotMain implements Runnable {
 
     public static void main(String[] args) {
         ErrorCode retval = TrackingParameters.getTrackingParams(args);
+
         TrackingParameters.printArgs();
 
         if (retval == ErrorCode.SUCCESS) {
@@ -103,7 +104,7 @@ public class IotMain implements Runnable {
 
 //        /* Working sliding window */
         String featureBatchEPL = "select features, UNum, curFrame, x1, x2, y1, y2, count(*) as frameRecordCount, timestamp " +
-                "from embeddingFeature_camera_0002#time_batch(" + TrackingParameters.timePeriod + " sec)  " +
+                "from embeddingFeature_camera_0001#time_batch(" + TrackingParameters.timePeriod + " sec)  " +
                 "group by curFrame ";
 
 

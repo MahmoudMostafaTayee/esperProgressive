@@ -76,22 +76,22 @@ public class AgglomerativeClusterer {
             if (TrackingParameters.isDebug) {
                 // This code snippet saves the distance matrix and frame numbers to CSV files to be compared with original code.
                 try {
-                    debug.saveDoubleMatrix("/home/mahmoud-tayee/Thesis/Real-Time_Multi-Camera_People_Tracking_using_Event_Stream_Processing/distance_matrix.csv", distanceMatrix);
+                    debug.saveDoubleMatrix(TrackingParameters.OUTPUT_DIR + "\\distance_matrix.csv", distanceMatrix);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
                 try {
-                    debug.saveIntList("/home/mahmoud-tayee/Thesis/Real-Time_Multi-Camera_People_Tracking_using_Event_Stream_Processing/frame_numbers.txt", frameNumbers);
+                    debug.saveIntList(TrackingParameters.OUTPUT_DIR + "\\frame_numbers.txt", frameNumbers);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
                 try {
-                    debug.saveIntList("/home/mahmoud-tayee/Thesis/Real-Time_Multi-Camera_People_Tracking_using_Event_Stream_Processing/serial_numbers.txt", serialNumbers);
+                    debug.saveIntList(TrackingParameters.OUTPUT_DIR + "\\serial_numbers.txt", serialNumbers);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
                 try {
-                    debug.saveIntList("/home/mahmoud-tayee/Thesis/Real-Time_Multi-Camera_People_Tracking_using_Event_Stream_Processing/cluster_labels.txt", clusterLabelsList);
+                    debug.saveIntList(TrackingParameters.OUTPUT_DIR + "\\cluster_labels.txt", clusterLabelsList);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
