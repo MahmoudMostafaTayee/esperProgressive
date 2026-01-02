@@ -6,7 +6,10 @@ import org.slf4j.LoggerFactory;
 
 public class TrackingParameters {
     private static final Logger logger = LoggerFactory.getLogger(TrackingParameters.class);
-    public enum exec_level { ALL, SCPT, MCPT };
+
+    public enum exec_level {
+        ALL, SCPT, MCPT
+    };
 
     public static double epsilonScpt = 0.10;
     public static int timePeriod = 1;
@@ -24,6 +27,12 @@ public class TrackingParameters {
     public static boolean overlap_suppression = true;
     public static boolean isDebug = true;
     public static int max_number_of_windows_to_process = 3; // This won't work unless in isDebug is ture.
+
+    // SNMS Parameters
+    public static boolean sequential_nms = true;
+    public static double temporally_snms_th = 0.6;
+    public static double spatially_snms_th = 0.6;
+    public static boolean merge_nonoverlap = true;
 
     // ===== Runtime-configurable paths =====
     public static String FEATURES_BASE_DIR;
@@ -48,19 +57,16 @@ public class TrackingParameters {
 
         // ---------- Scene ----------
         scene = Integer.parseInt(
-                    cmd.getOptionValue("scene")
-        );
+                cmd.getOptionValue("scene"));
 
         // ---------- Feature directory ----------
         FEATURES_BASE_DIR = cmd.getOptionValue(
-                "features_dir"
-        );
+                "features_dir");
 
         // ---------- Output directory ----------
         OUTPUT_DIR = cmd.getOptionValue(
                 "output_dir",
-                "./output"
-        );
+                "./output");
 
         // ---------- Camera filter ----------
         CAMERA_FILTER = cmd.getOptionValue("camera", "all");
@@ -89,13 +95,11 @@ public class TrackingParameters {
     private static void createOutputDirectory() {
         try {
             java.nio.file.Files.createDirectories(
-                    java.nio.file.Paths.get(OUTPUT_DIR)
-            );
+                    java.nio.file.Paths.get(OUTPUT_DIR));
         } catch (Exception e) {
             logger.error("Failed to create output directory: " + OUTPUT_DIR, e);
         }
     }
-
 
     private static CommandLine parseArguments(String[] args) {
         Options options = new Options();
@@ -162,9 +166,7 @@ public class TrackingParameters {
                         ", simTh=" + simTh +
                         ", deleteGidTh=" + deleteGidTh +
                         ", exec_lvl=" + exec_lvl +
-                        '}'
-        );
+                        '}');
     }
 
 }
-

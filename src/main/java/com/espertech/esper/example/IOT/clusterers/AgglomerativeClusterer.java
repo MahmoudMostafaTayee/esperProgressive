@@ -27,10 +27,12 @@ public class AgglomerativeClusterer {
     private int numberOfClusters = 1;
     Integer number_of_winodws_processed = 1;
 
-    public AgglomerativeClusterer(double epsilon){
+    public AgglomerativeClusterer(double epsilon) {
         this.epsilon = epsilon;
     }
-    private void processStreamingClusters(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime){
+
+    private void processStreamingClusters(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement,
+            EPRuntime runtime) {
         Instant start_time = Instant.now();
         Long first_timestamp = 0L;
         long lasttimestamp = 0L;
@@ -57,7 +59,6 @@ public class AgglomerativeClusterer {
                 }
                 lasttimestamp = timestamp;
 
-
                 System.out.println("Current Frame Number: " + curFrame);
                 // Process each detected user in the frame
                 for (DetectedUser user : detectedUsers) {
@@ -73,7 +74,7 @@ public class AgglomerativeClusterer {
                     int x2 = user.getX2();
                     int y1 = user.getY1();
                     int y2 = user.getY2();
-                    boundingBoxList.add(new Integer[]{x1, x2, y1, y2});
+                    boundingBoxList.add(new Integer[] { x1, x2, y1, y2 });
 
                     featureList.add(feature.stream().mapToDouble(Float::doubleValue).toArray());
                     frameNumbers.add(curFrame);
@@ -81,18 +82,19 @@ public class AgglomerativeClusterer {
                     idList.add(id);
                     System.out.println(user);
 
-//                Long frameRecordCount = (Long) e.get("frameRecordCount");
-//                if (numberOfClusters < frameRecordCount) {
-//                    numberOfClusters = frameRecordCount.intValue();
-//                }
-//                if (id == 1228) {
-//                    break;
-//                }
+                    // Long frameRecordCount = (Long) e.get("frameRecordCount");
+                    // if (numberOfClusters < frameRecordCount) {
+                    // numberOfClusters = frameRecordCount.intValue();
+                    // }
+                    // if (id == 1228) {
+                    // break;
+                    // }
+                }
+
             }
 
-        }
-
-            double[][] distanceMatrix = SimilarityUtils.computeCosineDistanceMatrix(featureList.toArray(new double[0][]), this.epsilon);
+            double[][] distanceMatrix = SimilarityUtils
+                    .computeCosineDistanceMatrix(featureList.toArray(new double[0][]), this.epsilon);
             HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
             int[] clusterLabels = hc.partition(this.epsilon);
             System.out.println("clusterLabels: " + Arrays.toString(clusterLabels));
@@ -105,7 +107,8 @@ public class AgglomerativeClusterer {
                     .collect(Collectors.toList());
 
             if (TrackingParameters.isDebug) {
-                // This code snippet saves the distance matrix and frame numbers to CSV files to be compared with original code.
+                // This code snippet saves the distance matrix and frame numbers to CSV files to
+                // be compared with original code.
                 try {
                     debug.saveDoubleMatrix(TrackingParameters.OUTPUT_DIR + "\\distance_matrix.csv", distanceMatrix);
                 } catch (IOException e) {
@@ -128,22 +131,29 @@ public class AgglomerativeClusterer {
                 }
             }
 
+            List<Integer> newClusterLabels = ClusteringUtils.tracking_by_clustering(
+                    distanceMatrix,
+                    frameNumbers,
+                    serialNumbers,
+                    clusterLabelsList,
+                    this.epsilon);
 
-            List<Integer> newClusterLabels =
-            ClusteringUtils.tracking_by_clustering(
-                                                        distanceMatrix,
-                                                        frameNumbers,
-                                                        serialNumbers,
-                                                        clusterLabelsList,
-                                                        this.epsilon
-                                                        );
+            if (TrackingParameters.sequential_nms) {
+                newClusterLabels = ClusteringUtils.sequentialNonMaximumSuppression(
+                        newClusterLabels,
+                        frameNumbers,
+                        boundingBoxList,
+                        TrackingParameters.temporally_snms_th,
+                        TrackingParameters.spatially_snms_th,
+                        TrackingParameters.merge_nonoverlap);
+            }
 
             System.out.println("newClusterLabels: " + Arrays.toString(newClusterLabels.toArray()));
 
             Map<Integer, List<Integer>> clusters = new HashMap<>();
             for (int i = 0; i < clusterLabels.length; i++) {
                 int label = newClusterLabels.get(i);
-                int id    = idList.get(i);
+                int id = idList.get(i);
                 clusters.computeIfAbsent(label, k -> new ArrayList<>()).add(id);
             }
 
@@ -160,16 +170,16 @@ public class AgglomerativeClusterer {
         System.out.println("First ID: " + first_id + " And Last Id: " + last_id);
         System.out.println("Time taken: " + HelperUtils.elapsedMillis(start_time) + " ms");
         System.out.println("--------------------------------------------------------------------------");
-        if(TrackingParameters.isDebug && (number_of_winodws_processed >= TrackingParameters.max_number_of_windows_to_process))
-        {
+        if (TrackingParameters.isDebug
+                && (number_of_winodws_processed >= TrackingParameters.max_number_of_windows_to_process)) {
             exit(0);
         }
         number_of_winodws_processed += 1;
     }
-    public UpdateListener getListener(){
-        return (newEvents, oldEvents,  statement,  runtime) ->
-        {
-            processStreamingClusters(newEvents, oldEvents,  statement,  runtime);
+
+    public UpdateListener getListener() {
+        return (newEvents, oldEvents, statement, runtime) -> {
+            processStreamingClusters(newEvents, oldEvents, statement, runtime);
         };
     }
 }

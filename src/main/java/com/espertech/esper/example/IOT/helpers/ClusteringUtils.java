@@ -21,8 +21,9 @@ public class ClusteringUtils {
     /**
      * Performs agglomerative hierarchical clustering on a given distance matrix.
      *
-     * @param distanceMatrix The distance matrix representing the distances between data points.
-     * @param epsilon The maximum distance to consider for forming clusters.
+     * @param distanceMatrix The distance matrix representing the distances between
+     *                       data points.
+     * @param epsilon        The maximum distance to consider for forming clusters.
      * @return A list of cluster labels for each data point.
      */
     public static List<Integer> agglomerativeClustering(double[][] distanceMatrix, double epsilon) {
@@ -37,18 +38,19 @@ public class ClusteringUtils {
         // Partition the clusters based on epsilon (distance criterion)
         int[] clusterLabels;
         try {
-//            System.out.println("distanceMatrix" + Arrays.deepToString(distanceMatrix));
+            // System.out.println("distanceMatrix" + Arrays.deepToString(distanceMatrix));
             clusterLabels = hc.partition(epsilon);
         } catch (IllegalArgumentException e) {
             // Fallback: Assign all to one cluster, like SciPy
             clusterLabels = new int[distanceMatrix.length];
             Arrays.fill(clusterLabels, 0);
 
-//            // If epsilon is too large, try a smaller value or handle as a single cluster
-//            // For now, let's try a slightly smaller epsilon
-//            double adjustedEpsilon = epsilon / 2.0; // Or some other strategy
-//            System.err.println("Warning: Epsilon " + epsilon + " was too large for HierarchicalClustering. Adjusting to " + adjustedEpsilon);
-//            clusterLabels = hc.partition(adjustedEpsilon);
+            // // If epsilon is too large, try a smaller value or handle as a single cluster
+            // // For now, let's try a slightly smaller epsilon
+            // double adjustedEpsilon = epsilon / 2.0; // Or some other strategy
+            // System.err.println("Warning: Epsilon " + epsilon + " was too large for
+            // HierarchicalClustering. Adjusting to " + adjustedEpsilon);
+            // clusterLabels = hc.partition(adjustedEpsilon);
         }
 
         // Convert int[] to List<Integer>
@@ -60,10 +62,12 @@ public class ClusteringUtils {
     }
 
     /**
-     * Determines the initial index for the assignment problem based on minimum distances within overlap groups.
+     * Determines the initial index for the assignment problem based on minimum
+     * distances within overlap groups.
      *
-     * @param distanceMatrix The distance matrix between all data points.
-     * @param overlapIndicesList A list of lists, where each inner list contains indices of overlapping nodes.
+     * @param distanceMatrix     The distance matrix between all data points.
+     * @param overlapIndicesList A list of lists, where each inner list contains
+     *                           indices of overlapping nodes.
      * @return The index of the overlap group with the maximum minimum distance.
      */
     public static int getInitialIndex(double[][] distanceMatrix, List<List<Integer>> overlapIndicesList) {
@@ -99,16 +103,20 @@ public class ClusteringUtils {
     }
 
     /**
-     * Performs bipartite matching between unclustered overlap nodes and clustered overlap nodes.
+     * Performs bipartite matching between unclustered overlap nodes and clustered
+     * overlap nodes.
      *
-     * @param newKey A new key for the centrality dictionary.
-     * @param centralityDict The dictionary to store centrality results.
-     * @param centralityMatrix The centrality matrix representing similarities between overlap nodes and subclusters.
-     * @param overlapIndices A list of indices of overlapping nodes.
-     * @param epsilon The epsilon value for thresholding similarities.
+     * @param newKey           A new key for the centrality dictionary.
+     * @param centralityDict   The dictionary to store centrality results.
+     * @param centralityMatrix The centrality matrix representing similarities
+     *                         between overlap nodes and subclusters.
+     * @param overlapIndices   A list of indices of overlapping nodes.
+     * @param epsilon          The epsilon value for thresholding similarities.
      * @return The updated centrality dictionary.
      */
-    public static Map<Integer, Map<String, Object>> bipartiteMatching(int newKey, Map<Integer, Map<String, Object>> centralityDict, double[][] centralityMatrix, List<Integer> overlapIndices, double epsilon) {
+    public static Map<Integer, Map<String, Object>> bipartiteMatching(int newKey,
+            Map<Integer, Map<String, Object>> centralityDict, double[][] centralityMatrix, List<Integer> overlapIndices,
+            double epsilon) {
         double th = 1 - epsilon;
         double sumCentrality = 0;
         List<Integer> subclusterIndices = new ArrayList<>(Collections.nCopies(overlapIndices.size(), null));
@@ -163,14 +171,19 @@ public class ClusteringUtils {
     /**
      * Gets candidates for the assignment problem based on similarity.
      *
-     * @param similarityMatrix The similarity matrix between all data points.
-     * @param subclusterIndicesList A list of lists, where each inner list contains indices of subclusters.
-     * @param overlapIndicesList A list of lists, where each inner list contains indices of overlapping nodes.
-     * @param epsilon The epsilon value for thresholding similarities.
-     * @param numCandidates The maximum number of candidates to return.
-     * @return A list of lists, where each inner list contains indices of candidate overlapping nodes.
+     * @param similarityMatrix      The similarity matrix between all data points.
+     * @param subclusterIndicesList A list of lists, where each inner list contains
+     *                              indices of subclusters.
+     * @param overlapIndicesList    A list of lists, where each inner list contains
+     *                              indices of overlapping nodes.
+     * @param epsilon               The epsilon value for thresholding similarities.
+     * @param numCandidates         The maximum number of candidates to return.
+     * @return A list of lists, where each inner list contains indices of candidate
+     *         overlapping nodes.
      */
-    public static List<List<Integer>> getCandidatesIndicesList(double[][] similarityMatrix, List<List<Integer>> subclusterIndicesList, List<List<Integer>> overlapIndicesList, double epsilon, int numCandidates) {
+    public static List<List<Integer>> getCandidatesIndicesList(double[][] similarityMatrix,
+            List<List<Integer>> subclusterIndicesList, List<List<Integer>> overlapIndicesList, double epsilon,
+            int numCandidates) {
         if (overlapIndicesList.size() < numCandidates) {
             return overlapIndicesList;
         } else {
@@ -185,14 +198,16 @@ public class ClusteringUtils {
                 currentSimilarityMatrix[i][i] = 0.0;
             }
 
-            // flatten_subcluster_indices = list(chain.from_iterable(subcluster_indices_list))
+            // flatten_subcluster_indices =
+            // list(chain.from_iterable(subcluster_indices_list))
             List<Integer> flattenSubclusterIndices = new ArrayList<>();
             for (List<Integer> sublist : subclusterIndicesList) {
                 flattenSubclusterIndices.addAll(sublist);
             }
 
             // tmp_similarity_matrix = similarity_matrix[flatten_subcluster_indices]
-            double[][] tmpSimilarityMatrix = new double[flattenSubclusterIndices.size()][currentSimilarityMatrix[0].length];
+            double[][] tmpSimilarityMatrix = new double[flattenSubclusterIndices
+                    .size()][currentSimilarityMatrix[0].length];
             for (int i = 0; i < flattenSubclusterIndices.size(); i++) {
                 tmpSimilarityMatrix[i] = currentSimilarityMatrix[flattenSubclusterIndices.get(i)];
             }
@@ -264,13 +279,15 @@ public class ClusteringUtils {
     /**
      * Separates overlapping nodes into subclusters.
      *
-     * @param tmpClusters A list of temporary cluster labels.
-     * @param overlapIndicesList A list of lists, where each inner list contains indices of overlapping nodes.
-     * @param distanceMatrix The distance matrix between all data points.
-     * @param epsilon The epsilon value for thresholding similarities.
+     * @param tmpClusters        A list of temporary cluster labels.
+     * @param overlapIndicesList A list of lists, where each inner list contains
+     *                           indices of overlapping nodes.
+     * @param distanceMatrix     The distance matrix between all data points.
+     * @param epsilon            The epsilon value for thresholding similarities.
      * @return An updated list of cluster labels.
      */
-    public static List<Integer> separateIntoSubcluster(List<Integer> tmpClusters, List<List<Integer>> overlapIndicesList, double[][] distanceMatrix, double epsilon) {
+    public static List<Integer> separateIntoSubcluster(List<Integer> tmpClusters,
+            List<List<Integer>> overlapIndicesList, double[][] distanceMatrix, double epsilon) {
         int maxOverlap = 0;
         for (List<Integer> indices : overlapIndicesList) {
             if (indices.size() > maxOverlap) {
@@ -304,7 +321,8 @@ public class ClusteringUtils {
             Map<Integer, Map<String, Object>> centralityDict = new HashMap<>();
             double maxCentrality = 0.0;
 
-            List<List<Integer>> candidatesIndicesList = getCandidatesIndicesList(similarityMatrix, subclusterIndicesList, overlapIndicesList, epsilon, 10);
+            List<List<Integer>> candidatesIndicesList = getCandidatesIndicesList(similarityMatrix,
+                    subclusterIndicesList, overlapIndicesList, epsilon, 10);
 
             for (int i = 0; i < candidatesIndicesList.size(); i++) {
                 List<Integer> overlapIndices = candidatesIndicesList.get(i);
@@ -398,15 +416,18 @@ public class ClusteringUtils {
     }
 
     /**
-     * Translates the similarity matrix between each node into the centrality matrix between each cluster.
+     * Translates the similarity matrix between each node into the centrality matrix
+     * between each cluster.
      *
-     * @param clusters A list of cluster labels for each data point.
+     * @param clusters         A list of cluster labels for each data point.
      * @param similarityMatrix The similarity matrix between all data points.
-     * @param frames A list of frame numbers corresponding to each data point.
-     * @param epsilon The epsilon value for thresholding similarities.
+     * @param frames           A list of frame numbers corresponding to each data
+     *                         point.
+     * @param epsilon          The epsilon value for thresholding similarities.
      * @return The centrality matrix.
      */
-    public static double[][] createCentralityMatrix(List<Integer> clusters, double[][] similarityMatrix, List<Integer> frames, double epsilon) {
+    public static double[][] createCentralityMatrix(List<Integer> clusters, double[][] similarityMatrix,
+            List<Integer> frames, double epsilon) {
         boolean removeNoiseCluster = true; // Default value from Python kwargs
 
         List<Integer> uniqueClusters = new ArrayList<>(new TreeSet<>(clusters));
@@ -484,9 +505,9 @@ public class ClusteringUtils {
     /**
      * Performs hierarchical clustering that targets clusters.
      *
-     * @param clusters A list of cluster labels for each data point.
+     * @param clusters         A list of cluster labels for each data point.
      * @param centralityMatrix The centrality matrix between clusters.
-     * @param epsilon The epsilon value for thresholding similarities.
+     * @param epsilon          The epsilon value for thresholding similarities.
      * @return An updated list of cluster labels.
      */
     public static List<Integer> associateCluster(List<Integer> clusters, double[][] centralityMatrix, double epsilon) {
@@ -564,7 +585,8 @@ public class ClusteringUtils {
                 List<Integer> countsList = new ArrayList<>(count.values());
                 for (int i = 0; i < currentCentralityMatrix.length; i++) {
                     for (int j = 0; j < currentCentralityMatrix[i].length; j++) {
-                        averagedCentralityMatrix[i][j] = currentCentralityMatrix[i][j] / (double)(countsList.get(i) * countsList.get(j));
+                        averagedCentralityMatrix[i][j] = currentCentralityMatrix[i][j]
+                                / (double) (countsList.get(i) * countsList.get(j));
                     }
                 }
                 for (int i = 0; i < averagedCentralityMatrix.length; i++) {
@@ -605,7 +627,8 @@ public class ClusteringUtils {
                 }
 
                 // Update centrality_matrix
-                double[][] newCentralityMatrix = new double[currentCentralityMatrix.length - 1][currentCentralityMatrix.length - 1];
+                double[][] newCentralityMatrix = new double[currentCentralityMatrix.length
+                        - 1][currentCentralityMatrix.length - 1];
                 List<Integer> nextIndices = new ArrayList<>();
                 for (int i = 0; i < currentCentralityMatrix.length; i++) {
                     if (i != cluster2Index) {
@@ -655,14 +678,17 @@ public class ClusteringUtils {
     /**
      * Performs overlap suppression clustering.
      *
-     * @param distanceMatrix The distance matrix between all data points.
-     * @param frames A list of frame numbers corresponding to each data point.
-     * @param nonoverlapIndices A list of indices of non-overlapping nodes.
-     * @param overlapIndicesList A list of lists, where each inner list contains indices of overlapping nodes.
-     * @param epsilon The epsilon value for thresholding similarities.
+     * @param distanceMatrix     The distance matrix between all data points.
+     * @param frames             A list of frame numbers corresponding to each data
+     *                           point.
+     * @param nonoverlapIndices  A list of indices of non-overlapping nodes.
+     * @param overlapIndicesList A list of lists, where each inner list contains
+     *                           indices of overlapping nodes.
+     * @param epsilon            The epsilon value for thresholding similarities.
      * @return A list of cluster labels after overlap suppression.
      */
-    public static List<Integer> overlapSuppressionClustering(double[][] distanceMatrix, List<Integer> frames, List<Integer> nonoverlapIndices, List<List<Integer>> overlapIndicesList, double epsilon) {
+    public static List<Integer> overlapSuppressionClustering(double[][] distanceMatrix, List<Integer> frames,
+            List<Integer> nonoverlapIndices, List<List<Integer>> overlapIndicesList, double epsilon) {
         List<Integer> clusters = new ArrayList<>(Collections.nCopies(frames.size(), -1));
 
         // clustering for non-overlapping nodes
@@ -671,7 +697,8 @@ public class ClusteringUtils {
                 double[][] nonoverlapDistanceMatrix = new double[nonoverlapIndices.size()][nonoverlapIndices.size()];
                 for (int i = 0; i < nonoverlapIndices.size(); i++) {
                     for (int j = 0; j < nonoverlapIndices.size(); j++) {
-                        nonoverlapDistanceMatrix[i][j] = distanceMatrix[nonoverlapIndices.get(i)][nonoverlapIndices.get(j)];
+                        nonoverlapDistanceMatrix[i][j] = distanceMatrix[nonoverlapIndices.get(i)][nonoverlapIndices
+                                .get(j)];
                     }
                 }
                 List<Integer> nonoverlapClusters = agglomerativeClustering(nonoverlapDistanceMatrix, epsilon);
@@ -705,22 +732,24 @@ public class ClusteringUtils {
      * Reclusters overlapping clusters to resolve ambiguities.
      *
      * @param distanceMatrix The distance matrix between all data points.
-     * @param trackingDict A map containing tracking information for each serial, including frame numbers.
-     * @param serials A list of serial numbers corresponding to the data points.
-     * @param clusters A list of initial cluster labels for each data point.
-     * @param epsilon The epsilon value for thresholding similarities.
+     * @param trackingDict   A map containing tracking information for each serial,
+     *                       including frame numbers.
+     * @param serials        A list of serial numbers corresponding to the data
+     *                       points.
+     * @param clusters       A list of initial cluster labels for each data point.
+     * @param epsilon        The epsilon value for thresholding similarities.
      * @return A list of updated cluster labels after reclustering.
      */
     public static List<Integer> reclusteringOverlapCluster(double[][] distanceMatrix,
-//                                                           Map<Integer, Map<String, Object>> trackingDict,
-                                                           List<Integer> frames,
-                                                           List<Integer> serials,
-                                                           List<Integer> clusters,
-                                                           double epsilon) {
-//        List<Integer> frames = new ArrayList<>();
-//        for (int serial : serials) {
-//            frames.add((Integer) trackingDict.get(serial).get("Frame"));
-//        }
+            // Map<Integer, Map<String, Object>> trackingDict,
+            List<Integer> frames,
+            List<Integer> serials,
+            List<Integer> clusters,
+            double epsilon) {
+        // List<Integer> frames = new ArrayList<>();
+        // for (int serial : serials) {
+        // frames.add((Integer) trackingDict.get(serial).get("Frame"));
+        // }
 
         Map<Integer, List<Integer>> clusterFrameDict = new HashMap<>();
         Map<Integer, List<Integer>> clusterIndicesDict = new HashMap<>();
@@ -748,11 +777,13 @@ public class ClusteringUtils {
                 continue;
             }
 
-            OverlapDetector.OverlapResult overlapResult = OverlapDetector.divideOverlapOrNonOverlap(clusterFrames, clusterIndices);
+            OverlapDetector.OverlapResult overlapResult = OverlapDetector.divideOverlapOrNonOverlap(clusterFrames,
+                    clusterIndices);
             List<List<Integer>> overlapIndicesList = overlapResult.overlapIndicesList;
             List<Integer> nonoverlapIndices = overlapResult.nonOverlapIndices;
 
-            List<Integer> tmpClusters = overlapSuppressionClustering(distanceMatrix, frames, nonoverlapIndices, overlapIndicesList, epsilon);
+            List<Integer> tmpClusters = overlapSuppressionClustering(distanceMatrix, frames, nonoverlapIndices,
+                    overlapIndicesList, epsilon);
 
             int maxClusterId = Collections.max(newClusters);
             for (int i = 0; i < tmpClusters.size(); i++) {
@@ -766,7 +797,7 @@ public class ClusteringUtils {
 
     public static List<Integer> relabelClusters(List<Integer> clusters) {
         // Step 1: Extract unique cluster IDs (preserving insertion order)
-        Set<Integer> uniqueClusterSet = new LinkedHashSet<>(clusters);  // Keeps insertion order
+        Set<Integer> uniqueClusterSet = new LinkedHashSet<>(clusters); // Keeps insertion order
         List<Integer> uniqueClusters = new ArrayList<>(uniqueClusterSet);
 
         // Step 2: Map old cluster ID → new cluster ID (sequential starting from 0)
@@ -784,13 +815,12 @@ public class ClusteringUtils {
         return relabeledClusters;
     }
 
-
     public static List<Integer> tracking_by_clustering(double[][] distanceMatrix,
-//                                                           Map<Integer, Map<String, Object>> trackingDict,
-                                                       List<Integer> frames,
-                                                       List<Integer> serials,
-                                                       List<Integer> clusters,
-                                                       double epsilon) {
+            // Map<Integer, Map<String, Object>> trackingDict,
+            List<Integer> frames,
+            List<Integer> serials,
+            List<Integer> clusters,
+            double epsilon) {
         if (TrackingParameters.overlap_suppression) {
             logger.info("Overlap suppression");
             clusters = reclusteringOverlapCluster(
@@ -798,14 +828,211 @@ public class ClusteringUtils {
                     frames,
                     serials,
                     clusters,
-                    epsilon
-            );
+                    epsilon);
         }
 
         clusters = relabelClusters(clusters);
 
         return clusters;
     }
+
+    /**
+     * Calculates the overlap coefficient between two rectangles.
+     *
+     * @param rectangle1 Array containing [x1, x2, y1, y2] of the first rectangle.
+     * @param rectangle2 Array containing [x1, x2, y1, y2] of the second rectangle.
+     * @return The overlap coefficient.
+     */
+    public static double getOverlapCoefficient(Integer[] rectangle1, Integer[] rectangle2) {
+        int overlapWidth = Math.min(rectangle1[1], rectangle2[1]) - Math.max(rectangle1[0], rectangle2[0]);
+        int overlapHeight = Math.min(rectangle1[3], rectangle2[3]) - Math.max(rectangle1[2], rectangle2[2]);
+        double overlapArea = Math.max(overlapWidth, 0) * Math.max(overlapHeight, 0);
+
+        double rectangle1Area = (rectangle1[1] - rectangle1[0]) * (rectangle1[3] - rectangle1[2]);
+        double rectangle2Area = (rectangle2[1] - rectangle2[0]) * (rectangle2[3] - rectangle2[2]);
+
+        return overlapArea / Math.min(rectangle1Area, rectangle2Area);
+    }
+
+    /**
+     * Performs Sequential Non-Maximum Suppression (SNMS).
+     *
+     * @param clusters         List of cluster labels (OfflineID).
+     * @param frames           List of frame numbers.
+     * @param boundingBoxes    List of bounding boxes.
+     * @param temporallySnmsTh Temporal overlap threshold.
+     * @param spatiallySnmsTh  Spatial overlap threshold.
+     * @param mergeNonOverlap  Whether to merge non-overlapping parts or remove
+     *                         noise.
+     * @return Updated list of cluster labels.
+     */
+    public static List<Integer> sequentialNonMaximumSuppression(
+            List<Integer> clusters,
+            List<Integer> frames,
+            List<Integer[]> boundingBoxes,
+            double temporallySnmsTh,
+            double spatiallySnmsTh,
+            boolean mergeNonOverlap) {
+        // tracking_dict abstraction: We work with indices as serials
+        // clusters <-> OfflineID
+
+        Set<Integer> uniqueOfflineIds = new HashSet<>(clusters);
+        if (uniqueOfflineIds.contains(-1)) {
+            uniqueOfflineIds.remove(-1);
+        }
+        List<Integer> sortedUniqueOfflineIds = new ArrayList<>(uniqueOfflineIds);
+        Collections.sort(sortedUniqueOfflineIds);
+
+        // Build maps equivalent to offline_id_serial_dict and offline_id_frame_dict
+        // We use the index in the lists as the "serial"
+        Map<Integer, List<Integer>> offlineIdIndicesDict = new HashMap<>();
+        Map<Integer, List<Integer>> offlineIdFrameDict = new HashMap<>();
+
+        for (int id : sortedUniqueOfflineIds) {
+            offlineIdIndicesDict.put(id, new ArrayList<>());
+            offlineIdFrameDict.put(id, new ArrayList<>());
+        }
+
+        for (int i = 0; i < clusters.size(); i++) {
+            int id = clusters.get(i);
+            if (id != -1) {
+                offlineIdIndicesDict.get(id).add(i);
+                offlineIdFrameDict.get(id).add(frames.get(i));
+            }
+        }
+
+        // Iterate comparisons
+        // Python: for offline_id1, offline_id2 in combinations(unique_offline_ids,2):
+        // In Java, we iterate loops
+
+        // Since we might merge IDs, we need to be careful about the iteration.
+        // The Python code iterates on the original list of unique IDs.
+
+        for (int i = 0; i < sortedUniqueOfflineIds.size(); i++) {
+            for (int j = i + 1; j < sortedUniqueOfflineIds.size(); j++) {
+                int offlineId1 = sortedUniqueOfflineIds.get(i);
+                int offlineId2 = sortedUniqueOfflineIds.get(j);
+
+                // However, offline_id_frame_dict is updated in Python.
+                // We should check if these IDs still have frames.
+
+                List<Integer> id1Frames = offlineIdFrameDict.get(offlineId1);
+                List<Integer> id2Frames = offlineIdFrameDict.get(offlineId2);
+
+                if (id1Frames.isEmpty() || id2Frames.isEmpty())
+                    continue;
+
+                Set<Integer> overlapFrames = new HashSet<>(id1Frames);
+                overlapFrames.retainAll(id2Frames);
+
+                // Check temporal overlap
+                // if
+                // max(len(overlap_frames)/len(id1_frames),len(overlap_frames)/len(id2_frames))
+                // <temporally_snms_th: continue
+
+                double ratio1 = (double) overlapFrames.size() / id1Frames.size();
+                double ratio2 = (double) overlapFrames.size() / id2Frames.size();
+
+                if (Math.max(ratio1, ratio2) < temporallySnmsTh)
+                    continue;
+
+                // Prepare for spatial check
+                // Ensure id1 is the one with fewer frames? Python: if len(id1_frames) <
+                // len(id2_frames): swap
+                // But wait, the swap in Python changes which variable holds which value for the
+                // scope of the loop.
+                int activeId1 = offlineId1;
+                int activeId2 = offlineId2;
+                List<Integer> activeId1Frames = id1Frames;
+                List<Integer> activeId2Frames = id2Frames;
+
+                if (activeId1Frames.size() < activeId2Frames.size()) {
+                    int tempId = activeId1;
+                    activeId1 = activeId2;
+                    activeId2 = tempId;
+                    // update frame refs
+                    activeId1Frames = offlineIdFrameDict.get(activeId1);
+                    activeId2Frames = offlineIdFrameDict.get(activeId2);
+                }
+
+                List<Integer> activeId1Indices = offlineIdIndicesDict.get(activeId1);
+                List<Integer> activeId2Indices = offlineIdIndicesDict.get(activeId2);
+
+                // Gather bounding boxes for overlapping frames
+                List<Double> overlapCoefficients = new ArrayList<>();
+
+                // We need to match frames.
+                // Create map frame -> index for quick lookup or just iterate
+                Map<Integer, Integer> frameToIndex1 = new HashMap<>();
+                for (int idx : activeId1Indices) {
+                    frameToIndex1.put(frames.get(idx), idx);
+                }
+
+                for (int idx2 : activeId2Indices) {
+                    int frame = frames.get(idx2);
+                    if (overlapFrames.contains(frame)) {
+                        if (frameToIndex1.containsKey(frame)) {
+                            int idx1 = frameToIndex1.get(frame);
+                            double coeff = getOverlapCoefficient(boundingBoxes.get(idx1), boundingBoxes.get(idx2));
+                            overlapCoefficients.add(coeff);
+                        }
+                    }
+                }
+
+                if (overlapCoefficients.isEmpty())
+                    continue;
+
+                double meanOverlap = overlapCoefficients.stream().mapToDouble(Double::doubleValue).average()
+                        .orElse(0.0);
+
+                if (meanOverlap < spatiallySnmsTh)
+                    continue;
+
+                // Merge
+                if (mergeNonOverlap) {
+                    // In Java, activeId1 and activeId2 are used.
+                    // We need to iterate carefully.
+
+                    // We can't modify the lists we are iterating over strictly speaking if we use
+                    // for-each,
+                    // but we are using indices.
+
+                    // Let's iterate over a copy of activeId2Indices to be safe
+                    List<Integer> currentId2Indices = new ArrayList<>(activeId2Indices);
+
+                    for (int idx2 : currentId2Indices) {
+                        int frame = frames.get(idx2);
+                        if (overlapFrames.contains(frame)) {
+                            // Mark as noise
+                            clusters.set(idx2, -1);
+
+                            // Update dicts
+                            offlineIdFrameDict.get(activeId2).remove(Integer.valueOf(frame)); // Remove object
+                            offlineIdIndicesDict.get(activeId2).remove(Integer.valueOf(idx2));
+                        } else {
+                            // Merge to ID1
+                            clusters.set(idx2, activeId1);
+
+                            // Update dicts
+                            offlineIdFrameDict.get(activeId1).add(frame);
+                            offlineIdIndicesDict.get(activeId1).add(idx2);
+
+                            offlineIdFrameDict.get(activeId2).remove(Integer.valueOf(frame));
+                            offlineIdIndicesDict.get(activeId2).remove(Integer.valueOf(idx2));
+                        }
+                    }
+
+                } else {
+                    // noise logic
+                    for (int idx2 : activeId2Indices) {
+                        clusters.set(idx2, -1);
+                    }
+                    offlineIdFrameDict.get(activeId2).clear();
+                    offlineIdIndicesDict.get(activeId2).clear();
+                }
+            }
+        }
+
+        return clusters;
+    }
 }
-
-
