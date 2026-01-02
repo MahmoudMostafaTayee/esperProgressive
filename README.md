@@ -65,35 +65,48 @@ This project tackles the problem of tracking people across multiple camera views
 
   ---
 
-  ## ▶️ Running the Project
+## ▶️ Running the Project
 
-  ### Entry Point
+### Using Terminal Scripts (Recommended)
+You can run the project directly from the terminal using the provided scripts. These scripts use Maven to manage dependencies and bypass checkstyle for a smooth run.
 
-  ```
-  com.espertech.esper.example.IOT.IotMain
-  ```
+#### Windows (Command Prompt)
+```cmd
+.\run_project.bat
+```
 
-  ---
+#### Windows (PowerShell)
+```powershell
+.\run_project.ps1
+```
 
-  ## 🔧 Program Arguments
+### Manual Run with Maven
+Alternatively, you can use Maven's `exec:java` goal:
+```bash
+mvn exec:java -Dexec.mainClass="com.espertech.esper.example.IOT.IotMain" -Dexec.args="--scene 1 --features_dir C:\OURs\Thesis\Datasets\EmbedFeature --camera 0001 --output_dir ./outputs/scene1" -Dcheckstyle.skip
+```
 
-  | Argument            | Description                   |
-  | ------------------- | ----------------------------- |
-  | `--dataRoot`        | Root directory of the dataset |
-  | `--scene`           | Scene name to process         |
-  | `--fps`             | Target frames per second      |
-  | `--window`          | Sliding window size (seconds) |
-  | `--useExternalTime` | Enable Esper external time    |
+---
 
-  ### Example
+## 🔧 Program Arguments
 
-  ```text
-  --dataRoot /home/user/Datasets/EmbedFeature
-  --scene scene_001
-  --fps 10
-  --window 1.0
-  --useExternalTime true
-  ```
+| Argument         | Description                                      | Default     |
+| ---------------- | ------------------------------------------------ | ----------- |
+| `--scene`        | **(Required)** Scene number (e.g., 1, 2, 3)      | -           |
+| `--features_dir` | Base directory for embedding features            | -           |
+| `--camera`       | Camera number (e.g., 0001, 0002) or `all`        | `all`       |
+| `--output_dir`   | Directory to save logs and outputs               | `./output`  |
+| `--exec_all`     | Execute all tracking stages (SCPT and MCPT)      | (Enabled)   |
+| `--exec_scpt`    | Execute only Single-Camera People Tracking       | -           |
+| `--exec_mcpt`    | Execute only Multi-Camera People Tracking        | -           |
+
+### Example Arguments
+```text
+--scene 1 
+--features_dir C:\OURs\Thesis\Datasets\EmbedFeature 
+--camera 0001 
+--output_dir ./outputs/scene1
+```
 
   ---
 
