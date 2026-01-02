@@ -25,6 +25,7 @@ public class AgglomerativeClusterer {
     private long agglomerative_clustering_time_tracker = 0;
     private final double epsilon;
     private int numberOfClusters = 1;
+    Integer number_of_winodws_processed = 1;
 
     public AgglomerativeClusterer(double epsilon){
         this.epsilon = epsilon;
@@ -159,7 +160,11 @@ public class AgglomerativeClusterer {
         System.out.println("First ID: " + first_id + " And Last Id: " + last_id);
         System.out.println("Time taken: " + HelperUtils.elapsedMillis(start_time) + " ms");
         System.out.println("--------------------------------------------------------------------------");
-        exit(0);
+        if(TrackingParameters.isDebug && (number_of_winodws_processed >= TrackingParameters.max_number_of_windows_to_process))
+        {
+            exit(0);
+        }
+        number_of_winodws_processed += 1;
     }
     public UpdateListener getListener(){
         return (newEvents, oldEvents,  statement,  runtime) ->

@@ -9,8 +9,8 @@ public class TrackingParameters {
     public enum exec_level { ALL, SCPT, MCPT };
 
     public static double epsilonScpt = 0.10;
-    public static int timePeriod = 3;
-    public static int fps = 30;
+    public static int timePeriod = 1;
+    public static int fps = 10;
     public static double epsilonMcpt = 0.37;
     public static int shortTrackTh = 120;
     public static int keypointConditionTh = 1;
@@ -23,6 +23,7 @@ public class TrackingParameters {
     public static double iouTh = 0.9;
     public static boolean overlap_suppression = true;
     public static boolean isDebug = true;
+    public static int max_number_of_windows_to_process = 3; // This won't work unless in isDebug is ture.
 
     // ===== Runtime-configurable paths =====
     public static String FEATURES_BASE_DIR;
