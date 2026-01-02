@@ -39,6 +39,9 @@ public class TrackingParameters {
     public static int warp_th = 40;
     public static double alpha = 0.5;
 
+    public static boolean exclude_short = true;
+    public static int short_tracklet_th = 5;
+
     // ===== Runtime-configurable paths =====
     public static String FEATURES_BASE_DIR;
     public static String OUTPUT_DIR;

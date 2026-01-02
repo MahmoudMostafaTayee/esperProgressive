@@ -157,6 +157,12 @@ public class AgglomerativeClusterer {
                         TrackingParameters.alpha);
             }
 
+            if (TrackingParameters.exclude_short) {
+                newClusterLabels = ClusteringUtils.excludeShortTracklet(
+                        newClusterLabels,
+                        TrackingParameters.short_tracklet_th);
+            }
+
             System.out.println("newClusterLabels: " + Arrays.toString(newClusterLabels.toArray()));
 
             Map<Integer, List<Integer>> clusters = new HashMap<>();

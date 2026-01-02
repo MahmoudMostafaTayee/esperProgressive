@@ -1292,4 +1292,38 @@ public class ClusteringUtils {
         }
         return result;
     }
+
+    /**
+     * Excludes tracklets that are too short (noise).
+     * 
+     * @param clusters    List of cluster labels.
+     * @param minTrackLen Minimum length of a valid tracklet.
+     * @return Updated list of cluster labels with short tracklets set to -1.
+     */
+    public static List<Integer> excludeShortTracklet(List<Integer> clusters, int minTrackLen) {
+        // Count occurrences of each cluster
+        Map<Integer, Integer> counts = new HashMap<>();
+        for (int c : clusters) {
+            if (c != -1) {
+                counts.put(c, counts.getOrDefault(c, 0) + 1);
+            }
+        }
+
+        // Identify short clusters
+        Set<Integer> shortClusters = new HashSet<>();
+        for (Map.Entry<Integer, Integer> entry : counts.entrySet()) {
+            if (entry.getValue() <= minTrackLen) {
+                shortClusters.add(entry.getKey());
+            }
+        }
+
+        // Update cluster labels
+        List<Integer> newClusters = new ArrayList<>(clusters);
+        for (int i = 0; i < newClusters.size(); i++) {
+            if (shortClusters.contains(newClusters.get(i))) {
+                newClusters.set(i, -1);
+            }
+        }
+        return newClusters;
+    }
 }
