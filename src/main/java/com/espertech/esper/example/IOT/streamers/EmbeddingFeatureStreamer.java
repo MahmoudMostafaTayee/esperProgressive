@@ -1,6 +1,8 @@
+// EmbeddingFeatureStreamer.java (Modified)
 package com.espertech.esper.example.IOT.streamers;
 
 import com.espertech.esper.example.IOT.helpers.TrackingParameters;
+import com.espertech.esper.example.IOT.utils.DetectedUser;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.example.IOT.streams.EmbeddingFeature;
 import com.espertech.esper.example.IOT.helpers.HelperUtils;
@@ -51,7 +53,6 @@ public class EmbeddingFeatureStreamer {
         String selectedCamera = TrackingParameters.CAMERA_FILTER;
 
         for (Map.Entry<Path, List<Path>> entry : cameras.entrySet()) {
-
             Path camera = entry.getKey();
 
             if (!Files.isDirectory(camera)) continue;
@@ -63,105 +64,107 @@ public class EmbeddingFeatureStreamer {
                 }
             }
 
-            System.out.println("Selected Camera: " + selectedCamera);
             selectedCameras.put(camera, entry.getValue());
         }
 
-
-        // Initialize processing status for each camera
         for (Map.Entry<Path, List<Path>> cameraEntry : selectedCameras.entrySet()) {
             Path camera = cameraEntry.getKey();
             processingStatus.put(camera, true);
         }
 
-        boolean hasMoreFiles;
-//        do{
-            for (Map.Entry<Path, List<Path>> cameraEntry : selectedCameras.entrySet()) {
-                Path camera = cameraEntry.getKey();
-//                System.out.println("Processing camera: " + camera);
-                if (!processingStatus.get(camera)) continue; // Skip if already processed.
-                boolean cameraHasMoreFiles = processCamera(scene, cameraEntry);
+        for (Map.Entry<Path, List<Path>> cameraEntry : selectedCameras.entrySet()) {
+            Path camera = cameraEntry.getKey();
+            if (!processingStatus.get(camera)) continue;
+            boolean cameraHasMoreFiles = processCamera(scene, cameraEntry);
 
-                // Update processing status
-                processingStatus.put(camera, cameraHasMoreFiles);
-            }
-//                EventEPLUtil.advanceTime(TrackingParameters.timePeriod * ONE_SEC_TIME_STEP);
-
-            // Check if any camera still has files left to process
-            hasMoreFiles = processingStatus.values().stream().anyMatch(status -> status);
-//        } while (hasMoreFiles); // Continue until all cameras are fully processed
+            processingStatus.put(camera, cameraHasMoreFiles);
+        }
     }
 
-    private static boolean processCamera(Path scene, Map.Entry<Path, List<Path>> cameraEntry ) {
+    private static boolean processCamera(Path scene, Map.Entry<Path, List<Path>> cameraEntry) {
         Path camera = cameraEntry.getKey();
         List<Path> files = cameraEntry.getValue();
-        // Get the last processed index for this camera, or start at 0
-        int startIndex = cameraOffsets.getOrDefault(camera, 0); // 10704 is the index to start from the 1000th frame.
+        int startIndex = cameraOffsets.getOrDefault(camera, 0);
 
-        int curFrame = -1;
+        if (startIndex >= files.size()) {
+            System.out.println("All files processed for camera: " + camera);
+            return false;
+        }
+
+        List<FileData> frameFiles = new ArrayList<>();
+        int currentFrame = -1;
         int fileIndex = startIndex;
-        ParsedFileInfo parsedFile;
-        do{
-            if (fileIndex >= files.size()) {
-                cameraOffsets.put(camera, fileIndex + startIndex);
-                System.out.println("All files processed for camera: " + camera);
-                return false; // No more files to process
-            }
 
-            Path entry = files.get(fileIndex++);
+        while (fileIndex < files.size()) {
+            Path entry = files.get(fileIndex);
             String fileName = entry.getFileName().toString();
-            parsedFile = parseFileName(fileName);
+            ParsedFileInfo parsedFile = parseFileName(fileName);
 
             if (parsedFile == null) {
                 System.err.println("Skipping file (invalid format): " + fileName);
+                fileIndex++;
                 continue;
             }
 
-            if (curFrame == -1) {
-                curFrame = parsedFile.curFrame;
+            if (currentFrame == -1) {
+                currentFrame = parsedFile.curFrame;
             }
 
-            if(curFrame == parsedFile.curFrame) {
-                processFile(scene, camera, entry, parsedFile, curFrame);
-            }
-            else {
-//                        EventEPLUtil.pseudoAdvanceTime((1.0)/TrackingParameters.fps);
-                logger.debug("End of frame");
+            if (parsedFile.curFrame != currentFrame) {
                 break;
             }
-        }while(true);
-        fileIndex--;
-        // Update offset for next batch
-        cameraOffsets.put(camera, fileIndex);
-        return (fileIndex) < files.size(); // Returns true if more files are left
 
+            frameFiles.add(new FileData(entry, parsedFile));
+            fileIndex++;
+        }
+
+        if (!frameFiles.isEmpty()) {
+            processFrame(scene, camera, frameFiles, currentFrame);
+        }
+
+        cameraOffsets.put(camera, fileIndex);
+        return fileIndex < files.size();
     }
 
-    private static void processFile(Path scene, Path camera, Path entry, ParsedFileInfo parsedFile, int prevFrame) {
-        String fileName = entry.getFileName().toString();
+    private static void processFrame(Path scene, Path camera, List<FileData> frameFiles, int frameNumber) {
+        long timestamp = System.currentTimeMillis();
+        List<DetectedUser> detectedUsers = new ArrayList<>();
 
-        try {
-            File npyFile = entry.toFile();
-            INDArray data = Nd4j.createFromNpyFile(npyFile);
-            List<Float> featureList = convertToFloatList(data.toFloatVector());
+        for (FileData fileData : frameFiles) {
+            try {
+                File npyFile = fileData.path.toFile();
+                INDArray data = Nd4j.createFromNpyFile(npyFile);
+                List<Float> featureList = convertToFloatList(data.toFloatVector());
 
-            logger.debug("Processed: {}", npyFile);
+                ParsedFileInfo parsed = fileData.parsedInfo;
+
+                DetectedUser user = new DetectedUser(
+                        featureList,
+                        parsed.uNum,
+                        parsed.x1,
+                        parsed.x2,
+                        parsed.y1,
+                        parsed.y2,
+                        parsed.conf
+                );
+
+                detectedUsers.add(user);
+
+                logger.debug("Added user {} to frame {}", parsed.uNum, parsed.curFrame);
+            } catch (Exception e) {
+                logger.error("Error processing file: {} - {}", fileData.path.getFileName(), e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        if (!detectedUsers.isEmpty()) {
+            EmbeddingFeature frameFeature = new EmbeddingFeature(timestamp, frameNumber, detectedUsers);
             EventEPLUtil.streamEvent(
-                    new EmbeddingFeature(System.currentTimeMillis(),
-                            featureList,
-                            parsedFile.curFrame,
-                            parsedFile.uNum,
-                            parsedFile.x1,
-                            parsedFile.x2,
-                            parsedFile.y1,
-                            parsedFile.y2,
-                            parsedFile.conf
-                    ),
+                    frameFeature,
                     "embeddingFeature" + "_" + camera.getFileName().toString()
             );
-        } catch (Exception e) {
-            logger.error("Error processing file: {} - {}", fileName, e.getMessage());
-            e.printStackTrace();
+            logger.info("Streamed frame {} with {} users from camera {}",
+                    frameNumber, detectedUsers.size(), camera.getFileName());
         }
     }
 
@@ -194,7 +197,7 @@ public class EmbeddingFeatureStreamer {
         Matcher matcher = FILE_PATTERN.matcher(fileName);
 
         if (!matcher.matches()) {
-            return null; // Invalid format
+            return null;
         }
 
         try {
@@ -213,6 +216,16 @@ public class EmbeddingFeatureStreamer {
         }
     }
 
+    private static class FileData {
+        Path path;
+        ParsedFileInfo parsedInfo;
+
+        FileData(Path path, ParsedFileInfo parsedInfo) {
+            this.path = path;
+            this.parsedInfo = parsedInfo;
+        }
+    }
+
     private static class ParsedFileInfo {
         int curFrame, uNum, x1, x2, y1, y2;
         float conf;
@@ -227,5 +240,4 @@ public class EmbeddingFeatureStreamer {
             this.conf = conf;
         }
     }
-
 }

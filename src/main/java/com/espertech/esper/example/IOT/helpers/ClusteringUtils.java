@@ -37,7 +37,7 @@ public class ClusteringUtils {
         // Partition the clusters based on epsilon (distance criterion)
         int[] clusterLabels;
         try {
-            System.out.println("distanceMatrix" + Arrays.deepToString(distanceMatrix));
+//            System.out.println("distanceMatrix" + Arrays.deepToString(distanceMatrix));
             clusterLabels = hc.partition(epsilon);
         } catch (IllegalArgumentException e) {
             // Fallback: Assign all to one cluster, like SciPy

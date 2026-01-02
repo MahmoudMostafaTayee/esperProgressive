@@ -5,6 +5,7 @@ import com.espertech.esper.example.IOT.helpers.ClusteringUtils;
 import com.espertech.esper.example.IOT.helpers.SimilarityUtils;
 import com.espertech.esper.example.IOT.helpers.TrackingParameters;
 import com.espertech.esper.example.IOT.helpers.debug;
+import com.espertech.esper.example.IOT.utils.DetectedUser;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPStatement;
 import com.espertech.esper.runtime.client.UpdateListener;
@@ -38,29 +39,60 @@ public class AgglomerativeClusterer {
             List<Integer[]> boundingBoxList = new ArrayList<>();
 
             long start = System.nanoTime();
+            boolean flag = true;
+            Long first_timestamp = 0L;
+            long lasttimestamp = 0L;
+            Integer first_id = 0;
+            Integer last_id = 0;
             for (EventBean e : newEvents) {
-                List<Float> feature = (List<Float>) e.get("features");
-                Integer id = (Integer) e.get("UNum");
+                // Get frame-level data
+                List<DetectedUser> detectedUsers = (List<DetectedUser>) e.get("detectedUsers");
+                Integer curFrame = (Integer) e.get("curFrame");
                 Long timestamp = (Long) e.get("timestamp");
-                Integer frameNumber = (Integer) e.get("curFrame");
 
-                int x1 = (Integer) e.get("x1");
-                int x2 = (Integer) e.get("x2");
-                int y1 = (Integer) e.get("y1");
-                int y2 = (Integer) e.get("y2");
-                boundingBoxList.add(new Integer[]{x1, x2, y1, y2});
-
-                featureList.add(feature.stream().mapToDouble(Float::doubleValue).toArray());
-                frameNumbers.add(frameNumber);
-                serialNumbers.add(id);
-                idList.add(id);
-
-                Long frameRecordCount = (Long) e.get("frameRecordCount");
-                if(numberOfClusters < frameRecordCount){
-                    numberOfClusters = frameRecordCount.intValue();
+                if (flag) {
+                    first_timestamp = timestamp;
+                    flag = false;
                 }
-            }
+                lasttimestamp = timestamp;
 
+
+                System.out.println("Current Frame Number: " + curFrame);
+                // Process each detected user in the frame
+                for (DetectedUser user : detectedUsers) {
+                    List<Float> feature = user.getFeatures();
+                    Integer id = user.getUNum();
+
+                    if (first_id == 0) {
+                        first_id = id;
+                    }
+                    last_id = id;
+
+                    int x1 = user.getX1();
+                    int x2 = user.getX2();
+                    int y1 = user.getY1();
+                    int y2 = user.getY2();
+                    boundingBoxList.add(new Integer[]{x1, x2, y1, y2});
+
+                    featureList.add(feature.stream().mapToDouble(Float::doubleValue).toArray());
+                    frameNumbers.add(curFrame);
+                    serialNumbers.add(id);
+                    idList.add(id);
+                    System.out.println(user);
+
+//                Long frameRecordCount = (Long) e.get("frameRecordCount");
+//                if (numberOfClusters < frameRecordCount) {
+//                    numberOfClusters = frameRecordCount.intValue();
+//                }
+//                if (id == 1228) {
+//                    break;
+//                }
+            }
+            System.out.println("--------------------------------------------------------------------------");
+            System.out.println("Window period: " + (lasttimestamp - first_timestamp));
+            System.out.println("First ID: " + first_id + " And Last Id: " + last_id);
+            System.out.println("--------------------------------------------------------------------------");
+        }
             double[][] distanceMatrix = SimilarityUtils.computeCosineDistanceMatrix(featureList.toArray(new double[0][]), this.epsilon);
             HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
             int[] clusterLabels = hc.partition(this.epsilon);
