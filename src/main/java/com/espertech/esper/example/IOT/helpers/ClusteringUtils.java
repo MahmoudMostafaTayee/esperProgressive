@@ -1035,4 +1035,261 @@ public class ClusteringUtils {
 
         return clusters;
     }
+
+    /**
+     * Separates warp tracklets based on motion feature.
+     * Prevents tracks from jumping unrealistic distances (warps).
+     */
+    public static List<Integer> separateWarpTracklet(
+            List<Integer> clusters,
+            List<Integer> frames,
+            List<Integer[]> boundingBoxes,
+            int warpTh,
+            double alpha) {
+        // clusters <-> OfflineID
+        // We need to mutate clusters list.
+        List<Integer> newClusters = new ArrayList<>(clusters);
+
+        Set<Integer> uniqueOfflineIds = new HashSet<>(newClusters);
+        if (uniqueOfflineIds.contains(-1)) {
+            uniqueOfflineIds.remove(-1);
+        }
+        List<Integer> sortedUniqueOfflineIds = new ArrayList<>(uniqueOfflineIds);
+        Collections.sort(sortedUniqueOfflineIds);
+
+        // Build map: OfflineID -> List of Indices
+        Map<Integer, List<Integer>> offlineIdIndicesDict = new HashMap<>();
+        for (int id : sortedUniqueOfflineIds) {
+            offlineIdIndicesDict.put(id, new ArrayList<>());
+        }
+
+        for (int i = 0; i < newClusters.size(); i++) {
+            int id = newClusters.get(i);
+            if (id != -1) {
+                // Ensure map has key (if logic above missed it or dynamic)
+                offlineIdIndicesDict.computeIfAbsent(id, k -> new ArrayList<>()).add(i);
+            }
+        }
+
+        int maxOfflineId = sortedUniqueOfflineIds.isEmpty() ? 0 : Collections.max(sortedUniqueOfflineIds);
+
+        // Queue for processing (since we might append new IDs)
+        List<Integer> queue = new ArrayList<>(sortedUniqueOfflineIds);
+
+        while (!queue.isEmpty()) {
+            int offlineId = queue.remove(0);
+            List<Integer> indices = offlineIdIndicesDict.get(offlineId);
+
+            if (indices == null || indices.size() <= 2)
+                continue;
+
+            // Extract frames and serials (indices)
+            List<Integer> clusterFrames = new ArrayList<>();
+            List<Integer> clusterIndices = new ArrayList<>();
+
+            boolean hasOverlap = false;
+            Set<Integer> frameSet = new HashSet<>();
+
+            for (int idx : indices) {
+                int f = frames.get(idx);
+                clusterFrames.add(f);
+                clusterIndices.add(idx);
+                if (!frameSet.add(f)) {
+                    hasOverlap = true;
+                }
+            }
+
+            if (hasOverlap) {
+                // duplicate frames in non-suppressed cluster? skip logic as per python
+                // "offline_id contains overlap" -> continue
+                continue;
+            }
+
+            // Sort by frame
+            // Create pairs
+            List<Integer[]> pairs = new ArrayList<>();
+            for (int i = 0; i < clusterFrames.size(); i++) {
+                pairs.add(new Integer[] { clusterFrames.get(i), clusterIndices.get(i) });
+            }
+            pairs.sort(Comparator.comparingInt(a -> a[0]));
+
+            List<Integer> sortedFrames = new ArrayList<>();
+            List<Integer> sortedIndices = new ArrayList<>();
+            for (Integer[] p : pairs) {
+                sortedFrames.add(p[0]);
+                sortedIndices.add(p[1]);
+            }
+
+            // Trajectory: center x, bottom y
+            List<double[]> trajectory = new ArrayList<>();
+            for (int idx : sortedIndices) {
+                Integer[] box = boundingBoxes.get(idx); // [x1, x2, y1, y2]
+                double cx = (box[0] + box[1]) / 2.0;
+                double by = (double) box[3];
+                trajectory.add(new double[] { cx, by });
+            }
+
+            Integer splitIndex = getWarpIndex(sortedFrames, trajectory, alpha, warpTh);
+
+            if (splitIndex != null) {
+                // Split
+                // Python: split_serials = serials[split_index:] (indices)
+                // max_offline_id += 1
+                // unique_offline_ids.append(max_offline_id) -> add to queue
+                // assign new ID
+
+                maxOfflineId++;
+                int newId = maxOfflineId;
+
+                List<Integer> splitIndices = sortedIndices.subList(splitIndex, sortedIndices.size());
+
+                offlineIdIndicesDict.put(newId, new ArrayList<>()); // Init new entry
+
+                // Update newClusters and internal map
+                for (int idx : splitIndices) {
+                    newClusters.set(idx, newId);
+
+                    // Remove from old ID map logic is tricky while iterating,
+                    // but we used a copy for 'indices' variable? No, 'indices' came from map.
+                    // We shouldn't modify the list we just read from if we want to be safe,
+                    // but we are done reading it for this iteration.
+
+                    // HOWEVER, we need to update the offlineIdIndicesDict for future lookups?
+                    // Actually, the new ID is added to queue. We need its indices in the map.
+                    offlineIdIndicesDict.get(newId).add(idx);
+                }
+
+                // Remove moved indices from old ID list to keep map consistent?
+                // The python code doesn't explicitly remove them from the old list in the dict
+                // used for driving the loop (it pops from unique_offline_ids).
+                // But it updates tracking_dict.
+                // Ideally we update our map so if we ever re-process (unlikely for popped ID),
+                // it's correct.
+                offlineIdIndicesDict.get(offlineId).removeAll(splitIndices);
+
+                queue.add(newId);
+            }
+        }
+
+        return newClusters;
+    }
+
+    /**
+     * Detects the index where a warp (unrealistic jump) occurs.
+     */
+    public static Integer getWarpIndex(List<Integer> frames, List<double[]> trajectory, double alpha, int warpTh) {
+        int minFrame = Collections.min(frames);
+        int maxFrame = Collections.max(frames);
+
+        // Linear Interpolation
+        // frames are unique and sorted.
+        // We want to interpolate for every frame from min to max.
+
+        List<double[]> interpolatedTrajectory = linearInterpolate(frames, trajectory, minFrame, maxFrame);
+        List<Integer> interpolatedFrames = new ArrayList<>();
+        for (int f = minFrame; f <= maxFrame; f++)
+            interpolatedFrames.add(f);
+
+        // Calculate Deltas
+        // delta_x = [x[i+1]-x[i]], same for y
+        List<Double> deltaX = new ArrayList<>();
+        List<Double> deltaY = new ArrayList<>();
+
+        for (int i = 0; i < interpolatedTrajectory.size() - 1; i++) {
+            double[] curr = interpolatedTrajectory.get(i);
+            double[] next = interpolatedTrajectory.get(i + 1);
+            deltaX.add(next[0] - curr[0]);
+            deltaY.add(next[1] - curr[1]);
+        }
+
+        int lastFrame = maxFrame;
+        Integer splitIndex = null;
+
+        double[] weightedCumsum = new double[2]; // [x, y]
+
+        // Iterate t from 1 (frame index 1 relative to start)
+        // t corresponds to interpolatedFrame index
+
+        for (int t = 1; t < interpolatedFrames.size(); t++) {
+            int currentFrame = interpolatedFrames.get(t);
+
+            // Indices for delta are t-1 (since delta has size N-1)
+            double dx = deltaX.get(t - 1);
+            double dy = deltaY.get(t - 1);
+
+            if (t == 1) {
+                weightedCumsum[0] = dx;
+                weightedCumsum[1] = dy;
+            }
+            if (t > 1) {
+                // Decay
+                weightedCumsum[0] = alpha * weightedCumsum[0] + (1 - alpha) * dx;
+                weightedCumsum[1] = alpha * weightedCumsum[1] + (1 - alpha) * dy;
+
+                if (!frames.contains(currentFrame))
+                    continue;
+
+                // Check warp
+                double dist = Math.sqrt(Math.pow(weightedCumsum[0], 2) + Math.pow(weightedCumsum[1], 2));
+
+                if (dist > warpTh) {
+                    lastFrame = currentFrame; // Why set lastFrame?
+
+                    // Python: split_index = frames.index(last_frame)
+                    // Code follows that.
+
+                    return frames.indexOf(lastFrame);
+                }
+
+                lastFrame = currentFrame;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Performs linear interpolation for disjoint frames.
+     */
+    private static List<double[]> linearInterpolate(List<Integer> frames, List<double[]> trajectory, int minFrame,
+            int maxFrame) {
+        // trajectory corresponds 1:1 to frames.
+
+        // Map frame -> point
+        Map<Integer, double[]> definedPoints = new HashMap<>();
+        for (int i = 0; i < frames.size(); i++) {
+            definedPoints.put(frames.get(i), trajectory.get(i));
+        }
+
+        List<double[]> result = new ArrayList<>();
+
+        // We assume frames are sorted.
+        // We find neighbors for each frame.
+
+        // Efficiency: Use indices
+        int currentIdx = 0;
+
+        for (int f = minFrame; f <= maxFrame; f++) {
+            if (definedPoints.containsKey(f)) {
+                result.add(definedPoints.get(f));
+                if (frames.get(currentIdx) == f) {
+                    if (currentIdx < frames.size() - 1)
+                        currentIdx++;
+                }
+            } else {
+                int nextFrame = frames.get(currentIdx);
+                int prevFrame = frames.get(currentIdx - 1);
+
+                double[] nextP = definedPoints.get(nextFrame);
+                double[] prevP = definedPoints.get(prevFrame);
+
+                double ratio = (double) (f - prevFrame) / (double) (nextFrame - prevFrame);
+
+                double newX = prevP[0] + ratio * (nextP[0] - prevP[0]);
+                double newY = prevP[1] + ratio * (nextP[1] - prevP[1]);
+                result.add(new double[] { newX, newY });
+            }
+        }
+        return result;
+    }
 }

@@ -34,6 +34,11 @@ public class TrackingParameters {
     public static double spatially_snms_th = 0.6;
     public static boolean merge_nonoverlap = true;
 
+    // Separate Warp Parameters
+    public static boolean separate_warp = true;
+    public static int warp_th = 40;
+    public static double alpha = 0.5;
+
     // ===== Runtime-configurable paths =====
     public static String FEATURES_BASE_DIR;
     public static String OUTPUT_DIR;

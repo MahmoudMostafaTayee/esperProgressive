@@ -148,6 +148,15 @@ public class AgglomerativeClusterer {
                         TrackingParameters.merge_nonoverlap);
             }
 
+            if (TrackingParameters.separate_warp) {
+                newClusterLabels = ClusteringUtils.separateWarpTracklet(
+                        newClusterLabels,
+                        frameNumbers,
+                        boundingBoxList,
+                        TrackingParameters.warp_th,
+                        TrackingParameters.alpha);
+            }
+
             System.out.println("newClusterLabels: " + Arrays.toString(newClusterLabels.toArray()));
 
             Map<Integer, List<Integer>> clusters = new HashMap<>();
