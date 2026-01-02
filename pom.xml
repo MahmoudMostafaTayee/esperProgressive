@@ -136,6 +136,9 @@
                         <manifestEntries>
                             <Built-By>EsperTech</Built-By>
                         </manifestEntries>
+                        <manifest>
+                            <mainClass>com.espertech.esper.example.IOT.IotMain</mainClass>
+                        </manifest>
                     </archive>
                 </configuration>
             </plugin>
