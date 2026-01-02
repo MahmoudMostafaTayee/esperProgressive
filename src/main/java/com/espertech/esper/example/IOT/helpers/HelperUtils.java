@@ -2,14 +2,32 @@ package com.espertech.esper.example.IOT.helpers;
 
 import java.io.IOException;
 import java.nio.file.*;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.regex.*;
+import java.time.LocalTime;
+import java.time.LocalDateTime;
 
 public class HelperUtils {
     private HelperUtils() {
         /* Prevent instantiation */
+    }
+
+    public static void PrintCurrentTime() {
+        // Get and print only the current local time
+        LocalTime currentTime = LocalTime.now();
+        System.out.println("Current Time: " + currentTime); // Example output: 14:30:00.123456
+
+        // Get and print current date and time
+        LocalDateTime currentDateTime = LocalDateTime.now();
+        System.out.println("Current Date and Time: " + currentDateTime); // Example output: 2026-01-02T14:30:00.123456
+    }
+
+    public static long elapsedMillis(Instant start) {
+        return Duration.between(start, Instant.now()).toMillis();
     }
 
     public static List<Path> getSortedDirectories(Path parentDir) throws IOException {

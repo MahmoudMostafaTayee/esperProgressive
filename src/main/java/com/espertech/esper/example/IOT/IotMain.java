@@ -7,6 +7,7 @@ package com.espertech.esper.example.IOT;
 
 import com.espertech.esper.common.client.EventBean;
 import com.espertech.esper.example.IOT.helpers.ErrorCode;
+import com.espertech.esper.example.IOT.helpers.HelperUtils;
 import com.espertech.esper.example.IOT.helpers.TrackingParameters;
 import com.espertech.esper.example.IOT.streamers.*;
 import com.espertech.esper.example.IOT.streams.*;
@@ -14,8 +15,6 @@ import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.example.IOT.utils.GenericIotEventListener;
 
 import com.espertech.esper.example.IOT.clusterers.AgglomerativeClusterer;
-import com.espertech.esper.example.IOT.clusterers.ClusTreeClusterer;
-import com.espertech.esper.example.IOT.clusterers.CluStreamClusterer;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPStatement;
 import org.slf4j.Logger;
@@ -104,8 +103,7 @@ public class IotMain implements Runnable {
 
 //        /* Working sliding window */
         String featureBatchEPL = "select detectedUsers, curFrame, timestamp " +
-                "from embeddingFeature_camera_0001";
-
+                "from embeddingFeature_camera_0001.win:length_batch( "+ TrackingParameters.fps * TrackingParameters.timePeriod +" )"; // If you need to be based on time: .win:time_batch(30 sec)
 
 //        /* Working sliding window with isOverlapping flag. */
 //        String featureBatchEPL = "select features, UNum, curFrame, x1, x2, y1, y2, count(*) as frameRecordCount, timestamp " +

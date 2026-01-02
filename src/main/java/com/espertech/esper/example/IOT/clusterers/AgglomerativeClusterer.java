@@ -1,10 +1,7 @@
 package com.espertech.esper.example.IOT.clusterers;
 
 import com.espertech.esper.common.client.EventBean;
-import com.espertech.esper.example.IOT.helpers.ClusteringUtils;
-import com.espertech.esper.example.IOT.helpers.SimilarityUtils;
-import com.espertech.esper.example.IOT.helpers.TrackingParameters;
-import com.espertech.esper.example.IOT.helpers.debug;
+import com.espertech.esper.example.IOT.helpers.*;
 import com.espertech.esper.example.IOT.utils.DetectedUser;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPStatement;
@@ -15,6 +12,8 @@ import smile.clustering.HierarchicalClustering;
 import smile.clustering.linkage.SingleLinkage;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -31,19 +30,20 @@ public class AgglomerativeClusterer {
         this.epsilon = epsilon;
     }
     private void processStreamingClusters(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime){
+        Instant start_time = Instant.now();
+        Long first_timestamp = 0L;
+        long lasttimestamp = 0L;
+        Integer first_id = 0;
+        Integer last_id = 0;
         if (newEvents != null) {
             List<double[]> featureList = new ArrayList<>();
             List<Integer> frameNumbers = new ArrayList<>();
             List<Integer> serialNumbers = new ArrayList<>();
             List<Integer> idList = new ArrayList<>();
             List<Integer[]> boundingBoxList = new ArrayList<>();
-
             long start = System.nanoTime();
             boolean flag = true;
-            Long first_timestamp = 0L;
-            long lasttimestamp = 0L;
-            Integer first_id = 0;
-            Integer last_id = 0;
+
             for (EventBean e : newEvents) {
                 // Get frame-level data
                 List<DetectedUser> detectedUsers = (List<DetectedUser>) e.get("detectedUsers");
@@ -88,11 +88,9 @@ public class AgglomerativeClusterer {
 //                    break;
 //                }
             }
-            System.out.println("--------------------------------------------------------------------------");
-            System.out.println("Window period: " + (lasttimestamp - first_timestamp));
-            System.out.println("First ID: " + first_id + " And Last Id: " + last_id);
-            System.out.println("--------------------------------------------------------------------------");
+
         }
+
             double[][] distanceMatrix = SimilarityUtils.computeCosineDistanceMatrix(featureList.toArray(new double[0][]), this.epsilon);
             HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
             int[] clusterLabels = hc.partition(this.epsilon);
@@ -156,6 +154,11 @@ public class AgglomerativeClusterer {
                         System.out.printf("Cluster %d: %s%n", label, members);
                     });
         }
+        System.out.println("--------------------------------------------------------------------------");
+        System.out.println("Window period: " + (lasttimestamp - first_timestamp));
+        System.out.println("First ID: " + first_id + " And Last Id: " + last_id);
+        System.out.println("Time taken: " + HelperUtils.elapsedMillis(start_time) + " ms");
+        System.out.println("--------------------------------------------------------------------------");
         exit(0);
     }
     public UpdateListener getListener(){
