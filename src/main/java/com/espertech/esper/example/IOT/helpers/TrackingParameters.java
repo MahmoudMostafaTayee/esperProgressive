@@ -42,6 +42,9 @@ public class TrackingParameters {
     public static boolean exclude_short = true;
     public static int short_tracklet_th = 5;
 
+    public static boolean exclude_motionless = true;
+    public static int stop_track_th = 25;
+
     // ===== Runtime-configurable paths =====
     public static String FEATURES_BASE_DIR;
     public static String OUTPUT_DIR;

@@ -1326,4 +1326,83 @@ public class ClusteringUtils {
         }
         return newClusters;
     }
+
+    /**
+     * Excludes tracklets that show minimal movement (motionless/stationary).
+     * 
+     * @param clusters      List of cluster labels.
+     * @param frames        List of frame numbers.
+     * @param boundingBoxes List of bounding boxes [x1, x2, y1, y2].
+     * @param stopTrackTh   Movement threshold in pixels.
+     * @return Updated list of cluster labels with motionless tracklets set to -1.
+     */
+    public static List<Integer> excludeMotionlessTracklet(
+            List<Integer> clusters,
+            List<Integer> frames,
+            List<Integer[]> boundingBoxes,
+            int stopTrackTh) {
+
+        // Group indices by cluster ID
+        Set<Integer> uniqueIds = new HashSet<>(clusters);
+        uniqueIds.remove(-1); // Exclude noise
+
+        Map<Integer, List<Integer>> clusterIndices = new HashMap<>();
+        for (int id : uniqueIds) {
+            clusterIndices.put(id, new ArrayList<>());
+        }
+
+        for (int i = 0; i < clusters.size(); i++) {
+            int id = clusters.get(i);
+            if (id != -1) {
+                clusterIndices.get(id).add(i);
+            }
+        }
+
+        // Check movement for each cluster
+        Set<Integer> motionlessClusters = new HashSet<>();
+
+        for (Map.Entry<Integer, List<Integer>> entry : clusterIndices.entrySet()) {
+            int clusterId = entry.getKey();
+            List<Integer> indices = entry.getValue();
+
+            if (indices.isEmpty())
+                continue;
+
+            // Extract positions (center-x, bottom-y)
+            List<Double> xPositions = new ArrayList<>();
+            List<Double> yPositions = new ArrayList<>();
+
+            for (int idx : indices) {
+                Integer[] box = boundingBoxes.get(idx);
+                double centerX = (box[0] + box[1]) / 2.0;
+                double bottomY = box[3];
+                xPositions.add(centerX);
+                yPositions.add(bottomY);
+            }
+
+            // Calculate range
+            double xMin = Collections.min(xPositions);
+            double xMax = Collections.max(xPositions);
+            double yMin = Collections.min(yPositions);
+            double yMax = Collections.max(yPositions);
+
+            double xRange = xMax - xMin;
+            double yRange = yMax - yMin;
+
+            // Check if motionless (both ranges below threshold)
+            if (xRange < stopTrackTh && yRange < stopTrackTh) {
+                motionlessClusters.add(clusterId);
+            }
+        }
+
+        // Update cluster labels
+        List<Integer> newClusters = new ArrayList<>(clusters);
+        for (int i = 0; i < newClusters.size(); i++) {
+            if (motionlessClusters.contains(newClusters.get(i))) {
+                newClusters.set(i, -1);
+            }
+        }
+
+        return newClusters;
+    }
 }

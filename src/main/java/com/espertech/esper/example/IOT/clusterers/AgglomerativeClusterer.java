@@ -163,6 +163,14 @@ public class AgglomerativeClusterer {
                         TrackingParameters.short_tracklet_th);
             }
 
+            if (TrackingParameters.exclude_motionless) {
+                newClusterLabels = ClusteringUtils.excludeMotionlessTracklet(
+                        newClusterLabels,
+                        frameNumbers,
+                        boundingBoxList,
+                        TrackingParameters.stop_track_th);
+            }
+
             System.out.println("newClusterLabels: " + Arrays.toString(newClusterLabels.toArray()));
 
             Map<Integer, List<Integer>> clusters = new HashMap<>();
