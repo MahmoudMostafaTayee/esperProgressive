@@ -45,6 +45,10 @@ public class TrackingParameters {
     public static boolean exclude_motionless = true;
     public static int stop_track_th = 25;
 
+    // Visualization Parameters
+    public static boolean enable_visualization_export = true;
+    public static String visualization_output_dir = "./tracking_results";
+
     // ===== Runtime-configurable paths =====
     public static String FEATURES_BASE_DIR;
     public static String OUTPUT_DIR;
@@ -140,9 +144,18 @@ public class TrackingParameters {
                 .desc("Directory to save logs and outputs")
                 .build());
 
-        options.addOption("exec_all", false, "Execute all stages");
-        options.addOption("exec_scpt", false, "Execute SCPT stage");
-        options.addOption("exec_mcpt", false, "Execute MCPT stage");
+        options.addOption(Option.builder()
+                .longOpt("exec_all")
+                .desc("Execute all stages")
+                .build());
+        options.addOption(Option.builder()
+                .longOpt("exec_scpt")
+                .desc("Execute SCPT stage")
+                .build());
+        options.addOption(Option.builder()
+                .longOpt("exec_mcpt")
+                .desc("Execute MCPT stage")
+                .build());
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
