@@ -9,10 +9,8 @@ import com.espertech.esper.runtime.client.EPStatement;
 import com.espertech.esper.runtime.client.UpdateListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import smile.clustering.HierarchicalClustering;
-import smile.clustering.linkage.SingleLinkage;
-
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Collectors;
 
 public class MultiCameraClusterer {
@@ -22,6 +20,18 @@ public class MultiCameraClusterer {
 
     public MultiCameraClusterer(double epsilon) {
         this.epsilon = epsilon;
+        // Clean output file on startup
+        if (com.espertech.esper.example.IOT.helpers.TrackingParameters.isDebug) {
+            try {
+                java.io.File file = new java.io.File(
+                        com.espertech.esper.example.IOT.helpers.TrackingParameters.OUTPUT_DIR + "/global_tracks.csv");
+                if (file.exists()) {
+                    file.delete();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public UpdateListener getListener() {
@@ -110,21 +120,71 @@ public class MultiCameraClusterer {
 
         // 2. Perform Hierarchical Clustering
         if (trackEvents.size() > 1) {
-            // HierarchicalClustering hc = HierarchicalClustering.fit(new
-            // SingleLinkage(distanceMatrix));
-            // SingleLinkage takes double[][] proximity.
+            // Custom BFS Clustering to handle disconnected graph robustly
+            // 1. Initialize all labels to -1
+            int[] clusterLabels = new int[trackEvents.size()];
+            Arrays.fill(clusterLabels, -1);
+            int currentClusterId = 0;
 
-            HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
-            int[] clusterLabels;
-            try {
-                clusterLabels = hc.partition(this.epsilon);
-            } catch (IllegalArgumentException e) {
-                // If the threshold is larger than any possible merge, then all nodes
-                // should be in a single cluster.
-                clusterLabels = new int[trackEvents.size()];
-                // All in cluster 0
-                for (int i = 0; i < clusterLabels.length; i++)
-                    clusterLabels[i] = 0;
+            for (int i = 0; i < trackEvents.size(); i++) {
+                if (clusterLabels[i] != -1)
+                    continue; // Already visited
+
+                // Start new cluster
+                clusterLabels[i] = currentClusterId;
+                Queue<Integer> queue = new LinkedList<>();
+                queue.add(i);
+
+                while (!queue.isEmpty()) {
+                    int u = queue.poll();
+
+                    // Find neighbors
+                    for (int v = 0; v < trackEvents.size(); v++) {
+                        // Check if unvisited and within distance threshold
+                        if (clusterLabels[v] == -1 && distanceMatrix[u][v] <= this.epsilon) {
+
+                            // CONFLICT CHECK: Does 'v' conflict with any EXISTING member of
+                            // currentClusterId?
+                            // Conflict = Same Camera AND Time Overlap
+                            boolean conflict = false;
+                            for (int k = 0; k < trackEvents.size(); k++) {
+                                if (clusterLabels[k] == currentClusterId) {
+                                    LocalTrackEvent m1 = trackEvents.get(k);
+                                    LocalTrackEvent m2 = trackEvents.get(v);
+
+                                    if (m1.getCameraId().equals(m2.getCameraId())) {
+                                        // Overlap Check: max(start1, start2) < min(end1, end2)
+                                        long start = Math.max(m1.getStartTime(), m2.getStartTime());
+                                        long end = Math.min(m1.getEndTime(), m2.getEndTime());
+
+                                        if (start < end) {
+                                            conflict = true;
+                                            if (com.espertech.esper.example.IOT.helpers.TrackingParameters.isDebug) {
+                                                logger.info(
+                                                        "Conflict Detected! Ignoring merge of {} and {} (Cam {}, ID {}). Overlap: {}-{}",
+                                                        u, v, m1.getCameraId(), currentClusterId, start, end);
+                                            }
+                                            break;
+                                        } else {
+                                            if (com.espertech.esper.example.IOT.helpers.TrackingParameters.isDebug) {
+                                                logger.info(
+                                                        "No Overlap for same camera: {} vs {} (Cam {}). {}-{} vs {}-{}",
+                                                        u, v, m1.getCameraId(), m1.getStartTime(), m1.getEndTime(),
+                                                        m2.getStartTime(), m2.getEndTime());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (!conflict) {
+                                clusterLabels[v] = currentClusterId;
+                                queue.add(v);
+                            }
+                        }
+                    }
+                }
+                currentClusterId++;
             }
 
             if (com.espertech.esper.example.IOT.helpers.TrackingParameters.isDebug) {
@@ -177,7 +237,9 @@ public class MultiCameraClusterer {
                 exportTrackingResults(Collections.singletonList(globalEvent));
             }
 
-        } else {
+        } else
+
+        {
             // Single track, just emit it as a new global track
             GlobalTrackEvent globalEvent = new GlobalTrackEvent(
                     ++globalIdCounter,
