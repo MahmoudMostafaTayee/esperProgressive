@@ -14,10 +14,11 @@ public class TrackingParameters {
     public static double epsilonScpt = 0.10;
     public static int timePeriod = 1;
     public static int fps = 10;
+    public static int minSamples = 4;
     public static double epsilonMcpt = 0.37;
-    public static int shortTrackTh = 120;
+    public static int shortTrackTh = 0;
     public static int keypointConditionTh = 1;
-    public static boolean replaceSimilarityByWCoordinate = true;
+    public static boolean replaceSimilarityByWCoordinate = false;
     public static String distanceType = "min";
     public static int distanceTh = 10;
     public static double simTh = 0.85;
@@ -26,7 +27,7 @@ public class TrackingParameters {
     public static double iouTh = 0.9;
     public static boolean overlap_suppression = true;
     public static boolean isDebug = true;
-    public static int max_number_of_windows_to_process = 3; // This won't work unless in isDebug is ture.
+    public static int max_number_of_windows_to_process = 100; // This won't work unless in isDebug is ture.
 
     // SNMS Parameters
     public static boolean sequential_nms = true;
@@ -39,10 +40,10 @@ public class TrackingParameters {
     public static int warp_th = 40;
     public static double alpha = 0.5;
 
-    public static boolean exclude_short = true;
+    public static boolean exclude_short = false;
     public static int short_tracklet_th = 5;
 
-    public static boolean exclude_motionless = true;
+    public static boolean exclude_motionless = false;
     public static int stop_track_th = 25;
 
     // Visualization Parameters
@@ -87,6 +88,10 @@ public class TrackingParameters {
         CAMERA_FILTER = cmd.getOptionValue("camera", "all");
 
         // ---------- Execution level ----------
+        if (cmd.hasOption("debug")) {
+            isDebug = true;
+        }
+
         if (cmd.hasOption("exec_all")) {
             exec_lvl = exec_level.ALL;
         } else if (cmd.hasOption("exec_scpt")) {
@@ -147,6 +152,11 @@ public class TrackingParameters {
         options.addOption(Option.builder()
                 .longOpt("exec_all")
                 .desc("Execute all stages")
+                .build());
+
+        options.addOption(Option.builder()
+                .longOpt("debug")
+                .desc("Enable debug output")
                 .build());
         options.addOption(Option.builder()
                 .longOpt("exec_scpt")

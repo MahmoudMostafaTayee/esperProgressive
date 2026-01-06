@@ -10,8 +10,29 @@ import org.apache.commons.math3.linear.ArrayRealVector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
+/**
+ * A utility class for various similarity and distance calculations.
+ */
 public class SimilarityUtils {
     private static final Logger logger = LoggerFactory.getLogger(SimilarityUtils.class);
+
+    public static double[] computeMeanFeature(List<double[]> features) {
+        if (features == null || features.isEmpty())
+            return new double[0];
+        int dim = features.get(0).length;
+        double[] mean = new double[dim];
+        for (double[] f : features) {
+            for (int k = 0; k < dim; k++) {
+                mean[k] += f[k];
+            }
+        }
+        for (int k = 0; k < dim; k++) {
+            mean[k] /= features.size();
+        }
+        return mean;
+    }
 
     public static double cosineSimilarity(List<Float> features1, List<Float> features2) {
         if (features1 == null || features2 == null || features1.size() != features2.size()) {

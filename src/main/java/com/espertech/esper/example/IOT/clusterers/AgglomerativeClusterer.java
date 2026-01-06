@@ -102,7 +102,17 @@ public class AgglomerativeClusterer {
             double[][] distanceMatrix = SimilarityUtils
                     .computeCosineDistanceMatrix(featureList.toArray(new double[0][]), this.epsilon);
             HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
-            int[] clusterLabels = hc.partition(this.epsilon);
+            int[] clusterLabels;
+            try {
+                clusterLabels = hc.partition(this.epsilon);
+            } catch (IllegalArgumentException e) {
+                // If the threshold is larger than any possible merge, then all nodes
+                // should be in a single cluster (0).
+                clusterLabels = new int[featureList.size()];
+                for (int i = 0; i < clusterLabels.length; i++) {
+                    clusterLabels[i] = 0;
+                }
+            }
             System.out.println("clusterLabels: " + Arrays.toString(clusterLabels));
             long durationMs = (System.nanoTime() - start) / 1_000_000;
             agglomerative_clustering_time_tracker += durationMs;
@@ -143,6 +153,15 @@ public class AgglomerativeClusterer {
                     serialNumbers,
                     clusterLabelsList,
                     this.epsilon);
+
+            // Remove noise clusters (matches Python's remove_noise_cluster and min_samples)
+            System.out.println("DEBUG: Before filter, cluster labels count: " + newClusterLabels.size());
+            newClusterLabels = ClusteringUtils.excludeShortTracklet(
+                    newClusterLabels,
+                    TrackingParameters.minSamples - 1);
+            System.out.println("DEBUG: After filter, cluster labels count: " + newClusterLabels.size());
+            long noiseCount = newClusterLabels.stream().filter(l -> l == -1).count();
+            System.out.println("DEBUG: Noise count (-1): " + noiseCount);
 
             if (TrackingParameters.sequential_nms) {
                 newClusterLabels = ClusteringUtils.sequentialNonMaximumSuppression(
@@ -196,8 +215,9 @@ public class AgglomerativeClusterer {
             final Long finalLastTimestamp = lasttimestamp;
 
             for (Integer label : sortedLabels) {
+                if (label == -1)
+                    continue; // Skip noise
                 List<Integer> members = clusters.get(label);
-                System.out.printf("Cluster %d: %s%n", label, members);
 
                 List<double[]> clusterFeatures = new ArrayList<>();
                 List<DetectedUser> clusterUsers = new ArrayList<>();

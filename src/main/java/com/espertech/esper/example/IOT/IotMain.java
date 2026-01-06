@@ -187,10 +187,10 @@ public class IotMain implements Runnable {
         // The AgglomerativeClusterer emits events at the end of its batch (every
         // timePeriod seconds).
 
-        String multiCameraEPL = "select * from LocalTrackEvent.win:time_batch(" + TrackingParameters.timePeriod
+        String multiCameraEPL = "select * from LocalTrackEvent.win:time_batch(" + (TrackingParameters.timePeriod + 1)
                 + " sec)";
 
-        MultiCameraClusterer multiCameraClusterer = new MultiCameraClusterer(TrackingParameters.epsilonScpt);
+        MultiCameraClusterer multiCameraClusterer = new MultiCameraClusterer(TrackingParameters.epsilonMcpt);
         EventEPLUtil.compileDeployAddListener(multiCameraEPL, multiCameraClusterer.getListener());
 
         // CluStreamClusterer cluStream = new CluStreamClusterer();
@@ -268,32 +268,26 @@ public class IotMain implements Runnable {
         // create schema TriggerEvent();
         // """);
 
-        EventEPLUtil.addEpl("""
-                    create table PersonTable (
-                        personId int primary key,
-                        lastSeen long
-                    );
-                """);
+        EventEPLUtil.addEpl("create table PersonTable (\n" +
+                "    personId int primary key,\n" +
+                "    lastSeen long\n" +
+                ");");
 
-        EventEPLUtil.addEpl("""
-                    on PersonTracker as pd
-                    merge into PersonTable as pt
-                    where pt.personId = pd.personId
-                    when matched then
-                        update set pt.lastSeen = pd.timestamp
-                    when not matched then
-                        insert select pd.personId as personId, pd.timestamp as lastSeen;
-                """);
+        EventEPLUtil.addEpl("on PersonTracker as pd\n" +
+                "merge into PersonTable as pt\n" +
+                "where pt.personId = pd.personId\n" +
+                "when matched then\n" +
+                "    update set pt.lastSeen = pd.timestamp\n" +
+                "when not matched then\n" +
+                "    insert select pd.personId as personId, pd.timestamp as lastSeen;");
 
         // Clean up persons who haven’t been seen in 5 seconds
         EventEPLUtil.addEpl("on pattern [every timer:interval(1000)]\n" +
                 "delete from PersonTable\n" +
                 "where current_timestamp() - lastSeen > 5000;");
 
-        String eplSelect = """
-                    on TriggerEvent
-                    select personId, lastSeen from PersonTable;
-                """;
+        String eplSelect = "on TriggerEvent\n" +
+                "select personId, lastSeen from PersonTable;";
         EventEPLUtil.addEpl(
                 eplSelect,
                 (EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime) -> {

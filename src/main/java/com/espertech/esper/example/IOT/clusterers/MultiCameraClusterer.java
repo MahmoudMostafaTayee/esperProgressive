@@ -34,6 +34,9 @@ public class MultiCameraClusterer {
         if (newEvents == null || newEvents.length == 0)
             return;
 
+        System.out.println("DEBUG: MultiCameraClusterer received " + newEvents.length + " tracklets.");
+        if (newEvents.length <= 1)
+            return; // Not clustering a single tracklet
         List<LocalTrackEvent> trackEvents = new ArrayList<>();
         for (EventBean event : newEvents) {
             Object underlying = event.getUnderlying();
@@ -47,6 +50,10 @@ public class MultiCameraClusterer {
 
         logger.info("Processing {} local tracks from multiple cameras.", trackEvents.size());
 
+        performClustering(trackEvents, runtime);
+    }
+
+    public void performClustering(List<LocalTrackEvent> trackEvents, EPRuntime runtime) {
         // 1. Calculate Pairwise Distances with Overlap Suppression
         // Since we are clustering tracklets, we need to compute distance between
         // tracklet A and tracklet B.
@@ -58,7 +65,9 @@ public class MultiCameraClusterer {
 
         List<double[]> meanFeatures = new ArrayList<>();
         for (LocalTrackEvent track : trackEvents) {
-            meanFeatures.add(computeMeanFeature(track.getFeatures()));
+            meanFeatures.add(SimilarityUtils.computeMeanFeature(track.getFeatures()));
+            // Compute world coordinates for each detection if not already present
+            computeWorldCoordinates(track);
         }
 
         double[][] distanceMatrix = new double[trackEvents.size()][trackEvents.size()];
@@ -72,23 +81,21 @@ public class MultiCameraClusterer {
                 LocalTrackEvent t2 = trackEvents.get(j);
 
                 if (t1.getCameraId().equals(t2.getCameraId())) {
-                    // Check time overlap
-                    // Simplistic check: if their window overlaps.
-                    // Since we are processing a batch window of events, they likely all overlap in
-                    // the large window.
-                    // But strictly, tracks from the same camera in the same batch SHOULD be
-                    // distinct people
-                    // (since SCMT already clustered them).
-                    // So we should ALWAYS suppress merging tracks from the same camera in the same
-                    // batch?
-                    // Yes, SCMT says "these are different people". We shouldn't merge them back.
+                    // Overlap suppression for same camera
                     dist = 1000.0;
+                } else if (com.espertech.esper.example.IOT.helpers.TrackingParameters.replaceSimilarityByWCoordinate) {
+                    // Proximity check for different cameras
+                    double worldDist = computeWorldDistance(t1, t2);
+                    if (worldDist > com.espertech.esper.example.IOT.helpers.TrackingParameters.distanceTh) {
+                        dist = 1000.0; // Suppress
+                    }
                 }
 
                 if (com.espertech.esper.example.IOT.helpers.TrackingParameters.isDebug) {
                     logger.info("Dist Calc: {} (Cam {}) vs {} (Cam {}): CosSim={}, FinalDist={}",
                             i, t1.getCameraId(), j, t2.getCameraId(),
-                            SimilarityUtils.cosineSimilarity(meanFeatures.get(i), meanFeatures.get(j)),
+                            com.espertech.esper.example.IOT.helpers.SimilarityUtils
+                                    .cosineSimilarity(meanFeatures.get(i), meanFeatures.get(j)),
                             dist);
                 }
 
@@ -97,20 +104,28 @@ public class MultiCameraClusterer {
             }
         }
 
-        // 2. Hierarchical Clustering
+        if (com.espertech.esper.example.IOT.helpers.TrackingParameters.isDebug) {
+            logger.info("Distance Matrix: {}", java.util.Arrays.deepToString(distanceMatrix));
+        }
+
+        // 2. Perform Hierarchical Clustering
         if (trackEvents.size() > 1) {
-            // Flatten matrix for Smile (lower triangular) - wait, Smile takes full matrix
-            // or triangular?
-            // Smile's HierarchicalClustering.fit takes a triangular distance matrix
-            // (double[])?
-            // Or can take a square raw matrix?
-            // Checking AgglomerativeClusterer usage:
             // HierarchicalClustering hc = HierarchicalClustering.fit(new
             // SingleLinkage(distanceMatrix));
             // SingleLinkage takes double[][] proximity.
 
             HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
-            int[] clusterLabels = hc.partition(this.epsilon);
+            int[] clusterLabels;
+            try {
+                clusterLabels = hc.partition(this.epsilon);
+            } catch (IllegalArgumentException e) {
+                // If the threshold is larger than any possible merge, then all nodes
+                // should be in a single cluster.
+                clusterLabels = new int[trackEvents.size()];
+                // All in cluster 0
+                for (int i = 0; i < clusterLabels.length; i++)
+                    clusterLabels[i] = 0;
+            }
 
             if (com.espertech.esper.example.IOT.helpers.TrackingParameters.isDebug) {
                 logger.info("Epsilon: {}", this.epsilon);
@@ -252,19 +267,57 @@ public class MultiCameraClusterer {
         }
     }
 
-    private double[] computeMeanFeature(List<double[]> features) {
-        if (features == null || features.isEmpty())
-            return new double[0];
-        int dim = features.get(0).length;
-        double[] mean = new double[dim];
-        for (double[] f : features) {
-            for (int k = 0; k < dim; k++) {
-                mean[k] += f[k];
+    private void computeWorldCoordinates(LocalTrackEvent track) {
+        String camIdStr = track.getCameraId().replace("camera_", "");
+        int camId = Integer.parseInt(camIdStr);
+        for (com.espertech.esper.example.IOT.utils.DetectedUser user : track.getDetectedUsers()) {
+            if (!user.hasWorldCoords()) {
+                try {
+                    double centerX = (user.getX1() + user.getX2()) / 2.0;
+                    double bottomY = user.getY2();
+                    double[] world = com.espertech.esper.example.IOT.helpers.HomographyManager.toWorldCoordinates(camId,
+                            centerX, bottomY);
+                    user.setWorldX(world[0]);
+                    user.setWorldY(world[1]);
+                } catch (java.io.IOException e) {
+                    logger.error("Failed to compute world coordinates for track in camera " + camId, e);
+                }
             }
         }
-        for (int k = 0; k < dim; k++) {
-            mean[k] /= features.size();
-        }
-        return mean;
     }
+
+    private double computeWorldDistance(LocalTrackEvent t1, LocalTrackEvent t2) {
+        Map<Integer, double[]> frames1 = new HashMap<>();
+        for (com.espertech.esper.example.IOT.utils.DetectedUser u : t1.getDetectedUsers()) {
+            frames1.put(u.getFrameNumber(), new double[] { u.getWorldX(), u.getWorldY() });
+        }
+
+        List<Double> distances = new ArrayList<>();
+        for (com.espertech.esper.example.IOT.utils.DetectedUser u : t2.getDetectedUsers()) {
+            if (frames1.containsKey(u.getFrameNumber())) {
+                double[] p1 = frames1.get(u.getFrameNumber());
+                double dx = p1[0] - u.getWorldX();
+                double dy = p1[1] - u.getWorldY();
+                distances.add(Math.sqrt(dx * dx + dy * dy));
+            }
+        }
+
+        if (distances.isEmpty()) {
+            return 0.0; // In Python, common_frames < 1 returns similarity as is (or replaces if
+                        // configured)
+            // But here we return 0.0 so it doesn't get suppressed by threshold.
+            // Matching Python's replace_similarity: if no common frames, it doesn't
+            // replace.
+        }
+
+        String type = com.espertech.esper.example.IOT.helpers.TrackingParameters.distanceType;
+        if ("min".equals(type)) {
+            return Collections.min(distances);
+        } else if ("max".equals(type)) {
+            return Collections.max(distances);
+        } else {
+            return distances.stream().mapToDouble(d -> d).average().orElse(0.0);
+        }
+    }
+
 }

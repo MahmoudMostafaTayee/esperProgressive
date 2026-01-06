@@ -71,10 +71,11 @@ public class HomographyManager {
      * @throws IOException If calibration file cannot be read
      */
     public static double[] toWorldCoordinates(int cameraId, double x, double y) throws IOException {
-        double[][] H = getHomographyMatrix(cameraId);
+        double[][] H_original = getHomographyMatrix(cameraId);
+        double[][] H = invert3x3(H_original);
 
         // Apply homography transformation
-        // [x', y', z'] = H * [x, y, 1]
+        // [x', y', z'] = H_inv * [x, y, 1]
         // world_x = x' / z', world_y = y' / z'
 
         double xPrime = H[0][0] * x + H[0][1] * y + H[0][2];
@@ -82,6 +83,33 @@ public class HomographyManager {
         double zPrime = H[2][0] * x + H[2][1] * y + H[2][2];
 
         return new double[] { xPrime / zPrime, yPrime / zPrime };
+    }
+
+    public static double[][] invert3x3(double[][] A) {
+        double det = A[0][0] * (A[1][1] * A[2][2] - A[2][1] * A[1][2]) -
+                A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0]) +
+                A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]);
+
+        if (Math.abs(det) < 1e-10) {
+            return A; // Singular matrix, return as is (fallback)
+        }
+
+        double invDet = 1.0 / det;
+        double[][] inv = new double[3][3];
+
+        inv[0][0] = (A[1][1] * A[2][2] - A[2][1] * A[1][2]) * invDet;
+        inv[0][1] = (A[0][2] * A[2][1] - A[0][1] * A[2][2]) * invDet;
+        inv[0][2] = (A[0][1] * A[1][2] - A[0][2] * A[1][1]) * invDet;
+
+        inv[1][0] = (A[1][2] * A[2][0] - A[1][0] * A[2][2]) * invDet;
+        inv[1][1] = (A[0][0] * A[2][2] - A[0][2] * A[2][0]) * invDet;
+        inv[1][2] = (A[1][0] * A[0][2] - A[0][0] * A[1][2]) * invDet;
+
+        inv[2][0] = (A[1][0] * A[2][1] - A[1][1] * A[2][0]) * invDet;
+        inv[2][1] = (A[2][0] * A[0][1] - A[0][0] * A[2][1]) * invDet;
+        inv[2][2] = (A[0][0] * A[1][1] - A[1][0] * A[0][1]) * invDet;
+
+        return inv;
     }
 
     /**
