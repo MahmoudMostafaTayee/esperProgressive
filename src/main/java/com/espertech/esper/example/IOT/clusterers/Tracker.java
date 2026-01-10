@@ -13,22 +13,19 @@ import smile.clustering.linkage.SingleLinkage;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.lang.System.exit;
 
-public class AgglomerativeClusterer {
-    private static final Logger logger = LoggerFactory.getLogger(AgglomerativeClusterer.class);
+public class Tracker {
+    private static final Logger logger = LoggerFactory.getLogger(Tracker.class);
 
     private long agglomerative_clustering_time_tracker = 0;
-    private final double epsilon;
     private int numberOfClusters = 1;
     Integer number_of_winodws_processed = 1;
 
-    public AgglomerativeClusterer(double epsilon) {
-        this.epsilon = epsilon;
+    public Tracker() {
     }
 
     private void processStreamingClusters(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement,
@@ -81,39 +78,22 @@ public class AgglomerativeClusterer {
                     serialNumbers.add(id);
                     idList.add(id);
                     System.out.println(user);
-
-                    // Long frameRecordCount = (Long) e.get("frameRecordCount");
-                    // if (numberOfClusters < frameRecordCount) {
-                    // numberOfClusters = frameRecordCount.intValue();
-                    // }
-                    // if (id == 1228) {
-                    // break;
-                    // }
                 }
 
             }
+            List<Integer> newClusterLabels = SCPT.trackingByClustering(featureList, frameNumbers, serialNumbers, boundingBoxList);
 
-            double[][] distanceMatrix = SimilarityUtils
-                    .computeCosineDistanceMatrix(featureList.toArray(new double[0][]), this.epsilon);
-            HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
-            int[] clusterLabels = hc.partition(this.epsilon);
-            System.out.println("clusterLabels: " + Arrays.toString(clusterLabels));
             long durationMs = (System.nanoTime() - start) / 1_000_000;
             agglomerative_clustering_time_tracker += durationMs;
-            System.out.println("Agglomerative Clustering Time: " + agglomerative_clustering_time_tracker + " ms");
-
-            List<Integer> clusterLabelsList = Arrays.stream(clusterLabels)
-                    .boxed()
-                    .collect(Collectors.toList());
 
             if (TrackingParameters.isDebug) {
                 // This code snippet saves the distance matrix and frame numbers to CSV files to
                 // be compared with original code.
-                try {
-                    debug.saveDoubleMatrix(TrackingParameters.OUTPUT_DIR + "\\distance_matrix.csv", distanceMatrix);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+//                try {
+//                    debug.saveDoubleMatrix(TrackingParameters.OUTPUT_DIR + "\\distance_matrix.csv", distanceMatrix);
+//                } catch (IOException e) {
+//                    throw new RuntimeException(e);
+//                }
                 try {
                     debug.saveIntList(TrackingParameters.OUTPUT_DIR + "\\frame_numbers.txt", frameNumbers);
                 } catch (IOException e) {
@@ -124,19 +104,12 @@ public class AgglomerativeClusterer {
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
-                try {
-                    debug.saveIntList(TrackingParameters.OUTPUT_DIR + "\\cluster_labels.txt", clusterLabelsList);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+//                try {
+//                    debug.saveIntList(TrackingParameters.OUTPUT_DIR + "\\cluster_labels.txt", clusterLabelsList);
+//                } catch (IOException e) {
+//                    throw new RuntimeException(e);
+//                }
             }
-
-            List<Integer> newClusterLabels = ClusteringUtils.tracking_by_clustering(
-                    distanceMatrix,
-                    frameNumbers,
-                    serialNumbers,
-                    clusterLabelsList,
-                    this.epsilon);
 
             if (TrackingParameters.sequential_nms) {
                 newClusterLabels = ClusteringUtils.sequentialNonMaximumSuppression(
@@ -173,20 +146,20 @@ public class AgglomerativeClusterer {
 
             System.out.println("newClusterLabels: " + Arrays.toString(newClusterLabels.toArray()));
 
-            Map<Integer, List<Integer>> clusters = new HashMap<>();
-            for (int i = 0; i < clusterLabels.length; i++) {
-                int label = newClusterLabels.get(i);
-                int id = idList.get(i);
-                clusters.computeIfAbsent(label, k -> new ArrayList<>()).add(id);
-            }
-
-            // 2. Print each cluster in order
-            clusters.keySet().stream()
-                    .sorted()
-                    .forEach(label -> {
-                        List<Integer> members = clusters.get(label);
-                        System.out.printf("Cluster %d: %s%n", label, members);
-                    });
+//            Map<Integer, List<Integer>> clusters = new HashMap<>();
+//            for (int i = 0; i < clusterLabels.length; i++) {
+//                int label = newClusterLabels.get(i);
+//                int id = idList.get(i);
+//                clusters.computeIfAbsent(label, k -> new ArrayList<>()).add(id);
+//            }
+//
+//            // 2. Print each cluster in order
+//            clusters.keySet().stream()
+//                    .sorted()
+//                    .forEach(label -> {
+//                        List<Integer> members = clusters.get(label);
+//                        System.out.printf("Cluster %d: %s%n", label, members);
+//                    });
         }
         System.out.println("--------------------------------------------------------------------------");
         System.out.println("Window period: " + (lasttimestamp - first_timestamp));
