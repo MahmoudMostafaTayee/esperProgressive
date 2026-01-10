@@ -17,7 +17,7 @@ public class SCPT {
 
     public static List<Integer> trackingByClustering(List<double[]> featureList, List<Integer> frameNumbers, List<Integer> serialNumbers, List<Integer[]> boundingBoxList)
     {
-        double[][] similarityMatrix = computerSimilarityMatrix(featureList.toArray(new double[0][]), TrackingParameters.epsilonScpt);
+        double[][] similarityMatrix = createSimilarityMatrixSCPT(featureList.toArray(new double[0][]), TrackingParameters.epsilonScpt);
         double[][] distanceMatrix = computeDistanceMatrix(similarityMatrix, featureList.toArray(new double[0][]).length);
         HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
         int[] clusterLabels = hc.partition(TrackingParameters.epsilonScpt);
@@ -159,7 +159,7 @@ public class SCPT {
     }
 
 
-    public static class OverlapResult {
+    public static class OverlapResult /*✅*/{
         public List<List<Integer>> overlapIndicesList;
         public List<Integer> nonOverlapIndices;
 
@@ -205,170 +205,141 @@ public class SCPT {
         double[][] centralityMatrix = createCentralityMatrix(clusters, similarityMatrix, frames, epsilon);
 
         // merging for subcluster
-        clusters = associateCluster(clusters, centralityMatrix, epsilon);
+        clusters = associateCluster(clusters, centralityMatrix, epsilon, true, 1, true);
 
         return clusters;
     }
 
-    public static List<Integer> associateCluster(List<Integer> clusters, double[][] centralityMatrix, double epsilon) {
-        boolean removeNoiseCluster = true; // Default value from Python kwargs
-        int costFunction = 1; // Default value from Python kwargs
-        boolean minimize = true; // Default value from Python kwargs
+    public static List<Integer> associateCluster/*✅*/(List<Integer> clusters, 
+                                                 double[][] centralityMatrix, 
+                                                 double epsilon,
+                                                 // Added missing parameters to signature
+                                                 boolean removeNoiseCluster,
+                                                 int costFunction,
+                                                 boolean minimize) {
 
-        // Convert List<Integer> to int[] for easier manipulation
+        // 1. Setup
         int[] clustersArray = clusters.stream().mapToInt(Integer::intValue).toArray();
-
-        List<Integer> uniqueClustersList = new ArrayList<>();
-        for (int cluster : clustersArray) {
-            if (!uniqueClustersList.contains(cluster)) {
-                uniqueClustersList.add(cluster);
-            }
-        }
-        Collections.sort(uniqueClustersList);
-
+        
+        List<Integer> uniqueClustersList = new ArrayList<>(new TreeSet<>(clusters));
         if (removeNoiseCluster && uniqueClustersList.contains(-1)) {
             uniqueClustersList.remove(Integer.valueOf(-1));
         }
 
-        // Create a mutable copy of the centralityMatrix
-        double[][] currentCentralityMatrix = new double[centralityMatrix.length][centralityMatrix[0].length];
+        // Deep copy matrix
+        double[][] currentCentralityMatrix = new double[centralityMatrix.length][];
         for (int i = 0; i < centralityMatrix.length; i++) {
-            System.arraycopy(centralityMatrix[i], 0, currentCentralityMatrix[i], 0, centralityMatrix[i].length);
+            currentCentralityMatrix[i] = Arrays.copyOf(centralityMatrix[i], centralityMatrix[i].length);
+            currentCentralityMatrix[i][i] = 0.0; // Ensure diagonal is 0
         }
 
-        // np.fill_diagonal(centrality_matrix, 0)
-        for (int i = 0; i < currentCentralityMatrix.length; i++) {
-            currentCentralityMatrix[i][i] = 0.0;
-        }
-
+        // Setup counts
         Map<Integer, Integer> count = new HashMap<>();
         if (costFunction == 2) {
             for (int cluster : clustersArray) {
+                if (removeNoiseCluster && cluster == -1) continue;
                 count.put(cluster, count.getOrDefault(cluster, 0) + 1);
-            }
-            if (removeNoiseCluster && count.containsKey(-1)) {
-                count.remove(-1);
-            }
-        }
-
-        double centrality = -1.0;
-        if (currentCentralityMatrix.length > 0 && currentCentralityMatrix[0].length > 0) {
-            centrality = currentCentralityMatrix[0][0]; // Initialize with first element
-            for (int i = 0; i < currentCentralityMatrix.length; i++) {
-                for (int j = 0; j < currentCentralityMatrix[i].length; j++) {
-                    if (currentCentralityMatrix[i][j] > centrality) {
-                        centrality = currentCentralityMatrix[i][j];
-                    }
-                }
             }
         }
 
         double th = 1.0 - epsilon;
 
-        while (centrality > th) {
+        // 2. Main Loop
+        while (true) {
             int cluster1Index = -1;
             int cluster2Index = -1;
-            double maxVal = -1.0;
+            double maxVal = -Double.MAX_VALUE;
 
-            if (costFunction == 1) {
-                for (int i = 0; i < currentCentralityMatrix.length; i++) {
-                    for (int j = 0; j < currentCentralityMatrix[i].length; j++) {
-                        if (currentCentralityMatrix[i][j] > maxVal) {
-                            maxVal = currentCentralityMatrix[i][j];
-                            cluster1Index = i;
-                            cluster2Index = j;
-                        }
-                    }
-                }
-            } else if (costFunction == 2) {
-                double[][] averagedCentralityMatrix = new double[currentCentralityMatrix.length][currentCentralityMatrix[0].length];
-                List<Integer> countsList = new ArrayList<>(count.values());
-                for (int i = 0; i < currentCentralityMatrix.length; i++) {
-                    for (int j = 0; j < currentCentralityMatrix[i].length; j++) {
-                        averagedCentralityMatrix[i][j] = currentCentralityMatrix[i][j]
-                                / (double) (countsList.get(i) * countsList.get(j));
-                    }
-                }
-                for (int i = 0; i < averagedCentralityMatrix.length; i++) {
-                    averagedCentralityMatrix[i][i] = 0.0;
-                }
+            // --- OPTIMIZED FIND MAX ---
+            // We combine the loops for CF1 and CF2 to avoid allocating a temp matrix.
+            for (int i = 0; i < currentCentralityMatrix.length; i++) {
+                // Optimization: j = i + 1 because matrix is symmetric
+                for (int j = i + 1; j < currentCentralityMatrix[i].length; j++) {
+                    
+                    double val = currentCentralityMatrix[i][j];
 
-                for (int i = 0; i < averagedCentralityMatrix.length; i++) {
-                    for (int j = 0; j < averagedCentralityMatrix[i].length; j++) {
-                        if (averagedCentralityMatrix[i][j] > maxVal) {
-                            maxVal = averagedCentralityMatrix[i][j];
-                            cluster1Index = i;
-                            cluster2Index = j;
-                        }
+                    if (costFunction == 2) {
+                        // Apply cost function math on the fly
+                        int c1 = uniqueClustersList.get(i);
+                        int c2 = uniqueClustersList.get(j);
+                        val = val / (double) (count.get(c1) * count.get(c2));
+                    }
+
+                    if (val > maxVal) {
+                        maxVal = val;
+                        cluster1Index = i;
+                        cluster2Index = j;
                     }
                 }
             }
 
-            centrality = maxVal;
-
-            if (centrality > th) {
-                int cluster1 = uniqueClustersList.get(cluster1Index);
-                int cluster2 = uniqueClustersList.get(cluster2Index);
-
-                double[] targetRow1 = currentCentralityMatrix[cluster1Index];
-                double[] targetRow2 = currentCentralityMatrix[cluster2Index];
-                double[] sumRow = new double[targetRow1.length];
-
-                for (int k = 0; k < targetRow1.length; k++) {
-                    sumRow[k] = targetRow1[k] + targetRow2[k];
-                }
-
-                if (minimize) {
-                    for (int k = 0; k < targetRow1.length; k++) {
-                        if (Math.min(targetRow1[k], targetRow2[k]) < 0) {
-                            sumRow[k] = -1.0; // This is a simplified interpretation of the Python logic
-                        }
-                    }
-                }
-
-                // Update centrality_matrix
-                double[][] newCentralityMatrix = new double[currentCentralityMatrix.length
-                        - 1][currentCentralityMatrix.length - 1];
-                List<Integer> nextIndices = new ArrayList<>();
-                for (int i = 0; i < currentCentralityMatrix.length; i++) {
-                    if (i != cluster2Index) {
-                        nextIndices.add(i);
-                    }
-                }
-
-                for (int i = 0; i < nextIndices.size(); i++) {
-                    for (int j = 0; j < nextIndices.size(); j++) {
-                        if (nextIndices.get(i) == cluster1Index) {
-                            newCentralityMatrix[i][j] = sumRow[nextIndices.get(j)];
-                        } else if (nextIndices.get(j) == cluster1Index) {
-                            newCentralityMatrix[i][j] = sumRow[nextIndices.get(i)];
-                        } else {
-                            newCentralityMatrix[i][j] = currentCentralityMatrix[nextIndices.get(i)][nextIndices.get(j)];
-                        }
-                    }
-                }
-                currentCentralityMatrix = newCentralityMatrix;
-
-                for (int i = 0; i < currentCentralityMatrix.length; i++) {
-                    currentCentralityMatrix[i][i] = 0.0;
-                }
-
-                // Update clusters
-                for (int i = 0; i < clustersArray.length; i++) {
-                    if (clustersArray[i] == cluster2) {
-                        clustersArray[i] = cluster1;
-                    }
-                }
-
-                // Update unique_clusters
-                uniqueClustersList.remove(Integer.valueOf(cluster2));
-
-                if (costFunction == 2) {
-                    count.put(cluster1, count.get(cluster1) + count.get(cluster2));
-                    count.remove(cluster2);
-                }
-            } else {
+            // Stop if threshold not met
+            if (maxVal <= th) {
                 break;
+            }
+
+            // 3. Merge Logic
+            int cluster1 = uniqueClustersList.get(cluster1Index);
+            int cluster2 = uniqueClustersList.get(cluster2Index);
+
+            // Calculate combined row
+            double[] sumRow = new double[currentCentralityMatrix.length];
+            for (int k = 0; k < currentCentralityMatrix.length; k++) {
+                // Skip if comparing to self (logic safety)
+                if (k == cluster1Index || k == cluster2Index) continue;
+
+                double val1 = currentCentralityMatrix[cluster1Index][k];
+                double val2 = currentCentralityMatrix[cluster2Index][k];
+
+                if (minimize && Math.min(val1, val2) < 0) {
+                    sumRow[k] = -1.0;
+                } else {
+                    sumRow[k] = val1 + val2;
+                }
+            }
+
+            // Update cluster1's row/col in place FIRST
+            for (int k = 0; k < currentCentralityMatrix.length; k++) {
+                currentCentralityMatrix[cluster1Index][k] = sumRow[k];
+                currentCentralityMatrix[k][cluster1Index] = sumRow[k];
+            }
+            currentCentralityMatrix[cluster1Index][cluster1Index] = 0.0;
+
+            // 4. Shrink Matrix (Remove cluster2)
+            // We build a new smaller matrix, skipping row/col of cluster2
+            int newSize = currentCentralityMatrix.length - 1;
+            double[][] newCentralityMatrix = new double[newSize][newSize];
+
+            int newRow = 0;
+            for (int i = 0; i < currentCentralityMatrix.length; i++) {
+                if (i == cluster2Index) continue;
+
+                int newCol = 0;
+                for (int j = 0; j < currentCentralityMatrix.length; j++) {
+                    if (j == cluster2Index) continue;
+                    
+                    newCentralityMatrix[newRow][newCol] = currentCentralityMatrix[i][j];
+                    newCol++;
+                }
+                newRow++;
+            }
+            currentCentralityMatrix = newCentralityMatrix;
+
+            // 5. Update Global State
+            // Update labels in the main array
+            for (int i = 0; i < clustersArray.length; i++) {
+                if (clustersArray[i] == cluster2) {
+                    clustersArray[i] = cluster1;
+                }
+            }
+
+            // Remove merged cluster from tracking list
+            uniqueClustersList.remove(cluster2Index); // More efficient to remove by index
+
+            // Update counts
+            if (costFunction == 2) {
+                count.put(cluster1, count.get(cluster1) + count.get(cluster2));
+                count.remove(cluster2);
             }
         }
 
@@ -376,7 +347,7 @@ public class SCPT {
     }
 
 
-    public static double[][] createCentralityMatrix(List<Integer> clusters, double[][] similarityMatrix,
+    public static double[][] createCentralityMatrix/*✅*/(List<Integer> clusters, double[][] similarityMatrix,
                                                     List<Integer> frames, double epsilon) {
         boolean removeNoiseCluster = true; // Default value from Python kwargs
 
@@ -590,14 +561,36 @@ public class SCPT {
         return tmpClusters;
     }
 
-    private static List<Integer> fillNone(List<Integer> list) {
-        List<Integer> filledList = new ArrayList<>(list);
-        int nextVal = 0;
-        for (int i = 0; i < filledList.size(); i++) {
-            if (filledList.get(i) == null) {
-                filledList.set(i, nextVal++);
+    public static List<Integer> fillNone/*✅*/(List<Integer> list) {
+        int n = list.size();
+        
+        // 1. Identify which numbers from 0 to n-1 are ALREADY used
+        Set<Integer> usedNums = new HashSet<>();
+        for (Integer num : list) {
+            if (num != null) {
+                usedNums.add(num);
             }
         }
+
+        // 2. Identify which numbers are NOT used (unused_nums)
+        Queue<Integer> unusedNums = new LinkedList<>();
+        for (int i = 0; i < n; i++) {
+            if (!usedNums.contains(i)) {
+                unusedNums.add(i);
+            }
+        }
+
+        // 3. Create the filled list
+        List<Integer> filledList = new ArrayList<>(list);
+        for (int i = 0; i < filledList.size(); i++) {
+            if (filledList.get(i) == null) {
+                // Python's .pop(0) is equivalent to Queue.poll()
+                if (!unusedNums.isEmpty()) {
+                    filledList.set(i, unusedNums.poll());
+                }
+            }
+        }
+        
         return filledList;
     }
 
@@ -776,35 +769,38 @@ public class SCPT {
         return candidatesIndicesList;
     }
 
-    public static int getInitialIndex(double[][] distanceMatrix, List<List<Integer>> overlapIndicesList) {
+    public static int getInitialIndex/*✅*/(double[][] distanceMatrix, List<List<Integer>> overlapIndicesList) {
         List<Double> distances = new ArrayList<>();
+
         for (List<Integer> overlapIndices : overlapIndicesList) {
-            double minDistance = 2.0; // Distance is between 0 and 1 for cosine distance
-            if (overlapIndices.size() > 1) {
-                for (int i = 0; i < overlapIndices.size(); i++) {
-                    for (int j = i + 1; j < overlapIndices.size(); j++) {
-                        int index1 = overlapIndices.get(i);
-                        int index2 = overlapIndices.get(j);
-                        double distance = distanceMatrix[index1][index2];
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                        }
+            double minDistance = 2.0; // Initial value from Python
+
+            // Python's combinations(overlap_indices, 2)
+            // If overlapIndices.size() < 2, these loops simply don't execute
+            for (int i = 0; i < overlapIndices.size(); i++) {
+                for (int j = i + 1; j < overlapIndices.size(); j++) {
+                    int index1 = overlapIndices.get(i);
+                    int index2 = overlapIndices.get(j);
+                    
+                    double distance = distanceMatrix[index1][index2];
+                    if (distance < minDistance) {
+                        minDistance = distance;
                     }
                 }
-            } else {
-                minDistance = 0.0; // Single element, no distance to compare
             }
             distances.add(minDistance);
         }
 
-        double maxDistance = -1.0;
-        int maxIndex = -1;
+        // np.argmax(distances)
+        double maxDistance = -Double.MAX_VALUE;
+        int maxIndex = 0; // Default to 0 to match argmax behavior on empty/constant lists
         for (int i = 0; i < distances.size(); i++) {
             if (distances.get(i) > maxDistance) {
                 maxDistance = distances.get(i);
                 maxIndex = i;
             }
         }
+        
         return maxIndex;
     }
 
@@ -855,7 +851,7 @@ public class SCPT {
         return distMatrix;
     }
 
-    public static double[][] computerSimilarityMatrix/*✅*/(double[][] features, double epsilon){
+    public static double[][] createSimilarityMatrixSCPT/*✅*/(double[][] features, double epsilon){
         int n = features.length;
         double[][] similarityMatrix = new double[n][n];
         double threshold = 1.0 - epsilon;
