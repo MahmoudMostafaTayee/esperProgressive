@@ -16,7 +16,8 @@ import java.util.Map;
 public class HomographyManager {
     private static final Gson gson = new Gson();
     private static final Map<Integer, double[][]> homographyCache = new HashMap<>();
-    private static String calibrationBasePath = "Original/scene_001";
+    private static String calibrationBasePath = com.espertech.esper.example.IOT.helpers.TrackingParameters.CALIBRATION_DIR
+            + "/scene_" + String.format("%03d", com.espertech.esper.example.IOT.helpers.TrackingParameters.scene);
 
     /**
      * Sets the base path for calibration files.
@@ -33,8 +34,8 @@ public class HomographyManager {
      * Gets the homography matrix for a specific camera.
      * 
      * @param cameraId Camera ID (e.g., 1 for camera_0001)
-     * @return 3x3 homography matrix
-     * @throws IOException If calibration file cannot be read
+     * @return 3x3 homography matrix or null if not found
+     * @throws IOException If calibration file exists but cannot be read
      */
     public static double[][] getHomographyMatrix(int cameraId) throws IOException {
         // Check cache first
@@ -46,7 +47,12 @@ public class HomographyManager {
         String calibrationPath = String.format("%s/camera_%04d/calibration.json",
                 calibrationBasePath, cameraId);
 
-        try (FileReader reader = new FileReader(calibrationPath)) {
+        java.io.File file = new java.io.File(calibrationPath);
+        if (!file.exists()) {
+            return null; // Gracefully handle missing calibration
+        }
+
+        try (FileReader reader = new FileReader(file)) {
             JsonObject json = gson.fromJson(reader, JsonObject.class);
 
             // Parse homography matrix
@@ -67,11 +73,14 @@ public class HomographyManager {
      * @param cameraId Camera ID
      * @param x        X coordinate in camera space
      * @param y        Y coordinate in camera space
-     * @return World coordinates [x, y]
-     * @throws IOException If calibration file cannot be read
+     * @return World coordinates [x, y] or null if calibration not found
+     * @throws IOException If calibration exists but cannot be read
      */
     public static double[] toWorldCoordinates(int cameraId, double x, double y) throws IOException {
         double[][] H_original = getHomographyMatrix(cameraId);
+        if (H_original == null) {
+            return null; // Gracefully handle missing calibration
+        }
         double[][] H = invert3x3(H_original);
 
         // Apply homography transformation
@@ -117,8 +126,8 @@ public class HomographyManager {
      * 
      * @param cameraId      Camera ID
      * @param boundingBoxes List of bounding boxes [x1, x2, y1, y2]
-     * @return Average world coordinates [x, y]
-     * @throws IOException If calibration file cannot be read
+     * @return Average world coordinates [x, y] or null if calibration not found
+     * @throws IOException If calibration exists but cannot be read
      */
     public static double[] computeAverageWorldCoordinate(int cameraId,
             java.util.List<Integer[]> boundingBoxes)
@@ -133,6 +142,9 @@ public class HomographyManager {
             double bottomY = bbox[3];
 
             double[] worldCoord = toWorldCoordinates(cameraId, centerX, bottomY);
+            if (worldCoord == null) {
+                return null; // Gracefully handle missing calibration
+            }
             sumX += worldCoord[0];
             sumY += worldCoord[1];
             count++;

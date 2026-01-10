@@ -5,7 +5,6 @@ import com.espertech.esper.example.IOT.events.LocalTrackEvent;
 import com.espertech.esper.example.IOT.events.GlobalTrackEvent;
 import com.espertech.esper.example.IOT.helpers.SimilarityUtils;
 import com.espertech.esper.runtime.client.EPRuntime;
-import com.espertech.esper.runtime.client.EPStatement;
 import com.espertech.esper.runtime.client.UpdateListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +35,11 @@ public class MultiCameraClusterer {
 
     public UpdateListener getListener() {
         return (newEvents, oldEvents, statement, runtime) -> {
+            logger.info("MultiCameraClusterer onUpdate called with {} events",
+                    newEvents != null ? newEvents.length : 0);
+            if (newEvents == null) {
+                return;
+            }
             processMultiCameraClusters(newEvents, runtime);
         };
     }
@@ -96,8 +100,9 @@ public class MultiCameraClusterer {
                 } else if (com.espertech.esper.example.IOT.helpers.TrackingParameters.replaceSimilarityByWCoordinate) {
                     // Proximity check for different cameras
                     double worldDist = computeWorldDistance(t1, t2);
-                    if (worldDist > com.espertech.esper.example.IOT.helpers.TrackingParameters.distanceTh) {
-                        dist = 1000.0; // Suppress
+                    if (worldDist >= 0
+                            && worldDist > com.espertech.esper.example.IOT.helpers.TrackingParameters.distanceTh) {
+                        dist = 1000.0; // High distance to suppress clustering
                     }
                 }
 
@@ -200,7 +205,6 @@ public class MultiCameraClusterer {
             // 3. Emit Global Tracks
             long currentTimestamp = System.currentTimeMillis();
             for (Map.Entry<Integer, List<LocalTrackEvent>> entry : clusters.entrySet()) {
-                int clusterLabel = entry.getKey(); // This is local to this batch clustering
                 List<LocalTrackEvent> members = entry.getValue();
 
                 // Assign a global ID.
@@ -339,10 +343,13 @@ public class MultiCameraClusterer {
                     double bottomY = user.getY2();
                     double[] world = com.espertech.esper.example.IOT.helpers.HomographyManager.toWorldCoordinates(camId,
                             centerX, bottomY);
-                    user.setWorldX(world[0]);
-                    user.setWorldY(world[1]);
+                    if (world != null) {
+                        user.setWorldX(world[0]);
+                        user.setWorldY(world[1]);
+                    }
                 } catch (java.io.IOException e) {
-                    logger.error("Failed to compute world coordinates for track in camera " + camId, e);
+                    logger.warn(
+                            "World coordinates unavailable for camera " + camId + " (calibration file likely missing)");
                 }
             }
         }
@@ -351,12 +358,18 @@ public class MultiCameraClusterer {
     private double computeWorldDistance(LocalTrackEvent t1, LocalTrackEvent t2) {
         Map<Integer, double[]> frames1 = new HashMap<>();
         for (com.espertech.esper.example.IOT.utils.DetectedUser u : t1.getDetectedUsers()) {
-            frames1.put(u.getFrameNumber(), new double[] { u.getWorldX(), u.getWorldY() });
+            if (u.hasWorldCoords()) {
+                frames1.put(u.getFrameNumber(), new double[] { u.getWorldX(), u.getWorldY() });
+            }
+        }
+
+        if (frames1.isEmpty()) {
+            return -1.0; // Signal that world coordinates are missing for T1
         }
 
         List<Double> distances = new ArrayList<>();
         for (com.espertech.esper.example.IOT.utils.DetectedUser u : t2.getDetectedUsers()) {
-            if (frames1.containsKey(u.getFrameNumber())) {
+            if (u.hasWorldCoords() && frames1.containsKey(u.getFrameNumber())) {
                 double[] p1 = frames1.get(u.getFrameNumber());
                 double dx = p1[0] - u.getWorldX();
                 double dy = p1[1] - u.getWorldY();
@@ -365,11 +378,18 @@ public class MultiCameraClusterer {
         }
 
         if (distances.isEmpty()) {
-            return 0.0; // In Python, common_frames < 1 returns similarity as is (or replaces if
-                        // configured)
-            // But here we return 0.0 so it doesn't get suppressed by threshold.
-            // Matching Python's replace_similarity: if no common frames, it doesn't
-            // replace.
+            // Check if T2 even has world coordinates
+            boolean t2HasCoords = false;
+            for (com.espertech.esper.example.IOT.utils.DetectedUser u : t2.getDetectedUsers()) {
+                if (u.hasWorldCoords()) {
+                    t2HasCoords = true;
+                    break;
+                }
+            }
+            if (!t2HasCoords) {
+                return -1.0; // Signal that world coordinates are missing for T2
+            }
+            return 0.0; // No common frames, but both have coords (don't suppress)
         }
 
         String type = com.espertech.esper.example.IOT.helpers.TrackingParameters.distanceType;
@@ -378,7 +398,11 @@ public class MultiCameraClusterer {
         } else if ("max".equals(type)) {
             return Collections.max(distances);
         } else {
-            return distances.stream().mapToDouble(d -> d).average().orElse(0.0);
+            // Average
+            double sum = 0;
+            for (double d : distances)
+                sum += d;
+            return sum / distances.size();
         }
     }
 
