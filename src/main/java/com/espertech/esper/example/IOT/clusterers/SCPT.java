@@ -17,7 +17,8 @@ public class SCPT {
 
     public static List<Integer> trackingByClustering(List<double[]> featureList, List<Integer> frameNumbers, List<Integer> serialNumbers, List<Integer[]> boundingBoxList)
     {
-        double[][] distanceMatrix = computeCosineDistanceMatrix(featureList.toArray(new double[0][]), TrackingParameters.epsilonScpt);
+        double[][] similarityMatrix = computerSimilarityMatrix(featureList.toArray(new double[0][]), TrackingParameters.epsilonScpt);
+        double[][] distanceMatrix = computeDistanceMatrix(similarityMatrix, featureList.toArray(new double[0][]).length);
         HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
         int[] clusterLabels = hc.partition(TrackingParameters.epsilonScpt);
         System.out.println("clusterLabels: " + Arrays.toString(clusterLabels));
@@ -61,62 +62,114 @@ public class SCPT {
         return relabeledClusters;
     }
 
-    public static List<Integer> reclusteringOverlapCluster(double[][] distanceMatrix,
-                                                           // Map<Integer, Map<String, Object>> trackingDict,
+    public static List<Integer> reclusteringOverlapCluster/*✅*/(double[][] distanceMatrix,
                                                            List<Integer> frames,
-                                                           List<Integer> serials,
+                                                           List<Integer> serials, // serials is unused in Java version but kept for signature match
                                                            List<Integer> clusters,
-                                                           double epsilon) {
-        // List<Integer> frames = new ArrayList<>();
-        // for (int serial : serials) {
-        // frames.add((Integer) trackingDict.get(serial).get("Frame"));
-        // }
-
+                                                           double epsilon){
+        // 1. Initialize dictionaries
         Map<Integer, List<Integer>> clusterFrameDict = new HashMap<>();
         Map<Integer, List<Integer>> clusterIndicesDict = new HashMap<>();
 
+        // Use HashSet for unique clusters (order doesn't matter for logic, but Set removes duplicates)
         Set<Integer> uniqueClusters = new HashSet<>(clusters);
+
         for (int cluster : uniqueClusters) {
             clusterFrameDict.put(cluster, new ArrayList<>());
             clusterIndicesDict.put(cluster, new ArrayList<>());
         }
 
+        // 2. Populate dictionaries
         for (int i = 0; i < clusters.size(); i++) {
             int cluster = clusters.get(i);
             clusterFrameDict.get(cluster).add(frames.get(i));
             clusterIndicesDict.get(cluster).add(i);
         }
 
+        // Clone clusters to avoid modifying original list if passed by reference (Java is pass-by-value of reference)
         List<Integer> newClusters = new ArrayList<>(clusters);
 
+        // 3. Iterate over clusters
         for (int cluster : uniqueClusters) {
             List<Integer> clusterFrames = clusterFrameDict.get(cluster);
             List<Integer> clusterIndices = clusterIndicesDict.get(cluster);
-
             Set<Integer> distinctClusterFrames = new HashSet<>(clusterFrames);
+
+            // If no duplicates (overlaps), skip
             if (distinctClusterFrames.size() == clusterFrames.size()) {
                 continue;
             }
 
-            OverlapDetector.OverlapResult overlapResult = OverlapDetector.divideOverlapOrNonOverlap(clusterFrames,
-                    clusterIndices);
+            // Divide overlap/non-overlap
+            OverlapResult overlapResult = divideOverlapOrNonOverlap(
+                    clusterFrames, clusterIndices);
             List<List<Integer>> overlapIndicesList = overlapResult.overlapIndicesList;
             List<Integer> nonoverlapIndices = overlapResult.nonOverlapIndices;
 
-            List<Integer> tmpClusters = overlapSuppressionClustering(distanceMatrix, frames, nonoverlapIndices,
-                    overlapIndicesList, epsilon);
+            // Perform sub-clustering
+            List<Integer> tmpClusters = overlapSuppressionClustering(
+                    distanceMatrix, frames, nonoverlapIndices, overlapIndicesList, epsilon);
 
+            // CRITICAL FIX: Recalculate maxClusterId based on the *current state* of newClusters
+            // Doing this inside the loop ensures we don't reuse IDs for different clusters
             int maxClusterId = Collections.max(newClusters);
+
+            // Update cluster IDs
+            // Assuming tmpClusters is the same size as newClusters (global masking)
             for (int i = 0; i < tmpClusters.size(); i++) {
+                // Only update indices belonging to the current cluster being processed
                 if (newClusters.get(i) == cluster) {
+                    // Logic: Offset the new sub-cluster ID by the current global Max ID
                     newClusters.set(i, maxClusterId + tmpClusters.get(i) + 1);
                 }
             }
         }
+
         return newClusters;
     }
 
-    public static List<Integer> overlapSuppressionClustering(double[][] distanceMatrix, List<Integer> frames,
+    public static OverlapResult divideOverlapOrNonOverlap/*✅*/(List<Integer> clusterFrames, List<Integer> clusterIndices){
+        // Process only common elements if lists are unequal
+        int size = Math.min(clusterFrames.size(), clusterIndices.size());
+        Map<Integer, List<Integer>> frameIndicesDict = new TreeMap<>();
+
+        // Group indices by frame
+        for (int i = 0; i < size; i++) {
+            int frame = clusterFrames.get(i);
+            int index = clusterIndices.get(i);
+            frameIndicesDict.computeIfAbsent(frame, k -> new ArrayList<>()).add(index);
+        }
+
+        // Identify frames with >1 index (overlaps)
+        List<List<Integer>> overlapIndicesList = frameIndicesDict.values().stream()
+                .filter(indices -> indices.size() > 1)
+                .collect(Collectors.toList());
+
+        // Flatten overlaps into a Set for O(1) lookups
+        Set<Integer> flattenedOverlapIndices = overlapIndicesList.stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toSet());
+
+        // Filter original indices not present in overlap set
+        List<Integer> nonOverlapIndices = clusterIndices.stream()
+                .filter(index -> !flattenedOverlapIndices.contains(index))
+                .collect(Collectors.toList());
+
+        return new OverlapResult(overlapIndicesList, nonOverlapIndices);
+    }
+
+
+    public static class OverlapResult {
+        public List<List<Integer>> overlapIndicesList;
+        public List<Integer> nonOverlapIndices;
+
+        public OverlapResult(List<List<Integer>> overlapIndicesList, List<Integer> nonOverlapIndices) {
+            this.overlapIndicesList = overlapIndicesList;
+            this.nonOverlapIndices = nonOverlapIndices;
+        }
+    }
+
+    public static List<Integer> overlapSuppressionClustering/*✅*/(double[][] distanceMatrix, List<Integer> frames,
                                                              List<Integer> nonoverlapIndices, List<List<Integer>> overlapIndicesList, double epsilon) {
         List<Integer> clusters = new ArrayList<>(Collections.nCopies(frames.size(), -1));
 
@@ -400,19 +453,21 @@ public class SCPT {
     }
 
 
-    public static List<Integer> separateIntoSubcluster(List<Integer> tmpClusters,
+    public static List<Integer> separateIntoSubcluster/*✅*/(List<Integer> tmpClusters,
                                                        List<List<Integer>> overlapIndicesList, double[][] distanceMatrix, double epsilon) {
+        // 1. Calculate Max Overlap
         int maxOverlap = 0;
         for (List<Integer> indices : overlapIndicesList) {
-            if (indices.size() > maxOverlap) {
-                maxOverlap = indices.size();
-            }
+            maxOverlap = Math.max(maxOverlap, indices.size());
         }
 
+        // 2. Initial Node Handling
         int initialIndex = getInitialIndex(distanceMatrix, overlapIndicesList);
         List<Integer> initialNodeIndices = new ArrayList<>(overlapIndicesList.get(initialIndex));
+        // Remove by index (int)
         overlapIndicesList.remove(initialIndex);
 
+        // Initialize subclusters
         List<List<Integer>> subclusterIndicesList = new ArrayList<>();
         for (int i = 0; i < maxOverlap; i++) {
             subclusterIndicesList.add(new ArrayList<>());
@@ -421,20 +476,20 @@ public class SCPT {
             subclusterIndicesList.get(i).add(initialNodeIndices.get(i));
         }
 
+        // 3. Create Similarity Matrix (1 - Distance)
         double[][] similarityMatrix = new double[distanceMatrix.length][distanceMatrix[0].length];
         for (int i = 0; i < distanceMatrix.length; i++) {
             for (int j = 0; j < distanceMatrix[0].length; j++) {
-                similarityMatrix[i][j] = 1.0 - distanceMatrix[i][j];
+                similarityMatrix[i][j] = (i == j) ? 0.0 : 1.0 - distanceMatrix[i][j];
             }
         }
-        for (int i = 0; i < similarityMatrix.length; i++) {
-            similarityMatrix[i][i] = 0.0;
-        }
 
+        // 4. Main Processing Loop
         while (!overlapIndicesList.isEmpty()) {
             Map<Integer, Map<String, Object>> centralityDict = new HashMap<>();
             double maxCentrality = 0.0;
 
+            // Hardcoded '10' matches your snippet; verify if this should be 'epsilon' or a config param
             List<List<Integer>> candidatesIndicesList = getCandidatesIndicesList(similarityMatrix,
                     subclusterIndicesList, overlapIndicesList, epsilon, 10);
 
@@ -480,7 +535,7 @@ public class SCPT {
                 }
             } else {
                 for (Map.Entry<Integer, Map<String, Object>> entry : centralityDict.entrySet()) {
-                    if ((Double) entry.getValue().get("centrality") == maxCentrality) {
+                    if (Math.abs((Double) entry.getValue().get("centrality") - maxCentrality) < 1e-9) {
                         maxIndex = entry.getKey();
                         currentOverlapIndices = (List<Integer>) entry.getValue().get("overlap_indices");
                         maxSubclusterIndices = (List<Integer>) entry.getValue().get("indices");
@@ -492,35 +547,41 @@ public class SCPT {
                 }
             }
 
+            // 5. Update Subclusters
+            // Ensure we don't exceed bounds (simulates Python zip)
             int limit = Math.min(maxSubclusterIndices.size(), currentOverlapIndices.size());
             for (int i = 0; i < limit; i++) {
-                int subIndex = maxSubclusterIndices.get(i);
-                int overlapNodeIndex = currentOverlapIndices.get(i);
-                subclusterIndicesList.get(subIndex).add(overlapNodeIndex);
+                subclusterIndicesList.get(maxSubclusterIndices.get(i)).add(currentOverlapIndices.get(i));
             }
 
+            // Remove processed overlap indices
+            // WARNING: This relies on currentOverlapIndices being value-equal to the one in the list
             overlapIndicesList.remove(currentOverlapIndices);
         }
 
-        int maxClusterId = -1;
-        if (!tmpClusters.isEmpty()) {
-            maxClusterId = Collections.max(tmpClusters);
-        }
+        // 6. Final Cluster ID Assignment
+        int maxClusterId = tmpClusters.isEmpty() ? -1 : Collections.max(tmpClusters);
 
         for (List<Integer> subclusterIndices : subclusterIndicesList) {
+            if (subclusterIndices.isEmpty()) continue; // Safety check
+
             if (subclusterIndices.size() == 1) {
                 tmpClusters.set(subclusterIndices.get(0), maxClusterId + 1);
                 maxClusterId = Collections.max(tmpClusters);
-            } else if (subclusterIndices.size() > 1) {
+            } else {
+                // Extract sub-matrix
                 double[][] subDistanceMatrix = new double[subclusterIndices.size()][subclusterIndices.size()];
                 for (int i = 0; i < subclusterIndices.size(); i++) {
                     for (int j = 0; j < subclusterIndices.size(); j++) {
                         subDistanceMatrix[i][j] = distanceMatrix[subclusterIndices.get(i)][subclusterIndices.get(j)];
                     }
                 }
+
+                // NOTE: Assuming agglomerativeClustering returns 0-based indices here
                 List<Integer> subClusters = agglomerativeClustering(subDistanceMatrix, epsilon);
-                System.out.println("subClusters" + subClusters);
+
                 for (int i = 0; i < subClusters.size(); i++) {
+                    // Formula: 0-based-index + max + 1
                     tmpClusters.set(subclusterIndices.get(i), subClusters.get(i) + maxClusterId + 1);
                 }
                 maxClusterId = Collections.max(tmpClusters);
@@ -540,139 +601,180 @@ public class SCPT {
         return filledList;
     }
 
-    public static Map<Integer, Map<String, Object>> bipartiteMatching(int newKey,
-                                                                      Map<Integer, Map<String, Object>> centralityDict, double[][] centralityMatrix, List<Integer> overlapIndices,
+    // Helper class to store matrix entries for sorting
+    private static class MatrixEntry implements Comparable<MatrixEntry> /*✅*/{
+        int row;
+        int col;
+        double value;
+
+        public MatrixEntry(int row, int col, double value) {
+            this.row = row;
+            this.col = col;
+            this.value = value;
+        }
+
+        @Override
+        public int compareTo(MatrixEntry other) {
+            // Sort descending by value
+            return Double.compare(other.value, this.value);
+        }
+    }
+
+    public static Map<Integer, Map<String, Object>> bipartiteMatching/*✅*/(int newKey,
+                                                                      Map<Integer, Map<String, Object>> centralityDict,
+                                                                      double[][] centralityMatrix,
+                                                                      List<Integer> overlapIndices,
                                                                       double epsilon) {
-        double th = 1 - epsilon;
+        double th = 1.0 - epsilon;
         double sumCentrality = 0;
+
+        // 1. Validation (Optional but recommended)
+        if (centralityMatrix.length != overlapIndices.size()) {
+            // You might want to log a warning here if this is unexpected data
+            System.err.println("Warning: Matrix rows (" + centralityMatrix.length +
+                    ") do not match overlap indices count (" + overlapIndices.size() + ")");
+        }
+
+        // Prepare result list filled with nulls
         List<Integer> subclusterIndices = new ArrayList<>(Collections.nCopies(overlapIndices.size(), null));
 
-        // Create a mutable copy of the centralityMatrix
-        double[][] currentCentralityMatrix = new double[centralityMatrix.length][centralityMatrix[0].length];
-        for (int i = 0; i < centralityMatrix.length; i++) {
-            System.arraycopy(centralityMatrix[i], 0, currentCentralityMatrix[i], 0, centralityMatrix[i].length);
-        }
+        // 1. Flatten valid matrix entries into a list
+        List<MatrixEntry> entries = new ArrayList<>();
+        int rows = centralityMatrix.length;
+        int cols = centralityMatrix[0].length;
 
-        while (true) {
-            double maxVal = -1.0;
-            int rowIndex = -1;
-            int colIndex = -1;
-
-            // Find the maximum value and its indices
-            for (int i = 0; i < currentCentralityMatrix.length; i++) {
-                for (int j = 0; j < currentCentralityMatrix[i].length; j++) {
-                    if (currentCentralityMatrix[i][j] > maxVal) {
-                        maxVal = currentCentralityMatrix[i][j];
-                        rowIndex = i;
-                        colIndex = j;
-                    }
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                if (centralityMatrix[i][j] > th) {
+                    entries.add(new MatrixEntry(i, j, centralityMatrix[i][j]));
                 }
             }
+        }
 
-            if (maxVal <= th) {
-                break;
-            }
+        // 2. Sort entries by value (Highest first) - Effectively "Greedy" approach
+        Collections.sort(entries);
 
-            sumCentrality += maxVal;
-            subclusterIndices.set(rowIndex, colIndex);
+        // 3. Select matches ensuring no row or col is reused
+        boolean[] rowUsed = new boolean[rows];
+        boolean[] colUsed = new boolean[cols];
 
-            // Set row and column to zero
-            for (int j = 0; j < currentCentralityMatrix[0].length; j++) {
-                currentCentralityMatrix[rowIndex][j] = 0.0;
-            }
-            for (int i = 0; i < currentCentralityMatrix.length; i++) {
-                currentCentralityMatrix[i][colIndex] = 0.0;
+        for (MatrixEntry entry : entries) {
+            if (!rowUsed[entry.row] && !colUsed[entry.col]) {
+                // Match found!
+                sumCentrality += entry.value;
+
+                // Store the column index at the row's position
+                // Guard against index out of bounds if matrix rows > overlapIndices size
+                if (entry.row < subclusterIndices.size()) {
+                    subclusterIndices.set(entry.row, entry.col);
+                }
+
+                // Mark row and col as used (equivalent to zeroing them out)
+                rowUsed[entry.row] = true;
+                colUsed[entry.col] = true;
             }
         }
 
+        // 4. Construct Result
         Map<String, Object> matchResult = new HashMap<>();
         matchResult.put("overlap_indices", overlapIndices);
         matchResult.put("indices", subclusterIndices);
         matchResult.put("centrality", sumCentrality);
+
         centralityDict.put(newKey, matchResult);
 
         return centralityDict;
     }
 
-
-    public static List<List<Integer>> getCandidatesIndicesList(double[][] similarityMatrix,
-                                                               List<List<Integer>> subclusterIndicesList, List<List<Integer>> overlapIndicesList, double epsilon,
+    public static List<List<Integer>> getCandidatesIndicesList/*✅*/(double[][] similarityMatrix,
+                                                               List<List<Integer>> subclusterIndicesList,
+                                                               List<List<Integer>> overlapIndicesList,
+                                                               double epsilon,
                                                                int numCandidates) {
+
+        // 1. Quick exit if we have fewer groups than candidates requested
         if (overlapIndicesList.size() < numCandidates) {
-            return overlapIndicesList;
-        } else {
-            // Create a copy to avoid modifying the original similarityMatrix
-            double[][] currentSimilarityMatrix = new double[similarityMatrix.length][similarityMatrix[0].length];
-            for (int i = 0; i < similarityMatrix.length; i++) {
-                System.arraycopy(similarityMatrix[i], 0, currentSimilarityMatrix[i], 0, similarityMatrix[i].length);
-            }
-
-            // np.fill_diagonal(similarity_matrix, 0)
-            for (int i = 0; i < currentSimilarityMatrix.length; i++) {
-                currentSimilarityMatrix[i][i] = 0.0;
-            }
-
-            // flatten_subcluster_indices =
-            // list(chain.from_iterable(subcluster_indices_list))
-            List<Integer> flattenSubclusterIndices = new ArrayList<>();
-            for (List<Integer> sublist : subclusterIndicesList) {
-                flattenSubclusterIndices.addAll(sublist);
-            }
-
-            // tmp_similarity_matrix = similarity_matrix[flatten_subcluster_indices]
-            double[][] tmpSimilarityMatrix = new double[flattenSubclusterIndices
-                    .size()][currentSimilarityMatrix[0].length];
-            for (int i = 0; i < flattenSubclusterIndices.size(); i++) {
-                tmpSimilarityMatrix[i] = currentSimilarityMatrix[flattenSubclusterIndices.get(i)];
-            }
-
-            // max_similarities = np.max(tmp_similarity_matrix,axis=0)
-            double[] maxSimilarities = new double[tmpSimilarityMatrix[0].length];
-            Arrays.fill(maxSimilarities, -1.0); // Initialize with a very small value
-            for (int j = 0; j < tmpSimilarityMatrix[0].length; j++) {
-                for (int i = 0; i < tmpSimilarityMatrix.length; i++) {
-                    if (tmpSimilarityMatrix[i][j] > maxSimilarities[j]) {
-                        maxSimilarities[j] = tmpSimilarityMatrix[i][j];
-                    }
-                }
-            }
-
-            // neighbor_indices = np.where(max_similarities > (1-epsilon))[0]
-            List<Integer> neighborIndicesList = new ArrayList<>();
-            double threshold = 1 - epsilon;
-            for (int i = 0; i < maxSimilarities.length; i++) {
-                if (maxSimilarities[i] > threshold) {
-                    neighborIndicesList.add(i);
-                }
-            }
-
-            // sorted_indices = np.argsort(max_similarities[neighbor_indices])[::-1]
-            // Sort neighborIndicesList based on maxSimilarities in descending order
-            neighborIndicesList.sort((idx1, idx2) -> Double.compare(maxSimilarities[idx2], maxSimilarities[idx1]));
-
-            if (neighborIndicesList.size() > numCandidates) {
-                neighborIndicesList = neighborIndicesList.subList(0, numCandidates);
-            }
-
-            List<List<Integer>> candidatesIndicesList = new ArrayList<>();
-            List<Integer> remainingNeighborIndices = new ArrayList<>(neighborIndicesList);
-
-            for (int neighborIndex : neighborIndicesList) {
-                for (List<Integer> overlapIndices : overlapIndicesList) {
-                    if (overlapIndices.contains(neighborIndex)) {
-                        candidatesIndicesList.add(overlapIndices);
-                        // Remove elements from remainingNeighborIndices that are in overlapIndices
-                        for (int olIndex : overlapIndices) {
-                            remainingNeighborIndices.remove(Integer.valueOf(olIndex));
-                        }
-                        break; // Move to the next neighborIndex
-                    }
-                }
-            }
-            return candidatesIndicesList;
+            return new ArrayList<>(overlapIndicesList);
         }
-    }
 
+        // 2. Flatten subclusters
+        // We use a Set first to ensure uniqueness if subclusters overlap, though List is fine if guaranteed unique.
+        List<Integer> flattenSubclusterIndices = new ArrayList<>();
+        for (List<Integer> sublist : subclusterIndicesList) {
+            flattenSubclusterIndices.addAll(sublist);
+        }
+
+        int numCols = similarityMatrix[0].length;
+        double[] maxSimilarities = new double[numCols];
+        // Initialize with a value lower than possible similarity (assuming sim is usually 0.0 to 1.0)
+        Arrays.fill(maxSimilarities, -Double.MAX_VALUE);
+
+        // 3. Calculate Max Similarities (Optimized: No Matrix Copying)
+        // We iterate only the rows we care about (flattenSubclusterIndices)
+        // We handle the diagonal=0 logic virtually here.
+        for (int rowIdx : flattenSubclusterIndices) {
+            double[] row = similarityMatrix[rowIdx];
+            for (int colIdx = 0; colIdx < numCols; colIdx++) {
+                double val = row[colIdx];
+
+                // Emulate np.fill_diagonal(similarity_matrix, 0)
+                if (rowIdx == colIdx) {
+                    val = 0.0;
+                }
+
+                if (val > maxSimilarities[colIdx]) {
+                    maxSimilarities[colIdx] = val;
+                }
+            }
+        }
+
+        // 4. Filter indices based on threshold
+        List<Integer> neighborIndicesList = new ArrayList<>();
+        double threshold = 1.0 - epsilon;
+
+        for (int i = 0; i < maxSimilarities.length; i++) {
+            if (maxSimilarities[i] > threshold) {
+                neighborIndicesList.add(i);
+            }
+        }
+
+        // 5. Sort descending based on score
+        // Note: maxSimilarities must be effectively final for the lambda
+        final double[] scores = maxSimilarities;
+        neighborIndicesList.sort((i1, i2) -> Double.compare(scores[i2], scores[i1]));
+
+        // 6. Truncate to numCandidates (Python logic does this BEFORE grouping removal)
+        if (neighborIndicesList.size() > numCandidates) {
+            neighborIndicesList = neighborIndicesList.subList(0, numCandidates);
+        }
+
+        // 7. Select Candidates (Fixing the logic bug)
+        List<List<Integer>> candidatesIndicesList = new ArrayList<>();
+
+        // We use a Set to track indices that have been "consumed" by being part of a selected group
+        Set<Integer> consumedIndices = new HashSet<>();
+
+        for (Integer neighborIndex : neighborIndicesList) {
+            // CRITICAL FIX: If this index was part of a group we already added, skip it.
+            if (consumedIndices.contains(neighborIndex)) {
+                continue;
+            }
+
+            for (List<Integer> overlapIndices : overlapIndicesList) {
+                if (overlapIndices.contains(neighborIndex)) {
+                    candidatesIndicesList.add(overlapIndices);
+
+                    // Mark ALL members of this group as consumed so we don't pick them again
+                    consumedIndices.addAll(overlapIndices);
+
+                    // Break inner loop (found the group for this neighbor)
+                    break;
+                }
+            }
+        }
+
+        return candidatesIndicesList;
+    }
 
     public static int getInitialIndex(double[][] distanceMatrix, List<List<Integer>> overlapIndicesList) {
         List<Double> distances = new ArrayList<>();
@@ -708,76 +810,99 @@ public class SCPT {
 
 
 
-    public static List<Integer> agglomerativeClustering(double[][] distanceMatrix, double epsilon) {
-        // Set diagonal to 0 as in numpy.fill_diagonal
+    public static List<Integer> agglomerativeClustering/*✅*/(double[][] distanceMatrix, double epsilon) {
+        // Safety check for empty input
+        if (distanceMatrix == null || distanceMatrix.length == 0) {
+            return new ArrayList<>();
+        }
+
+        // Set diagonal to 0 (matches np.fill_diagonal)
         for (int i = 0; i < distanceMatrix.length; i++) {
             distanceMatrix[i][i] = 0.0;
         }
 
-        // Perform hierarchical clustering with SingleLinkage
-        HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
-
-        // Partition the clusters based on epsilon (distance criterion)
         int[] clusterLabels;
         try {
-            // System.out.println("distanceMatrix" + Arrays.deepToString(distanceMatrix));
+            // Perform hierarchical clustering with SingleLinkage
+            // Assuming 'SingleLinkage' accepts a full NxN distance matrix
+            HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
+
+            // Partition based on epsilon
             clusterLabels = hc.partition(epsilon);
-        } catch (IllegalArgumentException e) {
-            // Fallback: Assign all to one cluster, like SciPy
+        } catch (Exception e) {
+            // Fallback: Assign all to cluster 0 (or 1) if clustering fails
             clusterLabels = new int[distanceMatrix.length];
             Arrays.fill(clusterLabels, 0);
-
-            // // If epsilon is too large, try a smaller value or handle as a single cluster
-            // // For now, let's try a slightly smaller epsilon
-            // double adjustedEpsilon = epsilon / 2.0; // Or some other strategy
-            // System.err.println("Warning: Epsilon " + epsilon + " was too large for
-            // HierarchicalClustering. Adjusting to " + adjustedEpsilon);
-            // clusterLabels = hc.partition(adjustedEpsilon);
         }
 
-        // Convert int[] to List<Integer>
         List<Integer> clusters = new ArrayList<>();
         for (int label : clusterLabels) {
+            // STRICT PYTHON MATCH: fcluster returns 1-based indices.
+            // If your Java lib returns 0-based, add +1.
             clusters.add(label);
         }
         return clusters;
     }
 
-
-
-    public static double[][] computeCosineDistanceMatrix(double[][] features, double epsilon) {
-        int n = features.length;
+    private static double[][] computeDistanceMatrix/*✅*/(double[][] similarityMatrix, int n){
+        // Convert to distance matrix
         double[][] distMatrix = new double[n][n];
-        double threshold = 1 - epsilon;
-
         for (int i = 0; i < n; i++) {
-            distMatrix[i][i] = 0;  // Zero diagonal
-
-            for (int j = i + 1; j < n; j++) {
-                double similarity = cosineSimilarity(features[i], features[j]);
-                double distance = 1.0 - similarity;
-
-                // Apply epsilon threshold
-                distMatrix[i][j] = distMatrix[j][i] =
-                        (similarity < threshold) ? 1.0 : distance;
+            for (int j = 0; j < n; j++) {
+                distMatrix[i][j] = 1.0 - similarityMatrix[i][j];
             }
         }
         return distMatrix;
     }
 
-    // Compute cosine similarity between two vectors
-    private static double cosineSimilarity(double[] a, double[] b) {
-        double dot = 0.0, normA = 0.0, normB = 0.0;
-        for (int i = 0; i < a.length; i++) {
-            dot += a[i] * b[i];
-            normA += a[i] * a[i];
-            normB += b[i] * b[i];
+    public static double[][] computerSimilarityMatrix/*✅*/(double[][] features, double epsilon){
+        int n = features.length;
+        double[][] similarityMatrix = new double[n][n];
+        double threshold = 1.0 - epsilon;
+
+        // OPTIMIZATION: Pre-compute magnitudes to avoid recalculating inside the N*N loop
+        double[] magnitudes = new double[n];
+        for (int i = 0; i < n; i++) {
+            magnitudes[i] = getMagnitude(features[i]);
         }
 
-        if (normA == 0 && normB == 0) return 1.0;  // Both zero vectors
-        if (normA == 0 || normB == 0) return 0.0;   // One zero vector
+        for (int i = 0; i < n; i++) {
+            similarityMatrix[i][i] = 1.0; // Self-similarity
 
-        return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+            for (int j = i + 1; j < n; j++) {
+                // Pass pre-computed magnitudes
+                double similarity = cosineSimilarity(features[i], features[j], magnitudes[i], magnitudes[j]);
+
+                if (similarity < threshold) {
+                    similarity = 0.0;
+                }
+
+                similarityMatrix[i][j] = similarity;
+                similarityMatrix[j][i] = similarity;
+            }
+        }
+        return similarityMatrix;
+    }
+
+    private static double getMagnitude/*✅*/(double[] vec){
+        double sum = 0.0;
+        for (double v : vec) {
+            sum += v * v;
+        }
+        return Math.sqrt(sum);
+    }
+
+    private static double cosineSimilarity/*✅*/(double[] a, double[] b, double normA, double normB){
+        // If either vector is zero-length, return result based on logic
+        if (normA == 0 && normB == 0) return 1.0;
+        if (normA == 0 || normB == 0) return 0.0;
+
+        double dot = 0.0;
+        for (int i = 0; i < a.length; i++) {
+            dot += a[i] * b[i];
+        }
+
+        return dot / (normA * normB);
     }
 
 }
