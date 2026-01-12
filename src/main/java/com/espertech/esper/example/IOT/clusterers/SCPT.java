@@ -15,50 +15,86 @@ import com.espertech.esper.example.IOT.helpers.ClusteringUtils;
 public class SCPT {
     private static final Logger logger = LoggerFactory.getLogger(SCPT.class);
 
-    public static List<Integer> trackingByClustering(List<double[]> featureList, List<Integer> frameNumbers, List<Integer> serialNumbers, List<Integer[]> boundingBoxList)
-    {
-        double[][] similarityMatrix = createSimilarityMatrixSCPT(featureList.toArray(new double[0][]), TrackingParameters.epsilonScpt);
-        double[][] distanceMatrix = computeDistanceMatrix(similarityMatrix, featureList.toArray(new double[0][]).length);
+    public static List<Integer> trackingByClustering/*✅*/(List<double[]> featureList, 
+                                                    List<Integer> frameNumbers, 
+                                                    List<Integer> serialNumbers, 
+                                                    List<Integer[]> boundingBoxList) {
+        
+        // 1. Edge Case: Single element
+        if (serialNumbers.size() == 1) {
+            return new ArrayList<>(Collections.singletonList(0));
+        }
+        
+        // Optimization: Convert to array once
+        double[][] featuresArray = featureList.toArray(new double[0][]);
+        
+        // 2. Compute Similarity Matrix
+        double[][] similarityMatrix = createSimilarityMatrixSCPT(
+            featuresArray, 
+            TrackingParameters.epsilonScpt
+        );
+        
+        // Ensure diagonal is 1 (matching Python's explicit np.fill_diagonal)
+        for (int i = 0; i < similarityMatrix.length; i++) {
+            similarityMatrix[i][i] = 1.0;
+        }
+        
+        // 3. Compute Distance Matrix
+        double[][] distanceMatrix = computeDistanceMatrix(
+            similarityMatrix, 
+            featuresArray.length
+        );
+        
+        // 4. Clustering
         HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
         int[] clusterLabels = hc.partition(TrackingParameters.epsilonScpt);
-        System.out.println("clusterLabels: " + Arrays.toString(clusterLabels));
-
+        
         List<Integer> clusterLabelsList = Arrays.stream(clusterLabels)
-                .boxed()
-                .collect(Collectors.toList());
-
-        if (TrackingParameters.overlap_suppression) {
-            logger.info("Overlap suppression");
-            clusterLabelsList = reclusteringOverlapCluster(
-                    distanceMatrix,
-                    frameNumbers,
-                    serialNumbers,
-                    clusterLabelsList,
-                    TrackingParameters.epsilonScpt);
+            .boxed()
+            .collect(Collectors.toList());
+        
+        if (TrackingParameters.isDebug) {
+            System.out.println("clusterLabels: " + clusterLabelsList);
         }
-
+        
+        // 5. Overlap Suppression
+        if (TrackingParameters.overlap_suppression) {
+            clusterLabelsList = reclusteringOverlapCluster(
+                distanceMatrix,
+                frameNumbers,
+                serialNumbers,
+                clusterLabelsList,
+                TrackingParameters.epsilonScpt
+            );
+        }
+        
+        // 6. Relabel Clusters
         clusterLabelsList = relabelClusters(clusterLabelsList);
-
+        
         return clusterLabelsList;
-
     }
-    public static List<Integer> relabelClusters(List<Integer> clusters) {
-        // Step 1: Extract unique cluster IDs (preserving insertion order)
-        Set<Integer> uniqueClusterSet = new LinkedHashSet<>(clusters); // Keeps insertion order
-        List<Integer> uniqueClusters = new ArrayList<>(uniqueClusterSet);
 
-        // Step 2: Map old cluster ID → new cluster ID (sequential starting from 0)
+    public static List<Integer> relabelClusters/*✅*/(List<Integer> clusters) {
+        if (clusters.isEmpty()) {
+            return clusters;
+        }
+        
+        // Extract unique cluster IDs (preserving first-occurrence order)
+        Set<Integer> uniqueClusterSet = new LinkedHashSet<>(clusters);
+        List<Integer> uniqueClusters = new ArrayList<>(uniqueClusterSet);
+        
+        // Map old cluster ID → new cluster ID (sequential starting from 0)
         Map<Integer, Integer> clusterIdMap = new HashMap<>();
         for (int i = 0; i < uniqueClusters.size(); i++) {
             clusterIdMap.put(uniqueClusters.get(i), i);
         }
-
-        // Step 3: Apply the remapping
-        List<Integer> relabeledClusters = new ArrayList<>();
+        
+        // Apply remapping
+        List<Integer> relabeledClusters = new ArrayList<>(clusters.size());
         for (Integer oldCluster : clusters) {
             relabeledClusters.add(clusterIdMap.get(oldCluster));
         }
-
+        
         return relabeledClusters;
     }
 
