@@ -15,99 +15,99 @@ import com.espertech.esper.example.IOT.helpers.ClusteringUtils;
 public class SCPT {
     private static final Logger logger = LoggerFactory.getLogger(SCPT.class);
 
-    public static List<Integer> trackingByClustering/*✅*/(List<double[]> featureList, 
-                                                    List<Integer> frameNumbers, 
-                                                    List<Integer> serialNumbers, 
-                                                    List<Integer[]> boundingBoxList) {
-        
+    public static List<Integer> trackingByClustering/* ✅ */(List<double[]> featureList,
+            List<Integer> frameNumbers,
+            List<Integer> serialNumbers,
+            List<Integer[]> boundingBoxList) {
+
         // 1. Edge Case: Single element
         if (serialNumbers.size() == 1) {
             return new ArrayList<>(Collections.singletonList(0));
         }
-        
+
         // Optimization: Convert to array once
         double[][] featuresArray = featureList.toArray(new double[0][]);
-        
+
         // 2. Compute Similarity Matrix
         double[][] similarityMatrix = createSimilarityMatrixSCPT(
-            featuresArray, 
-            TrackingParameters.epsilonScpt
-        );
-        
+                featuresArray,
+                TrackingParameters.epsilonScpt);
+
         // Ensure diagonal is 1 (matching Python's explicit np.fill_diagonal)
         for (int i = 0; i < similarityMatrix.length; i++) {
             similarityMatrix[i][i] = 1.0;
         }
-        
+
         // 3. Compute Distance Matrix
         double[][] distanceMatrix = computeDistanceMatrix(
-            similarityMatrix, 
-            featuresArray.length
-        );
-        
+                similarityMatrix,
+                featuresArray.length);
+
         // 4. Clustering
         HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
         int[] clusterLabels = hc.partition(TrackingParameters.epsilonScpt);
-        
+
         List<Integer> clusterLabelsList = Arrays.stream(clusterLabels)
-            .boxed()
-            .collect(Collectors.toList());
-        
-        if (TrackingParameters.isDebug) {
-            System.out.println("clusterLabels: " + clusterLabelsList);
-        }
-        
+                .boxed()
+                .collect(Collectors.toList());
+
+
+
         // 5. Overlap Suppression
         if (TrackingParameters.overlap_suppression) {
             clusterLabelsList = reclusteringOverlapCluster(
-                distanceMatrix,
-                frameNumbers,
-                serialNumbers,
-                clusterLabelsList,
-                TrackingParameters.epsilonScpt
-            );
+                    distanceMatrix,
+                    frameNumbers,
+                    serialNumbers,
+                    clusterLabelsList,
+                    TrackingParameters.epsilonScpt);
         }
-        
+
         // 6. Relabel Clusters
         clusterLabelsList = relabelClusters(clusterLabelsList);
-        
+
+        if (TrackingParameters.isDebug) {
+            System.out.println("clusterLabels: " + clusterLabelsList);
+        }
+
         return clusterLabelsList;
     }
 
-    public static List<Integer> relabelClusters/*✅*/(List<Integer> clusters) {
+    public static List<Integer> relabelClusters/* ✅ */(List<Integer> clusters) {
         if (clusters.isEmpty()) {
             return clusters;
         }
-        
+
         // Extract unique cluster IDs (preserving first-occurrence order)
         Set<Integer> uniqueClusterSet = new LinkedHashSet<>(clusters);
         List<Integer> uniqueClusters = new ArrayList<>(uniqueClusterSet);
-        
+
         // Map old cluster ID → new cluster ID (sequential starting from 0)
         Map<Integer, Integer> clusterIdMap = new HashMap<>();
         for (int i = 0; i < uniqueClusters.size(); i++) {
             clusterIdMap.put(uniqueClusters.get(i), i);
         }
-        
+
         // Apply remapping
         List<Integer> relabeledClusters = new ArrayList<>(clusters.size());
         for (Integer oldCluster : clusters) {
             relabeledClusters.add(clusterIdMap.get(oldCluster));
         }
-        
+
         return relabeledClusters;
     }
 
-    public static List<Integer> reclusteringOverlapCluster/*✅*/(double[][] distanceMatrix,
-                                                           List<Integer> frames,
-                                                           List<Integer> serials, // serials is unused in Java version but kept for signature match
-                                                           List<Integer> clusters,
-                                                           double epsilon){
+    public static List<Integer> reclusteringOverlapCluster/* ✅ */(double[][] distanceMatrix,
+            List<Integer> frames,
+            List<Integer> serials, // serials is unused in Java version but kept for signature match
+            List<Integer> clusters,
+            double epsilon) {
         // 1. Initialize dictionaries
         Map<Integer, List<Integer>> clusterFrameDict = new HashMap<>();
         Map<Integer, List<Integer>> clusterIndicesDict = new HashMap<>();
 
-        // Use HashSet for unique clusters (order doesn't matter for logic, but Set removes duplicates)
+        // Use HashSet for unique clusters (order doesn't matter for logic, but Set
+        // removes duplicates)
         Set<Integer> uniqueClusters = new HashSet<>(clusters);
 
         for (int cluster : uniqueClusters) {
@@ -122,7 +122,8 @@ public class SCPT {
             clusterIndicesDict.get(cluster).add(i);
         }
 
-        // Clone clusters to avoid modifying original list if passed by reference (Java is pass-by-value of reference)
+        // Clone clusters to avoid modifying original list if passed by reference (Java
+        // is pass-by-value of reference)
         List<Integer> newClusters = new ArrayList<>(clusters);
 
         // 3. Iterate over clusters
@@ -146,7 +147,8 @@ public class SCPT {
             List<Integer> tmpClusters = overlapSuppressionClustering(
                     distanceMatrix, frames, nonoverlapIndices, overlapIndicesList, epsilon);
 
-            // CRITICAL FIX: Recalculate maxClusterId based on the *current state* of newClusters
+            // CRITICAL FIX: Recalculate maxClusterId based on the *current state* of
+            // newClusters
             // Doing this inside the loop ensures we don't reuse IDs for different clusters
             int maxClusterId = Collections.max(newClusters);
 
@@ -164,7 +166,54 @@ public class SCPT {
         return newClusters;
     }
 
-    public static OverlapResult divideOverlapOrNonOverlap/*✅*/(List<Integer> clusterFrames, List<Integer> clusterIndices){
+    public static List<Integer> associateClusterBetweenPeriod(
+            List<double[]> currentFeatures,
+            List<Integer> currentClusters,
+            List<Integer> currentFrames,
+            List<double[]> pastFeatures,
+            List<Integer> pastClusters,
+            List<Integer> pastFrames,
+            double epsilon) {
+
+        // 1. Combine lists
+        List<Integer> allClusters = new ArrayList<>(pastClusters);
+        allClusters.addAll(currentClusters);
+
+        List<Integer> allFrames = new ArrayList<>(pastFrames);
+        allFrames.addAll(currentFrames);
+
+        List<double[]> allFeatures = new ArrayList<>(pastFeatures);
+        allFeatures.addAll(currentFeatures);
+
+        // 2. Create Similarity Matrix
+        double[][] featuresArray = allFeatures.toArray(new double[0][]);
+        double[][] similarityMatrix = createSimilarityMatrixSCPT(featuresArray, epsilon);
+
+        // 3. Create Centrality Matrix
+        double[][] centralityMatrix = createCentralityMatrix(allClusters, similarityMatrix, allFrames, epsilon);
+
+        // 4. Associate Cluster (Merging)
+        List<Integer> associatedClusters = associateCluster(
+                allClusters,
+                centralityMatrix,
+                epsilon,
+                true, // removeNoiseCluster default
+                1, // costFunction default
+                true // minimize default
+        );
+
+        // 5. Extract only the *current* portion of the clusters
+        int pastSize = pastClusters.size();
+        List<Integer> updatedCurrentClusters = new ArrayList<>();
+        for (int i = pastSize; i < associatedClusters.size(); i++) {
+            updatedCurrentClusters.add(associatedClusters.get(i));
+        }
+
+        return updatedCurrentClusters;
+    }
+
+    public static OverlapResult divideOverlapOrNonOverlap/* ✅ */(List<Integer> clusterFrames,
+            List<Integer> clusterIndices) {
         // Process only common elements if lists are unequal
         int size = Math.min(clusterFrames.size(), clusterIndices.size());
         Map<Integer, List<Integer>> frameIndicesDict = new TreeMap<>();
@@ -194,8 +243,7 @@ public class SCPT {
         return new OverlapResult(overlapIndicesList, nonOverlapIndices);
     }
 
-
-    public static class OverlapResult /*✅*/{
+    public static class OverlapResult /* ✅ */ {
         public List<List<Integer>> overlapIndicesList;
         public List<Integer> nonOverlapIndices;
 
@@ -205,8 +253,8 @@ public class SCPT {
         }
     }
 
-    public static List<Integer> overlapSuppressionClustering/*✅*/(double[][] distanceMatrix, List<Integer> frames,
-                                                             List<Integer> nonoverlapIndices, List<List<Integer>> overlapIndicesList, double epsilon) {
+    public static List<Integer> overlapSuppressionClustering/* ✅ */(double[][] distanceMatrix, List<Integer> frames,
+            List<Integer> nonoverlapIndices, List<List<Integer>> overlapIndicesList, double epsilon) {
         List<Integer> clusters = new ArrayList<>(Collections.nCopies(frames.size(), -1));
 
         // clustering for non-overlapping nodes
@@ -246,17 +294,17 @@ public class SCPT {
         return clusters;
     }
 
-    public static List<Integer> associateCluster/*✅*/(List<Integer> clusters, 
-                                                 double[][] centralityMatrix, 
-                                                 double epsilon,
-                                                 // Added missing parameters to signature
-                                                 boolean removeNoiseCluster,
-                                                 int costFunction,
-                                                 boolean minimize) {
+    public static List<Integer> associateCluster/* ✅ */(List<Integer> clusters,
+            double[][] centralityMatrix,
+            double epsilon,
+            // Added missing parameters to signature
+            boolean removeNoiseCluster,
+            int costFunction,
+            boolean minimize) {
 
         // 1. Setup
         int[] clustersArray = clusters.stream().mapToInt(Integer::intValue).toArray();
-        
+
         List<Integer> uniqueClustersList = new ArrayList<>(new TreeSet<>(clusters));
         if (removeNoiseCluster && uniqueClustersList.contains(-1)) {
             uniqueClustersList.remove(Integer.valueOf(-1));
@@ -273,7 +321,8 @@ public class SCPT {
         Map<Integer, Integer> count = new HashMap<>();
         if (costFunction == 2) {
             for (int cluster : clustersArray) {
-                if (removeNoiseCluster && cluster == -1) continue;
+                if (removeNoiseCluster && cluster == -1)
+                    continue;
                 count.put(cluster, count.getOrDefault(cluster, 0) + 1);
             }
         }
@@ -291,7 +340,7 @@ public class SCPT {
             for (int i = 0; i < currentCentralityMatrix.length; i++) {
                 // Optimization: j = i + 1 because matrix is symmetric
                 for (int j = i + 1; j < currentCentralityMatrix[i].length; j++) {
-                    
+
                     double val = currentCentralityMatrix[i][j];
 
                     if (costFunction == 2) {
@@ -322,7 +371,8 @@ public class SCPT {
             double[] sumRow = new double[currentCentralityMatrix.length];
             for (int k = 0; k < currentCentralityMatrix.length; k++) {
                 // Skip if comparing to self (logic safety)
-                if (k == cluster1Index || k == cluster2Index) continue;
+                if (k == cluster1Index || k == cluster2Index)
+                    continue;
 
                 double val1 = currentCentralityMatrix[cluster1Index][k];
                 double val2 = currentCentralityMatrix[cluster2Index][k];
@@ -348,12 +398,14 @@ public class SCPT {
 
             int newRow = 0;
             for (int i = 0; i < currentCentralityMatrix.length; i++) {
-                if (i == cluster2Index) continue;
+                if (i == cluster2Index)
+                    continue;
 
                 int newCol = 0;
                 for (int j = 0; j < currentCentralityMatrix.length; j++) {
-                    if (j == cluster2Index) continue;
-                    
+                    if (j == cluster2Index)
+                        continue;
+
                     newCentralityMatrix[newRow][newCol] = currentCentralityMatrix[i][j];
                     newCol++;
                 }
@@ -382,9 +434,8 @@ public class SCPT {
         return Arrays.stream(clustersArray).boxed().collect(Collectors.toList());
     }
 
-
-    public static double[][] createCentralityMatrix/*✅*/(List<Integer> clusters, double[][] similarityMatrix,
-                                                    List<Integer> frames, double epsilon) {
+    public static double[][] createCentralityMatrix/* ✅ */(List<Integer> clusters, double[][] similarityMatrix,
+            List<Integer> frames, double epsilon) {
         boolean removeNoiseCluster = true; // Default value from Python kwargs
 
         List<Integer> uniqueClusters = new ArrayList<>(new TreeSet<>(clusters));
@@ -459,9 +510,8 @@ public class SCPT {
         return centralityMatrix;
     }
 
-
-    public static List<Integer> separateIntoSubcluster/*✅*/(List<Integer> tmpClusters,
-                                                       List<List<Integer>> overlapIndicesList, double[][] distanceMatrix, double epsilon) {
+    public static List<Integer> separateIntoSubcluster/* ✅ */(List<Integer> tmpClusters,
+            List<List<Integer>> overlapIndicesList, double[][] distanceMatrix, double epsilon) {
         // 1. Calculate Max Overlap
         int maxOverlap = 0;
         for (List<Integer> indices : overlapIndicesList) {
@@ -496,7 +546,8 @@ public class SCPT {
             Map<Integer, Map<String, Object>> centralityDict = new HashMap<>();
             double maxCentrality = 0.0;
 
-            // Hardcoded '10' matches your snippet; verify if this should be 'epsilon' or a config param
+            // Hardcoded '10' matches your snippet; verify if this should be 'epsilon' or a
+            // config param
             List<List<Integer>> candidatesIndicesList = getCandidatesIndicesList(similarityMatrix,
                     subclusterIndicesList, overlapIndicesList, epsilon, 10);
 
@@ -562,7 +613,8 @@ public class SCPT {
             }
 
             // Remove processed overlap indices
-            // WARNING: This relies on currentOverlapIndices being value-equal to the one in the list
+            // WARNING: This relies on currentOverlapIndices being value-equal to the one in
+            // the list
             overlapIndicesList.remove(currentOverlapIndices);
         }
 
@@ -570,7 +622,8 @@ public class SCPT {
         int maxClusterId = tmpClusters.isEmpty() ? -1 : Collections.max(tmpClusters);
 
         for (List<Integer> subclusterIndices : subclusterIndicesList) {
-            if (subclusterIndices.isEmpty()) continue; // Safety check
+            if (subclusterIndices.isEmpty())
+                continue; // Safety check
 
             if (subclusterIndices.size() == 1) {
                 tmpClusters.set(subclusterIndices.get(0), maxClusterId + 1);
@@ -597,9 +650,9 @@ public class SCPT {
         return tmpClusters;
     }
 
-    public static List<Integer> fillNone/*✅*/(List<Integer> list) {
+    public static List<Integer> fillNone/* ✅ */(List<Integer> list) {
         int n = list.size();
-        
+
         // 1. Identify which numbers from 0 to n-1 are ALREADY used
         Set<Integer> usedNums = new HashSet<>();
         for (Integer num : list) {
@@ -626,12 +679,12 @@ public class SCPT {
                 }
             }
         }
-        
+
         return filledList;
     }
 
     // Helper class to store matrix entries for sorting
-    private static class MatrixEntry implements Comparable<MatrixEntry> /*✅*/{
+    private static class MatrixEntry implements Comparable<MatrixEntry> /* ✅ */ {
         int row;
         int col;
         double value;
@@ -649,11 +702,11 @@ public class SCPT {
         }
     }
 
-    public static Map<Integer, Map<String, Object>> bipartiteMatching/*✅*/(int newKey,
-                                                                      Map<Integer, Map<String, Object>> centralityDict,
-                                                                      double[][] centralityMatrix,
-                                                                      List<Integer> overlapIndices,
-                                                                      double epsilon) {
+    public static Map<Integer, Map<String, Object>> bipartiteMatching/* ✅ */(int newKey,
+            Map<Integer, Map<String, Object>> centralityDict,
+            double[][] centralityMatrix,
+            List<Integer> overlapIndices,
+            double epsilon) {
         double th = 1.0 - epsilon;
         double sumCentrality = 0;
 
@@ -715,11 +768,11 @@ public class SCPT {
         return centralityDict;
     }
 
-    public static List<List<Integer>> getCandidatesIndicesList/*✅*/(double[][] similarityMatrix,
-                                                               List<List<Integer>> subclusterIndicesList,
-                                                               List<List<Integer>> overlapIndicesList,
-                                                               double epsilon,
-                                                               int numCandidates) {
+    public static List<List<Integer>> getCandidatesIndicesList/* ✅ */(double[][] similarityMatrix,
+            List<List<Integer>> subclusterIndicesList,
+            List<List<Integer>> overlapIndicesList,
+            double epsilon,
+            int numCandidates) {
 
         // 1. Quick exit if we have fewer groups than candidates requested
         if (overlapIndicesList.size() < numCandidates) {
@@ -727,7 +780,8 @@ public class SCPT {
         }
 
         // 2. Flatten subclusters
-        // We use a Set first to ensure uniqueness if subclusters overlap, though List is fine if guaranteed unique.
+        // We use a Set first to ensure uniqueness if subclusters overlap, though List
+        // is fine if guaranteed unique.
         List<Integer> flattenSubclusterIndices = new ArrayList<>();
         for (List<Integer> sublist : subclusterIndicesList) {
             flattenSubclusterIndices.addAll(sublist);
@@ -735,7 +789,8 @@ public class SCPT {
 
         int numCols = similarityMatrix[0].length;
         double[] maxSimilarities = new double[numCols];
-        // Initialize with a value lower than possible similarity (assuming sim is usually 0.0 to 1.0)
+        // Initialize with a value lower than possible similarity (assuming sim is
+        // usually 0.0 to 1.0)
         Arrays.fill(maxSimilarities, -Double.MAX_VALUE);
 
         // 3. Calculate Max Similarities (Optimized: No Matrix Copying)
@@ -780,7 +835,8 @@ public class SCPT {
         // 7. Select Candidates (Fixing the logic bug)
         List<List<Integer>> candidatesIndicesList = new ArrayList<>();
 
-        // We use a Set to track indices that have been "consumed" by being part of a selected group
+        // We use a Set to track indices that have been "consumed" by being part of a
+        // selected group
         Set<Integer> consumedIndices = new HashSet<>();
 
         for (Integer neighborIndex : neighborIndicesList) {
@@ -805,7 +861,7 @@ public class SCPT {
         return candidatesIndicesList;
     }
 
-    public static int getInitialIndex/*✅*/(double[][] distanceMatrix, List<List<Integer>> overlapIndicesList) {
+    public static int getInitialIndex/* ✅ */(double[][] distanceMatrix, List<List<Integer>> overlapIndicesList) {
         List<Double> distances = new ArrayList<>();
 
         for (List<Integer> overlapIndices : overlapIndicesList) {
@@ -817,7 +873,7 @@ public class SCPT {
                 for (int j = i + 1; j < overlapIndices.size(); j++) {
                     int index1 = overlapIndices.get(i);
                     int index2 = overlapIndices.get(j);
-                    
+
                     double distance = distanceMatrix[index1][index2];
                     if (distance < minDistance) {
                         minDistance = distance;
@@ -836,13 +892,11 @@ public class SCPT {
                 maxIndex = i;
             }
         }
-        
+
         return maxIndex;
     }
 
-
-
-    public static List<Integer> agglomerativeClustering/*✅*/(double[][] distanceMatrix, double epsilon) {
+    public static List<Integer> agglomerativeClustering/* ✅ */(double[][] distanceMatrix, double epsilon) {
         // Safety check for empty input
         if (distanceMatrix == null || distanceMatrix.length == 0) {
             return new ArrayList<>();
@@ -876,7 +930,7 @@ public class SCPT {
         return clusters;
     }
 
-    private static double[][] computeDistanceMatrix/*✅*/(double[][] similarityMatrix, int n){
+    private static double[][] computeDistanceMatrix/* ✅ */(double[][] similarityMatrix, int n) {
         // Convert to distance matrix
         double[][] distMatrix = new double[n][n];
         for (int i = 0; i < n; i++) {
@@ -887,12 +941,13 @@ public class SCPT {
         return distMatrix;
     }
 
-    public static double[][] createSimilarityMatrixSCPT/*✅*/(double[][] features, double epsilon){
+    public static double[][] createSimilarityMatrixSCPT/* ✅ */(double[][] features, double epsilon) {
         int n = features.length;
         double[][] similarityMatrix = new double[n][n];
         double threshold = 1.0 - epsilon;
 
-        // OPTIMIZATION: Pre-compute magnitudes to avoid recalculating inside the N*N loop
+        // OPTIMIZATION: Pre-compute magnitudes to avoid recalculating inside the N*N
+        // loop
         double[] magnitudes = new double[n];
         for (int i = 0; i < n; i++) {
             magnitudes[i] = getMagnitude(features[i]);
@@ -916,7 +971,7 @@ public class SCPT {
         return similarityMatrix;
     }
 
-    private static double getMagnitude/*✅*/(double[] vec){
+    private static double getMagnitude/* ✅ */(double[] vec) {
         double sum = 0.0;
         for (double v : vec) {
             sum += v * v;
@@ -924,10 +979,12 @@ public class SCPT {
         return Math.sqrt(sum);
     }
 
-    private static double cosineSimilarity/*✅*/(double[] a, double[] b, double normA, double normB){
+    private static double cosineSimilarity/* ✅ */(double[] a, double[] b, double normA, double normB) {
         // If either vector is zero-length, return result based on logic
-        if (normA == 0 && normB == 0) return 1.0;
-        if (normA == 0 || normB == 0) return 0.0;
+        if (normA == 0 && normB == 0)
+            return 1.0;
+        if (normA == 0 || normB == 0)
+            return 0.0;
 
         double dot = 0.0;
         for (int i = 0; i < a.length; i++) {
