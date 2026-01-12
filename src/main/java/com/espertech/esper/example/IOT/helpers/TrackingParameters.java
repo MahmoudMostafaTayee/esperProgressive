@@ -22,6 +22,10 @@ public class TrackingParameters {
     public static int distanceTh = 10;
     public static double simTh = 0.85;
     public static int deleteGidTh = 5000;
+
+    public static int min_samples = 4;
+    public static String clustering_method = "agglomerative";
+
     public static exec_level exec_lvl = exec_level.ALL;
     public static double iouTh = 0.9;
     public static boolean overlap_suppression = true;

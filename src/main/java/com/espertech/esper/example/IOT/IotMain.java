@@ -7,14 +7,13 @@ package com.espertech.esper.example.IOT;
 
 import com.espertech.esper.common.client.EventBean;
 import com.espertech.esper.example.IOT.helpers.ErrorCode;
-import com.espertech.esper.example.IOT.helpers.HelperUtils;
 import com.espertech.esper.example.IOT.helpers.TrackingParameters;
 import com.espertech.esper.example.IOT.streamers.*;
 import com.espertech.esper.example.IOT.streams.*;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.example.IOT.utils.GenericIotEventListener;
 
-import com.espertech.esper.example.IOT.clusterers.AgglomerativeClusterer;
+import com.espertech.esper.example.IOT.clusterers.Tracker;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPStatement;
 import org.slf4j.Logger;
@@ -134,7 +133,7 @@ public class IotMain implements Runnable {
 //                        "from embeddingFeature_camera_0001#time_batch(" + TrackingParameters.timePeriod + " sec) " +
 //                        "group by curFrame";
 
-        AgglomerativeClusterer agglomerativeListener = new AgglomerativeClusterer(TrackingParameters.epsilonScpt);
+        Tracker agglomerativeListener = new Tracker();
 //        EventEPLUtil.compileDeploy(featureBatchEPL);
         EventEPLUtil.compileDeployAddListener(featureBatchEPL, agglomerativeListener.getListener());
 
