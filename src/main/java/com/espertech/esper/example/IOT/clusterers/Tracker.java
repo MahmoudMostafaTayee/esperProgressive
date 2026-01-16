@@ -151,7 +151,16 @@ public class Tracker {
                     pastClusters,
                     pastFrames,
                     TrackingParameters.epsilonScpt);
+
             if (TrackingParameters.isDebug) {
+                String filePath = "C:\\OURs\\Thesis\\dumps\\after-associateClusterBetweenPeriod\\clusters-java_" + (number_of_winodws_processed) + ".txt";
+
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+                    writer.write(newClusterLabels.toString());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
                 System.out.println("pastClusters: " + pastClusters);
                 System.out.println("clusterLabels after associateClusterBetweenPeriod: " + newClusterLabels);
             }
