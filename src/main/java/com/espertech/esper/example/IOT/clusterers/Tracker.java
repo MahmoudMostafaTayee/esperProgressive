@@ -28,7 +28,7 @@ public class Tracker {
 
     private long agglomerative_clustering_time_tracker = 0;
     private int numberOfClusters = 1;
-    Integer number_of_winodws_processed = 1;
+    Integer number_of_winodws_processed = 0;
 
     // State for association across windows
     private List<double[]> pastFeatures = new ArrayList<>();
@@ -102,11 +102,11 @@ public class Tracker {
 
         // 2. Intra-Window Clustering (Local Tracking)
         List<Integer> newClusterLabels = SCPT.trackingByClustering(featureList, frameNumbers, serialNumbers,
-                boundingBoxList);
+                boundingBoxList, number_of_winodws_processed);
 
         if (TrackingParameters.isDebug) {
             System.out.println("clusterLabels after trackingByClustering: " + newClusterLabels);
-            String filePath = "C:\\OURs\\Thesis\\dumps\\after-trackingByClustering\\clusters-java_" + (number_of_winodws_processed-1) + ".txt";
+            String filePath = "C:\\OURs\\Thesis\\dumps\\after-trackingByClustering\\clusters-java_" + (number_of_winodws_processed) + ".txt";
 
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
 //                writer.write("clusterLabels after trackingByClustering: ");
@@ -142,7 +142,7 @@ public class Tracker {
 
         // 5. Inter-Window Association (Global Tracking)
         // Associate with past window if available
-        if (number_of_winodws_processed > 1) {
+        if (number_of_winodws_processed >= 1) {
             newClusterLabels = SCPT.associateClusterBetweenPeriod(
                     featureList,
                     newClusterLabels,
@@ -249,7 +249,7 @@ public class Tracker {
         System.out.println("Time taken: " + HelperUtils.elapsedMillis(start_time) + " ms");
         System.out.println("--------------------------------------------------------------------------");
         if (TrackingParameters.isDebug
-                && (number_of_winodws_processed >= TrackingParameters.max_number_of_windows_to_process)) {
+                && ((number_of_winodws_processed+1) >= TrackingParameters.max_number_of_windows_to_process)) {
             exit(0);
         }
         number_of_winodws_processed += 1;

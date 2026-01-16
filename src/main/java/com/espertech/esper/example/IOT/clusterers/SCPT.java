@@ -6,6 +6,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import smile.clustering.HierarchicalClustering;
 import smile.clustering.linkage.SingleLinkage;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.io.IOException;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -18,7 +25,8 @@ public class SCPT {
     public static List<Integer> trackingByClustering/* ✅ */(List<double[]> featureList,
             List<Integer> frameNumbers,
             List<Integer> serialNumbers,
-            List<Integer[]> boundingBoxList) {
+            List<Integer[]> boundingBoxList,
+            Integer window_no) {
 
         // 1. Edge Case: Single element
         if (serialNumbers.size() == 1) {
@@ -32,6 +40,24 @@ public class SCPT {
         double[][] similarityMatrix = createSimilarityMatrixSCPT(
                 featuresArray,
                 TrackingParameters.epsilonScpt);
+
+        String filePath = "C:\\OURs\\Thesis\\dumps\\similatiry-matrix\\java-similarityMatrix_"
+                + (window_no)
+                + ".txt";
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+            for (double[] row : similarityMatrix) {
+                for (int j = 0; j < row.length; j++) {
+                    writer.write(String.valueOf(row[j]));
+                    if (j < row.length - 1) {
+                        writer.write(", ");
+                    }
+                }
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         // Ensure diagonal is 1 (matching Python's explicit np.fill_diagonal)
         for (int i = 0; i < similarityMatrix.length; i++) {
@@ -47,11 +73,21 @@ public class SCPT {
         HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
         int[] clusterLabels = hc.partition(TrackingParameters.epsilonScpt);
 
+        Path filePath_ = Paths.get(
+                "C:", "OURs", "Thesis", "dumps", "after-bare-clustering",
+                "clusters-java_" + window_no + ".txt");
+
+        try {
+            Files.writeString(
+                    filePath_,
+                    Arrays.toString(clusterLabels));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         List<Integer> clusterLabelsList = Arrays.stream(clusterLabels)
                 .boxed()
                 .collect(Collectors.toList());
-
-
 
         // 5. Overlap Suppression
         if (TrackingParameters.overlap_suppression) {
@@ -186,7 +222,8 @@ public class SCPT {
         double[][] similarityMatrix = createSimilarityMatrixSCPT(featuresArray, epsilon);
 
         // 3. Create Centrality Matrix (M x M where M = number of unique clusters)
-        // Note: ensure this method sorts unique clusters internally to match Python's 'sorted()' behavior
+        // Note: ensure this method sorts unique clusters internally to match Python's
+        // 'sorted()' behavior
         double[][] centralityMatrix = createCentralityMatrix(allClusters, similarityMatrix, allFrames, epsilon);
 
         // Python explicitly zeroes the diagonal.
@@ -202,12 +239,13 @@ public class SCPT {
                 centralityMatrix,
                 epsilon,
                 true, // removeNoiseCluster
-                1,    // costFunction
-                true  // minimize
+                1, // costFunction
+                true // minimize
         );
 
         // 5. Extract results
-        // NOTE: The Python version updates the global dictionary for BOTH past and current.
+        // NOTE: The Python version updates the global dictionary for BOTH past and
+        // current.
         // If you only need the current frame's new IDs:
         int pastSize = pastClusters.size();
         List<Integer> updatedCurrentClusters = new ArrayList<>();
@@ -504,9 +542,13 @@ public class SCPT {
                 }
 
                 double centrality = 0.0;
+                // Match Python's bug: uses default epsilon=0.3 instead of passed epsilon
+                double centralityThreshold = 1.0 - 0.3;
+                centralityThreshold = simulateFloat16(centralityThreshold);
+
                 for (int idx1 : cluster1Indices) {
                     for (int idx2 : cluster2Indices) {
-                        if (similarityMatrix[idx1][idx2] > (1.0 - epsilon)) {
+                        if (similarityMatrix[idx1][idx2] > centralityThreshold) {
                             centrality += similarityMatrix[idx1][idx2];
                         }
                     }
@@ -952,7 +994,9 @@ public class SCPT {
     public static double[][] createSimilarityMatrixSCPT/* ✅ */(double[][] features, double epsilon) {
         int n = features.length;
         double[][] similarityMatrix = new double[n][n];
-        double threshold = 1.0 - epsilon;
+        // Match Python's behavior where scalar threshold is cast to float16 during
+        // comparison
+        double threshold = simulateFloat16(1.0 - epsilon);
 
         // OPTIMIZATION: Pre-compute magnitudes to avoid recalculating inside the N*N
         // loop
@@ -968,6 +1012,9 @@ public class SCPT {
                 // Pass pre-computed magnitudes
                 double similarity = cosineSimilarity(features[i], features[j], magnitudes[i], magnitudes[j]);
 
+                // Simulate np.float16 precision
+                similarity = simulateFloat16(similarity);
+
                 if (similarity < threshold) {
                     similarity = 0.0;
                 }
@@ -977,6 +1024,56 @@ public class SCPT {
             }
         }
         return similarityMatrix;
+    }
+
+    private static double simulateFloat16(double val) {
+        long bits = Double.doubleToRawLongBits(val);
+        long s = (bits >>> 63) & 0x1;
+        long e = (bits >>> 52) & 0x7FF;
+        long m = bits & 0xFFFFFFFFFFFFFL;
+
+        if (e == 0)
+            return 0.0; // Assume zero for subnormals
+        if (e == 0x7FF)
+            return val; // Inf/NaN
+
+        // Float16: 5 exp bits (bias 15), 10 mantissa bits
+        // Double: 11 exp bits (bias 1023), 52 mantissa bits
+
+        long newE = e - 1023 + 15;
+
+        if (newE <= 0) {
+            // Subnormal float16, flush to zero for simplicity in this domain
+            return (s == 0) ? 0.0 : -0.0;
+        }
+        if (newE >= 31) {
+            // Overflow (shouldn't happen for cosine sim [-1, 1])
+            return (s == 0) ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;
+        }
+
+        // 52 mantissa bits -> 10 bits. Drop 42 bits.
+        long mKept = m >>> 42;
+        long guard = (m >>> 41) & 1; // MSB of dropped (bit 41)
+        long sticky = m & 0x1FFFFFFFFFFL; // Remaining dropped bits (40-0)
+
+        if (guard == 1) {
+            // Round up if sticky bits set or if tie to even (LSB of kept is 1)
+            if (sticky != 0 || (mKept & 1) == 1) {
+                mKept++;
+            }
+        }
+
+        if (mKept > 0x3FF) {
+            mKept = 0; // Overflow mantissa, increment exponent
+            newE++;
+        }
+
+        // Reconstruct double with the quantized value
+        long resE = newE - 15 + 1023;
+        long resM = mKept << 42;
+
+        long resBits = (s << 63) | (resE << 52) | resM;
+        return Double.longBitsToDouble(resBits);
     }
 
     private static double getMagnitude/* ✅ */(double[] vec) {
