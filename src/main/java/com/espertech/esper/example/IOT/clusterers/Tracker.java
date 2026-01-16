@@ -16,6 +16,11 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+//import java.io.IOException;
+//import java.util.List;
+
 import static java.lang.System.exit;
 
 public class Tracker {
@@ -42,6 +47,8 @@ public class Tracker {
         long lasttimestamp = 0L;
         Integer first_id = 0;
         Integer last_id = 0;
+        Integer first_frame = 0;
+        Integer last_frame = 0;
 
         // 1. Data Extraction
         List<double[]> featureList = new ArrayList<>();
@@ -61,7 +68,6 @@ public class Tracker {
 
             if (flag) {
                 first_timestamp = timestamp;
-                flag = false;
             }
             lasttimestamp = timestamp;
 
@@ -71,10 +77,12 @@ public class Tracker {
                 List<Float> feature = user.getFeatures();
                 Integer id = user.getUNum();
 
-                if (first_id == 0) {
+                if (flag) {
                     first_id = id;
+                    first_frame = curFrame;
                 }
                 last_id = id;
+                last_frame = curFrame;
 
                 boundingBoxList.add(new Integer[] { 
                     user.getX1(), user.getX2(), user.getY1(), user.getY2() 
@@ -85,6 +93,7 @@ public class Tracker {
                 serialNumbers.add(id);
                 idList.add(id);
                 System.out.println(user);
+                flag = false;
             }
 
         }
@@ -94,6 +103,18 @@ public class Tracker {
         // 2. Intra-Window Clustering (Local Tracking)
         List<Integer> newClusterLabels = SCPT.trackingByClustering(featureList, frameNumbers, serialNumbers,
                 boundingBoxList);
+
+        if (TrackingParameters.isDebug) {
+            System.out.println("clusterLabels after trackingByClustering: " + newClusterLabels);
+            String filePath = "C:\\OURs\\Thesis\\dumps\\after-trackingByClustering\\clusters-java_" + (number_of_winodws_processed-1) + ".txt";
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+//                writer.write("clusterLabels after trackingByClustering: ");
+                writer.write(newClusterLabels.toString());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
 
         // 3. Label Shifting (Global ID Generation)
         // Shift cluster labels to ensure global uniqueness and temporal continuity
@@ -130,6 +151,10 @@ public class Tracker {
                     pastClusters,
                     pastFrames,
                     TrackingParameters.epsilonScpt);
+            if (TrackingParameters.isDebug) {
+                System.out.println("pastClusters: " + pastClusters);
+                System.out.println("clusterLabels after associateClusterBetweenPeriod: " + newClusterLabels);
+            }
         }
 
         // 6. State Update for Next Window
@@ -220,6 +245,7 @@ public class Tracker {
         System.out.println("--------------------------------------------------------------------------");
         System.out.println("Window period: " + (lasttimestamp - first_timestamp));
         System.out.println("First ID: " + first_id + " And Last Id: " + last_id);
+        System.out.println("First Frame: " + first_frame + " And Last Frame: " + last_frame);
         System.out.println("Time taken: " + HelperUtils.elapsedMillis(start_time) + " ms");
         System.out.println("--------------------------------------------------------------------------");
         if (TrackingParameters.isDebug

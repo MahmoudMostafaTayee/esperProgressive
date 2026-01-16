@@ -202,7 +202,7 @@ public class EmbeddingFeatureStreamer {
 
         try {
             int curFrame = Integer.parseInt(matcher.group(1));
-            int uNum = Integer.parseInt(matcher.group(2));
+            int uNum = Integer.parseInt(matcher.group(2))-1;
             int x1 = Integer.parseInt(matcher.group(3));
             int x2 = Integer.parseInt(matcher.group(4));
             int y1 = Integer.parseInt(matcher.group(5));

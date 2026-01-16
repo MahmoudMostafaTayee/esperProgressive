@@ -66,10 +66,6 @@ public class SCPT {
         // 6. Relabel Clusters
         clusterLabelsList = relabelClusters(clusterLabelsList);
 
-        if (TrackingParameters.isDebug) {
-            System.out.println("clusterLabels: " + clusterLabelsList);
-        }
-
         return clusterLabelsList;
     }
 
@@ -175,7 +171,7 @@ public class SCPT {
             List<Integer> pastFrames,
             double epsilon) {
 
-        // 1. Combine lists
+        // 1. Combine lists to create a unified view of Past + Current
         List<Integer> allClusters = new ArrayList<>(pastClusters);
         allClusters.addAll(currentClusters);
 
@@ -185,26 +181,38 @@ public class SCPT {
         List<double[]> allFeatures = new ArrayList<>(pastFeatures);
         allFeatures.addAll(currentFeatures);
 
-        // 2. Create Similarity Matrix
+        // 2. Create Similarity Matrix (N x N where N = total points)
         double[][] featuresArray = allFeatures.toArray(new double[0][]);
         double[][] similarityMatrix = createSimilarityMatrixSCPT(featuresArray, epsilon);
 
-        // 3. Create Centrality Matrix
+        // 3. Create Centrality Matrix (M x M where M = number of unique clusters)
+        // Note: ensure this method sorts unique clusters internally to match Python's 'sorted()' behavior
         double[][] centralityMatrix = createCentralityMatrix(allClusters, similarityMatrix, allFrames, epsilon);
 
-        // 4. Associate Cluster (Merging)
+        // Python explicitly zeroes the diagonal.
+        // This prevents a cluster from "merging with itself" having a cost/score.
+        for (int i = 0; i < centralityMatrix.length; i++) {
+            centralityMatrix[i][i] = 0.0;
+        }
+
+        // 4. Associate Cluster (Merging logic)
+        // This returns the new ID for every point in 'allClusters'
         List<Integer> associatedClusters = associateCluster(
                 allClusters,
                 centralityMatrix,
                 epsilon,
-                true, // removeNoiseCluster default
-                1, // costFunction default
-                true // minimize default
+                true, // removeNoiseCluster
+                1,    // costFunction
+                true  // minimize
         );
 
-        // 5. Extract only the *current* portion of the clusters
+        // 5. Extract results
+        // NOTE: The Python version updates the global dictionary for BOTH past and current.
+        // If you only need the current frame's new IDs:
         int pastSize = pastClusters.size();
         List<Integer> updatedCurrentClusters = new ArrayList<>();
+
+        // We only iterate the second half of the list (the current frames)
         for (int i = pastSize; i < associatedClusters.size(); i++) {
             updatedCurrentClusters.add(associatedClusters.get(i));
         }
