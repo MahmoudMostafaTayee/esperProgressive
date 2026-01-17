@@ -39,8 +39,10 @@ public class Tracker {
     public Tracker() {
     }
 
-    private void processStreamingClusters(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime) {
-        if (newEvents == null || newEvents.length == 0) return;
+    private void processStreamingClusters(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement,
+            EPRuntime runtime) {
+        if (newEvents == null || newEvents.length == 0)
+            return;
 
         Instant start_time = Instant.now();
         Long first_timestamp = 0L;
@@ -84,8 +86,8 @@ public class Tracker {
                 last_id = id;
                 last_frame = curFrame;
 
-                boundingBoxList.add(new Integer[] { 
-                    user.getX1(), user.getX2(), user.getY1(), user.getY2() 
+                boundingBoxList.add(new Integer[] {
+                        user.getX1(), user.getX2(), user.getY1(), user.getY2()
                 });
 
                 featureList.add(feature.stream().mapToDouble(Float::doubleValue).toArray());
@@ -98,7 +100,8 @@ public class Tracker {
 
         }
 
-        if (featureList.isEmpty()) return;
+        if (featureList.isEmpty())
+            return;
 
         // 2. Intra-Window Clustering (Local Tracking)
         List<Integer> newClusterLabels = SCPT.trackingByClustering(featureList, frameNumbers, serialNumbers,
@@ -106,10 +109,11 @@ public class Tracker {
 
         if (TrackingParameters.isDebug) {
             System.out.println("clusterLabels after trackingByClustering: " + newClusterLabels);
-            String filePath = "C:\\OURs\\Thesis\\dumps\\after-trackingByClustering\\clusters-java_" + (number_of_winodws_processed) + ".txt";
+            String filePath = "C:\\OURs\\Thesis\\dumps\\after-trackingByClustering\\clusters-java_"
+                    + (number_of_winodws_processed) + ".txt";
 
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
-//                writer.write("clusterLabels after trackingByClustering: ");
+                // writer.write("clusterLabels after trackingByClustering: ");
                 writer.write(newClusterLabels.toString());
             } catch (IOException e) {
                 e.printStackTrace();
@@ -153,7 +157,8 @@ public class Tracker {
                     TrackingParameters.epsilonScpt);
 
             if (TrackingParameters.isDebug) {
-                String filePath = "C:\\OURs\\Thesis\\dumps\\after-associateClusterBetweenPeriod\\clusters-java_" + (number_of_winodws_processed) + ".txt";
+                String filePath = "C:\\OURs\\Thesis\\dumps\\after-associateClusterBetweenPeriod\\clusters-java_"
+                        + (number_of_winodws_processed) + ".txt";
 
                 try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
                     writer.write(newClusterLabels.toString());
@@ -210,6 +215,16 @@ public class Tracker {
                     TrackingParameters.temporally_snms_th,
                     TrackingParameters.spatially_snms_th,
                     TrackingParameters.merge_nonoverlap);
+
+            if (TrackingParameters.isDebug) {
+                String filePath = "C:\\OURs\\Thesis\\dumps\\after-sequential_nms\\clusters-java_"
+                        + (number_of_winodws_processed) + ".txt";
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+                    writer.write(newClusterLabels.toString());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
         if (TrackingParameters.separate_warp) {
@@ -219,12 +234,32 @@ public class Tracker {
                     boundingBoxList,
                     TrackingParameters.warp_th,
                     TrackingParameters.alpha);
+
+            if (TrackingParameters.isDebug) {
+                String filePath = "C:\\OURs\\Thesis\\dumps\\after-separate_warp\\clusters-java_"
+                        + (number_of_winodws_processed) + ".txt";
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+                    writer.write(newClusterLabels.toString());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
         if (TrackingParameters.exclude_short) {
             newClusterLabels = ClusteringUtils.excludeShortTracklet(
                     newClusterLabels,
                     TrackingParameters.short_tracklet_th);
+
+            if (TrackingParameters.isDebug) {
+                String filePath = "C:\\OURs\\Thesis\\dumps\\after-exclude_short\\clusters-java_"
+                        + (number_of_winodws_processed) + ".txt";
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+                    writer.write(newClusterLabels.toString());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
         if (TrackingParameters.exclude_motionless) {
@@ -233,6 +268,16 @@ public class Tracker {
                     frameNumbers,
                     boundingBoxList,
                     TrackingParameters.stop_track_th);
+
+            if (TrackingParameters.isDebug) {
+                String filePath = "C:\\OURs\\Thesis\\dumps\\after-exclude_motionless\\clusters-java_"
+                        + (number_of_winodws_processed) + ".txt";
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+                    writer.write(newClusterLabels.toString());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
         System.out.println("newClusterLabels: " + Arrays.toString(newClusterLabels.toArray()));
@@ -258,7 +303,7 @@ public class Tracker {
         System.out.println("Time taken: " + HelperUtils.elapsedMillis(start_time) + " ms");
         System.out.println("--------------------------------------------------------------------------");
         if (TrackingParameters.isDebug
-                && ((number_of_winodws_processed+1) >= TrackingParameters.max_number_of_windows_to_process)) {
+                && ((number_of_winodws_processed + 1) >= TrackingParameters.max_number_of_windows_to_process)) {
             exit(0);
         }
         number_of_winodws_processed += 1;
