@@ -14,10 +14,11 @@ public class TrackingParameters {
     public static double epsilonScpt = 0.10;
     public static int timePeriod = 1;
     public static int fps = 10;
+    public static int minSamples = 1;
     public static double epsilonMcpt = 0.37;
-    public static int shortTrackTh = 120;
+    public static int shortTrackTh = 0;
     public static int keypointConditionTh = 1;
-    public static boolean replaceSimilarityByWCoordinate = true;
+    public static boolean replaceSimilarityByWCoordinate = false;
     public static String distanceType = "min";
     public static int distanceTh = 10;
     public static double simTh = 0.85;
@@ -26,7 +27,8 @@ public class TrackingParameters {
     public static double iouTh = 0.9;
     public static boolean overlap_suppression = true;
     public static boolean isDebug = true;
-    public static int max_number_of_windows_to_process = 3; // This won't work unless in isDebug is ture.
+    public static int max_number_of_windows_to_process = 100; // This won't work unless in isDebug is ture.
+    public static int max_frames = -1; // -1 means all frames
 
     // SNMS Parameters
     public static boolean sequential_nms = true;
@@ -39,15 +41,20 @@ public class TrackingParameters {
     public static int warp_th = 40;
     public static double alpha = 0.5;
 
-    public static boolean exclude_short = true;
+    public static boolean exclude_short = false;
     public static int short_tracklet_th = 5;
 
-    public static boolean exclude_motionless = true;
+    public static boolean exclude_motionless = false;
     public static int stop_track_th = 25;
+
+    // Visualization Parameters
+    public static boolean enable_visualization_export = true;
+    public static String visualization_output_dir = "./tracking_results";
 
     // ===== Runtime-configurable paths =====
     public static String FEATURES_BASE_DIR;
     public static String OUTPUT_DIR;
+    public static String CALIBRATION_DIR;
 
     // ===== Camera selection =====
     // "all" OR "0001", "0002", ...
@@ -79,16 +86,29 @@ public class TrackingParameters {
                 "output_dir",
                 "./output");
 
+        // ---------- Calibration directory ----------
+        CALIBRATION_DIR = cmd.getOptionValue(
+                "calibration_dir",
+                "Original");
+
         // ---------- Camera filter ----------
         CAMERA_FILTER = cmd.getOptionValue("camera", "all");
 
         // ---------- Execution level ----------
+        if (cmd.hasOption("debug")) {
+            isDebug = true;
+        }
+
         if (cmd.hasOption("exec_all")) {
             exec_lvl = exec_level.ALL;
         } else if (cmd.hasOption("exec_scpt")) {
             exec_lvl = exec_level.SCPT;
         } else if (cmd.hasOption("exec_mcpt")) {
             exec_lvl = exec_level.MCPT;
+        }
+
+        if (cmd.hasOption("max_frames")) {
+            max_frames = Integer.parseInt(cmd.getOptionValue("max_frames"));
         }
 
         // ---------- Scene-specific parameters ----------
@@ -129,6 +149,12 @@ public class TrackingParameters {
                 .build());
 
         options.addOption(Option.builder()
+                .longOpt("calibration_dir")
+                .hasArg()
+                .desc("Base directory for calibration files")
+                .build());
+
+        options.addOption(Option.builder()
                 .longOpt("camera")
                 .hasArg()
                 .desc("Camera number (e.g., 0001) or 'all'")
@@ -140,9 +166,29 @@ public class TrackingParameters {
                 .desc("Directory to save logs and outputs")
                 .build());
 
-        options.addOption("exec_all", false, "Execute all stages");
-        options.addOption("exec_scpt", false, "Execute SCPT stage");
-        options.addOption("exec_mcpt", false, "Execute MCPT stage");
+        options.addOption(Option.builder()
+                .longOpt("exec_all")
+                .desc("Execute all stages")
+                .build());
+
+        options.addOption(Option.builder()
+                .longOpt("debug")
+                .desc("Enable debug output")
+                .build());
+        options.addOption(Option.builder()
+                .longOpt("exec_scpt")
+                .desc("Execute SCPT stage")
+                .build());
+        options.addOption(Option.builder()
+                .longOpt("exec_mcpt")
+                .desc("Execute MCPT stage")
+                .build());
+
+        options.addOption(Option.builder()
+                .longOpt("max_frames")
+                .hasArg()
+                .desc("Maximum number of frames to process")
+                .build());
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
@@ -165,6 +211,7 @@ public class TrackingParameters {
                         "scene=" + scene +
                         ", FEATURES_BASE_DIR='" + FEATURES_BASE_DIR + '\'' +
                         ", OUTPUT_DIR='" + OUTPUT_DIR + '\'' +
+                        ", CALIBRATION_DIR='" + CALIBRATION_DIR + '\'' +
                         ", CAMERA_FILTER='" + CAMERA_FILTER + '\'' +
                         ", epsilonScpt=" + epsilonScpt +
                         ", timePeriod=" + timePeriod +
@@ -176,6 +223,7 @@ public class TrackingParameters {
                         ", distanceTh=" + distanceTh +
                         ", simTh=" + simTh +
                         ", deleteGidTh=" + deleteGidTh +
+                        ", max_frames=" + max_frames +
                         ", exec_lvl=" + exec_lvl +
                         '}');
     }

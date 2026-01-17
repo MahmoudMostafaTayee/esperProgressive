@@ -24,29 +24,48 @@ import java.util.regex.Pattern;
 public class EmbeddingFeatureStreamer {
     private static final Logger logger = LoggerFactory.getLogger(EmbeddingFeatureStreamer.class);
 
-    private static final String BASE_PATH = TrackingParameters.FEATURES_BASE_DIR;
-    private static final Pattern FILE_PATTERN = Pattern.compile("feature_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+\\.?\\d*)\\.npy");
+    // private static final String BASE_PATH = TrackingParameters.FEATURES_BASE_DIR;
+    private static final Pattern FILE_PATTERN = Pattern
+            .compile("feature_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+\\.?\\d*)\\.npy");
     private static final long ONE_SEC_TIME_STEP = 1000L;
     private static final Map<Path, Integer> cameraOffsets = new HashMap<>();
     private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     public static void streamEmbeddingFeatures() {
-        Map<Path, Map<Path, List<Path>>> sceneData = initScenesData(Paths.get(BASE_PATH));
-        long frameIntervalMillis = (long)((ONE_SEC_TIME_STEP*1.0) / TrackingParameters.fps);
+        Map<Path, Map<Path, List<Path>>> scenes = initScenesData(Paths.get(TrackingParameters.FEATURES_BASE_DIR));
+        // int fps = TrackingParameters.fps;
+        long frameIntervalMillis = (long) ((ONE_SEC_TIME_STEP * 1.0) / TrackingParameters.fps);
 
         scheduler.scheduleWithFixedDelay(() -> {
-            for (Map.Entry<Path, Map<Path, List<Path>>> sceneEntry : sceneData.entrySet()) {
+            boolean allFinished = true;
+            for (Map.Entry<Path, Map<Path, List<Path>>> sceneEntry : scenes.entrySet()) {
                 Path scene = sceneEntry.getKey();
-                if (!Files.isDirectory(scene)) continue;
-                processScene(sceneEntry);
+                if (!Files.isDirectory(scene))
+                    continue;
+                boolean sceneHasMore = processScene(sceneEntry);
+                if (sceneHasMore)
+                    allFinished = false;
+            }
+            if (allFinished) {
+                logger.info("All files in all scenes processed. Shutting down streamer.");
+                scheduler.shutdown();
             }
         }, 0, frameIntervalMillis, TimeUnit.MILLISECONDS);
     }
 
-    private static void processScene(Map.Entry<Path, Map<Path, List<Path>>> sceneEntry) {
+    public static boolean isFinished() {
+        return scheduler.isTerminated();
+    }
+
+    private static boolean processScene(Map.Entry<Path, Map<Path, List<Path>>> sceneEntry) {
         Path scene = sceneEntry.getKey();
+        if (TrackingParameters.scene > 0
+                && !scene.getFileName().toString().contains(String.format("%03d", TrackingParameters.scene))) {
+            return false;
+        }
         Map<Path, List<Path>> cameras = sceneEntry.getValue();
         Map<Path, Boolean> processingStatus = new HashMap<>();
+        boolean sceneHasMore = false;
 
         Map<Path, List<Path>> selectedCameras = new HashMap<>();
 
@@ -55,13 +74,21 @@ public class EmbeddingFeatureStreamer {
         for (Map.Entry<Path, List<Path>> entry : cameras.entrySet()) {
             Path camera = entry.getKey();
 
-            if (!Files.isDirectory(camera)) continue;
+            if (!Files.isDirectory(camera))
+                continue;
 
             if (!selectedCamera.equalsIgnoreCase("all")) {
-                if (!camera.getFileName().toString()
-                        .equals("camera_" + selectedCamera)) {
-                    continue;
+                String[] cameraIds = selectedCamera.split(",");
+                boolean match = false;
+                for (String camId : cameraIds) {
+                    if (camera.getFileName().toString()
+                            .equals(String.format("camera_%04d", Integer.parseInt(camId.trim())))) {
+                        match = true;
+                        break;
+                    }
                 }
+                if (!match)
+                    continue;
             }
 
             selectedCameras.put(camera, entry.getValue());
@@ -74,11 +101,14 @@ public class EmbeddingFeatureStreamer {
 
         for (Map.Entry<Path, List<Path>> cameraEntry : selectedCameras.entrySet()) {
             Path camera = cameraEntry.getKey();
-            if (!processingStatus.get(camera)) continue;
+            if (!processingStatus.get(camera))
+                continue;
             boolean cameraHasMoreFiles = processCamera(scene, cameraEntry);
-
+            if (cameraHasMoreFiles)
+                sceneHasMore = true;
             processingStatus.put(camera, cameraHasMoreFiles);
         }
+        return sceneHasMore;
     }
 
     private static boolean processCamera(Path scene, Map.Entry<Path, List<Path>> cameraEntry) {
@@ -127,6 +157,12 @@ public class EmbeddingFeatureStreamer {
     }
 
     private static void processFrame(Path scene, Path camera, List<FileData> frameFiles, int frameNumber) {
+        if (TrackingParameters.max_frames > 0 && frameNumber > TrackingParameters.max_frames) {
+            logger.info("Max frames reached: " + TrackingParameters.max_frames + ". Shutting down streamer.");
+            scheduler.shutdown();
+            return;
+        }
+
         long timestamp = System.currentTimeMillis();
         List<DetectedUser> detectedUsers = new ArrayList<>();
 
@@ -145,8 +181,7 @@ public class EmbeddingFeatureStreamer {
                         parsed.x2,
                         parsed.y1,
                         parsed.y2,
-                        parsed.conf
-                );
+                        parsed.conf);
 
                 detectedUsers.add(user);
 
@@ -159,12 +194,15 @@ public class EmbeddingFeatureStreamer {
 
         if (!detectedUsers.isEmpty()) {
             EmbeddingFeature frameFeature = new EmbeddingFeature(timestamp, frameNumber, detectedUsers);
+            String eventName = "embeddingFeature" + "_" + camera.getFileName().toString();
             EventEPLUtil.streamEvent(
                     frameFeature,
-                    "embeddingFeature" + "_" + camera.getFileName().toString()
-            );
+                    eventName);
             logger.info("Streamed frame {} with {} users from camera {}",
                     frameNumber, detectedUsers.size(), camera.getFileName());
+
+            // Advance Esper internal time
+            EventEPLUtil.advanceTime(1.0 / TrackingParameters.fps);
         }
     }
 
@@ -189,7 +227,8 @@ public class EmbeddingFeatureStreamer {
 
     private static List<Float> convertToFloatList(float[] featureArray) {
         List<Float> featureList = new ArrayList<>(featureArray.length);
-        for (float value : featureArray) featureList.add(value);
+        for (float value : featureArray)
+            featureList.add(value);
         return featureList;
     }
 

@@ -27,8 +27,11 @@ public class AgglomerativeClusterer {
     private int numberOfClusters = 1;
     Integer number_of_winodws_processed = 1;
 
-    public AgglomerativeClusterer(double epsilon) {
+    private final String cameraId;
+
+    public AgglomerativeClusterer(double epsilon, String cameraId) {
         this.epsilon = epsilon;
+        this.cameraId = cameraId;
     }
 
     private void processStreamingClusters(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement,
@@ -44,6 +47,7 @@ public class AgglomerativeClusterer {
             List<Integer> serialNumbers = new ArrayList<>();
             List<Integer> idList = new ArrayList<>();
             List<Integer[]> boundingBoxList = new ArrayList<>();
+            List<DetectedUser> allDetectedUsers = new ArrayList<>();
             long start = System.nanoTime();
             boolean flag = true;
 
@@ -80,6 +84,8 @@ public class AgglomerativeClusterer {
                     frameNumbers.add(curFrame);
                     serialNumbers.add(id);
                     idList.add(id);
+                    user.setFrameNumber(curFrame);
+                    allDetectedUsers.add(user);
                     System.out.println(user);
 
                     // Long frameRecordCount = (Long) e.get("frameRecordCount");
@@ -96,7 +102,17 @@ public class AgglomerativeClusterer {
             double[][] distanceMatrix = SimilarityUtils
                     .computeCosineDistanceMatrix(featureList.toArray(new double[0][]), this.epsilon);
             HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
-            int[] clusterLabels = hc.partition(this.epsilon);
+            int[] clusterLabels;
+            try {
+                clusterLabels = hc.partition(this.epsilon);
+            } catch (IllegalArgumentException e) {
+                // If the threshold is larger than any possible merge, then all nodes
+                // should be in a single cluster (0).
+                clusterLabels = new int[featureList.size()];
+                for (int i = 0; i < clusterLabels.length; i++) {
+                    clusterLabels[i] = 0;
+                }
+            }
             System.out.println("clusterLabels: " + Arrays.toString(clusterLabels));
             long durationMs = (System.nanoTime() - start) / 1_000_000;
             agglomerative_clustering_time_tracker += durationMs;
@@ -137,6 +153,15 @@ public class AgglomerativeClusterer {
                     serialNumbers,
                     clusterLabelsList,
                     this.epsilon);
+
+            // Remove noise clusters (matches Python's remove_noise_cluster and min_samples)
+            System.out.println("DEBUG: Before filter, cluster labels count: " + newClusterLabels.size());
+            newClusterLabels = ClusteringUtils.excludeShortTracklet(
+                    newClusterLabels,
+                    TrackingParameters.minSamples - 1);
+            System.out.println("DEBUG: After filter, cluster labels count: " + newClusterLabels.size());
+            long noiseCount = newClusterLabels.stream().filter(l -> l == -1).count();
+            System.out.println("DEBUG: Noise count (-1): " + noiseCount);
 
             if (TrackingParameters.sequential_nms) {
                 newClusterLabels = ClusteringUtils.sequentialNonMaximumSuppression(
@@ -180,13 +205,45 @@ public class AgglomerativeClusterer {
                 clusters.computeIfAbsent(label, k -> new ArrayList<>()).add(id);
             }
 
-            // 2. Print each cluster in order
-            clusters.keySet().stream()
-                    .sorted()
-                    .forEach(label -> {
-                        List<Integer> members = clusters.get(label);
-                        System.out.printf("Cluster %d: %s%n", label, members);
-                    });
+            // 2. Print each cluster in order and emit LocalTrackEvent
+            // 2. Print each cluster in order and emit LocalTrackEvent
+            List<Integer> sortedLabels = new ArrayList<>(clusters.keySet());
+            Collections.sort(sortedLabels);
+
+            final List<Integer> finalNewClusterLabels = newClusterLabels;
+            final Long finalFirstTimestamp = first_timestamp;
+            final Long finalLastTimestamp = lasttimestamp;
+
+            for (Integer label : sortedLabels) {
+                if (label == -1)
+                    continue; // Skip noise
+                List<Integer> members = clusters.get(label);
+
+                List<double[]> clusterFeatures = new ArrayList<>();
+                List<DetectedUser> clusterUsers = new ArrayList<>();
+
+                for (int i = 0; i < clusterLabels.length; i++) {
+                    // Use finalNewClusterLabels here
+                    if (finalNewClusterLabels.get(i) == label) {
+                        clusterFeatures.add(featureList.get(i));
+                        clusterUsers.add(allDetectedUsers.get(i));
+                    }
+                }
+
+                // Emitting event
+                int representativeId = members.isEmpty() ? -1 : members.get(0);
+
+                com.espertech.esper.example.IOT.events.LocalTrackEvent event = new com.espertech.esper.example.IOT.events.LocalTrackEvent(
+                        this.cameraId,
+                        label,
+                        finalFirstTimestamp,
+                        finalLastTimestamp,
+                        clusterFeatures,
+                        representativeId,
+                        clusterUsers);
+
+                runtime.getEventService().sendEventBean(event, "LocalTrackEvent");
+            }
         }
         System.out.println("--------------------------------------------------------------------------");
         System.out.println("Window period: " + (lasttimestamp - first_timestamp));

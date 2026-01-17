@@ -7,6 +7,10 @@ public class DetectedUser {
     private int uNum;
     private int x1, x2, y1, y2;
     private float conf;
+    private int frameNumber;
+    private double worldX;
+    private double worldY;
+    private boolean hasWorldCoords = false;
 
     public DetectedUser(List<Float> features, int uNum, int x1, int x2, int y1, int y2, float conf) {
         this.features = features;
@@ -44,6 +48,36 @@ public class DetectedUser {
 
     public float getConf() {
         return conf;
+    }
+
+    public int getFrameNumber() {
+        return frameNumber;
+    }
+
+    public void setFrameNumber(int frameNumber) {
+        this.frameNumber = frameNumber;
+    }
+
+    public double getWorldX() {
+        return worldX;
+    }
+
+    public void setWorldX(double worldX) {
+        this.worldX = worldX;
+        this.hasWorldCoords = true;
+    }
+
+    public double getWorldY() {
+        return worldY;
+    }
+
+    public void setWorldY(double worldY) {
+        this.worldY = worldY;
+        this.hasWorldCoords = true;
+    }
+
+    public boolean hasWorldCoords() {
+        return hasWorldCoords;
     }
 
     @Override

@@ -1,4 +1,5 @@
 package com.espertech.esper.example.IOT.helpers;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -9,8 +10,29 @@ import org.apache.commons.math3.linear.ArrayRealVector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
+/**
+ * A utility class for various similarity and distance calculations.
+ */
 public class SimilarityUtils {
     private static final Logger logger = LoggerFactory.getLogger(SimilarityUtils.class);
+
+    public static double[] computeMeanFeature(List<double[]> features) {
+        if (features == null || features.isEmpty())
+            return new double[0];
+        int dim = features.get(0).length;
+        double[] mean = new double[dim];
+        for (double[] f : features) {
+            for (int k = 0; k < dim; k++) {
+                mean[k] += f[k];
+            }
+        }
+        for (int k = 0; k < dim; k++) {
+            mean[k] /= features.size();
+        }
+        return mean;
+    }
 
     public static double cosineSimilarity(List<Float> features1, List<Float> features2) {
         if (features1 == null || features2 == null || features1.size() != features2.size()) {
@@ -38,22 +60,25 @@ public class SimilarityUtils {
         double threshold = 1 - epsilon;
 
         for (int i = 0; i < n; i++) {
-            distMatrix[i][i] = 0;  // Zero diagonal
+            distMatrix[i][i] = 0; // Zero diagonal
 
             for (int j = i + 1; j < n; j++) {
                 double similarity = cosineSimilarity(features[i], features[j]);
                 double distance = 1.0 - similarity;
 
                 // Apply epsilon threshold
-                distMatrix[i][j] = distMatrix[j][i] =
-                        (similarity < threshold) ? 1.0 : distance;
+                distMatrix[i][j] = distMatrix[j][i] = (similarity < threshold) ? 1.0 : distance;
             }
         }
         return distMatrix;
     }
 
+    public static double cosineDistance(double[] a, double[] b) {
+        return 1.0 - cosineSimilarity(a, b);
+    }
+
     // Compute cosine similarity between two vectors
-    private static double cosineSimilarity(double[] a, double[] b) {
+    public static double cosineSimilarity(double[] a, double[] b) {
         double dot = 0.0, normA = 0.0, normB = 0.0;
         for (int i = 0; i < a.length; i++) {
             dot += a[i] * b[i];
@@ -61,8 +86,10 @@ public class SimilarityUtils {
             normB += b[i] * b[i];
         }
 
-        if (normA == 0 && normB == 0) return 1.0;  // Both zero vectors
-        if (normA == 0 || normB == 0) return 0.0;   // One zero vector
+        if (normA == 0 && normB == 0)
+            return 1.0; // Both zero vectors
+        if (normA == 0 || normB == 0)
+            return 0.0; // One zero vector
 
         return dot / (Math.sqrt(normA) * Math.sqrt(normB));
     }
@@ -85,7 +112,6 @@ public class SimilarityUtils {
             clusterMap.computeIfAbsent(labels[i], k -> new ArrayList<>()).add(ids.get(i));
         }
 
-        clusterMap.forEach((cluster, members) ->
-                logger.info("Cluster {}: {}", cluster, members));
+        clusterMap.forEach((cluster, members) -> logger.info("Cluster {}: {}", cluster, members));
     }
 }
