@@ -7,8 +7,11 @@ public class DetectedUser {
     private int uNum;
     private int x1, x2, y1, y2;
     private float conf;
+    private List<List<Float>> keypoints;
 
-    public DetectedUser(List<Float> features, int uNum, int x1, int x2, int y1, int y2, float conf) {
+    public DetectedUser(List<Float> features, int uNum, int x1, int x2, int y1, int y2, float conf,
+            List<List<Float>> keypoints) {
+        this.keypoints = keypoints;
         this.features = features;
         this.uNum = uNum;
         this.x1 = x1;
@@ -16,6 +19,10 @@ public class DetectedUser {
         this.y1 = y1;
         this.y2 = y2;
         this.conf = conf;
+    }
+
+    public List<List<Float>> getKeypoints() {
+        return keypoints;
     }
 
     public List<Float> getFeatures() {
@@ -53,6 +60,7 @@ public class DetectedUser {
                 ", bbox=[" + x1 + "," + y1 + "," + x2 + "," + y2 + "]" +
                 ", conf=" + conf +
                 ", features=" + features.size() + " values" +
+                ", keypoints=" + (keypoints != null ? keypoints.size() : 0) +
                 '}';
     }
 }
