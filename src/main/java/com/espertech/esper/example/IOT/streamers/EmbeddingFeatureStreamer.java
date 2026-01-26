@@ -27,6 +27,7 @@ import java.lang.reflect.Type;
 
 public class EmbeddingFeatureStreamer {
     private static final Logger logger = LoggerFactory.getLogger(EmbeddingFeatureStreamer.class);
+    private static int framesStreamed = 0;
 
     private static final String BASE_PATH = TrackingParameters.FEATURES_BASE_DIR;
     private static final Pattern FILE_PATTERN = Pattern
@@ -40,7 +41,18 @@ public class EmbeddingFeatureStreamer {
         Map<Path, Map<Path, List<Path>>> sceneData = initScenesData(Paths.get(BASE_PATH));
         long frameIntervalMillis = (long) ((ONE_SEC_TIME_STEP * 1.0) / TrackingParameters.fps);
 
+        int maxFrames = TrackingParameters.max_number_of_windows_to_process * TrackingParameters.timePeriod
+                * TrackingParameters.fps;
+
         scheduler.scheduleWithFixedDelay(() -> {
+            if (TrackingParameters.isDebug && framesStreamed >= maxFrames) {
+                logger.info("Reached maximum number of windows to process in debug mode ("
+                        + TrackingParameters.max_number_of_windows_to_process + " windows). Global maxFrames limit: "
+                        + maxFrames);
+                scheduler.shutdown();
+                return;
+            }
+            framesStreamed++;
             for (Map.Entry<Path, Map<Path, List<Path>>> sceneEntry : sceneData.entrySet()) {
                 Path scene = sceneEntry.getKey();
                 if (!Files.isDirectory(scene))
@@ -58,6 +70,26 @@ public class EmbeddingFeatureStreamer {
         Map<Path, List<Path>> selectedCameras = new HashMap<>();
 
         String selectedCamera = TrackingParameters.CAMERA_FILTER;
+        Set<String> allowedCameras = new HashSet<>();
+
+        if (selectedCamera.equalsIgnoreCase("all")) {
+            // allowedCameras remains empty, meaning all are allowed logic-wise or we handle
+            // it specifically
+        } else {
+            String[] parts = selectedCamera.split(",");
+            for (String part : parts) {
+                String token = part.trim();
+                if (token.isEmpty())
+                    continue;
+                if (token.matches("\\d+")) {
+                    allowedCameras.add(String.format("camera_%04d", Integer.parseInt(token)));
+                } else if (!token.startsWith("camera_")) {
+                    allowedCameras.add("camera_" + token);
+                } else {
+                    allowedCameras.add(token);
+                }
+            }
+        }
 
         for (Map.Entry<Path, List<Path>> entry : cameras.entrySet()) {
             Path camera = entry.getKey();
@@ -65,13 +97,13 @@ public class EmbeddingFeatureStreamer {
             if (!Files.isDirectory(camera))
                 continue;
 
-            if (!camera.getFileName().toString().startsWith("camera_")) {
+            String cameraName = camera.getFileName().toString();
+            if (!cameraName.startsWith("camera_")) {
                 continue;
             }
 
             if (!selectedCamera.equalsIgnoreCase("all")) {
-                if (!camera.getFileName().toString()
-                        .equals("camera_" + selectedCamera)) {
+                if (!allowedCameras.contains(cameraName)) {
                     continue;
                 }
             }

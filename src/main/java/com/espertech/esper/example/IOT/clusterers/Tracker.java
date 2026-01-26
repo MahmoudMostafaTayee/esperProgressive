@@ -3,6 +3,7 @@ package com.espertech.esper.example.IOT.clusterers;
 import com.espertech.esper.common.client.EventBean;
 import com.espertech.esper.example.IOT.helpers.*;
 import com.espertech.esper.example.IOT.utils.DetectedUser;
+import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPStatement;
 import com.espertech.esper.runtime.client.UpdateListener;
@@ -21,14 +22,13 @@ import java.io.FileWriter;
 //import java.io.IOException;
 //import java.util.List;
 
-import static java.lang.System.exit;
-
 public class Tracker {
     private static final Logger logger = LoggerFactory.getLogger(Tracker.class);
 
+    private String cameraId;
     private long agglomerative_clustering_time_tracker = 0;
     private int numberOfClusters = 1;
-    Integer number_of_winodws_processed = 0;
+    Integer windowIndex = 0;
 
     // State for association across windows
     private List<double[]> pastFeatures = new ArrayList<>();
@@ -36,7 +36,12 @@ public class Tracker {
     private List<Integer> pastClusters = new ArrayList<>();
     private int maxOfflineId = -1;
 
+    public Tracker(String cameraId) {
+        this.cameraId = cameraId;
+    }
+
     public Tracker() {
+        this.cameraId = "unknown";
     }
 
     private void processStreamingClusters(EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement,
@@ -73,7 +78,6 @@ public class Tracker {
             }
             lasttimestamp = timestamp;
 
-            System.out.println("Current Frame Number: " + curFrame);
             // Process each detected user in the frame
             for (DetectedUser user : detectedUsers) {
                 List<Float> feature = user.getFeatures();
@@ -94,7 +98,6 @@ public class Tracker {
                 frameNumbers.add(curFrame);
                 serialNumbers.add(id);
                 idList.add(id);
-                System.out.println(user);
                 flag = false;
             }
 
@@ -103,17 +106,17 @@ public class Tracker {
         if (featureList.isEmpty())
             return;
 
+        System.out.println(
+                "[" + cameraId + "] Processing Window " + windowIndex + " | Frames: " + first_frame + "-" + last_frame);
+
         // 2. Intra-Window Clustering (Local Tracking)
         List<Integer> newClusterLabels = SCPT.trackingByClustering(featureList, frameNumbers, serialNumbers,
-                boundingBoxList, number_of_winodws_processed);
+                boundingBoxList, windowIndex);
 
         if (TrackingParameters.isDebug) {
-            System.out.println("clusterLabels after trackingByClustering: " + newClusterLabels);
-            String filePath = "C:\\OURs\\Thesis\\dumps\\after-trackingByClustering\\clusters-java_"
-                    + (number_of_winodws_processed) + ".txt";
-
+            String filePath = TrackingParameters.OUTPUT_DIR + "\\clusters-java_" + cameraId + "_" + (windowIndex)
+                    + ".txt";
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
-                // writer.write("clusterLabels after trackingByClustering: ");
                 writer.write(newClusterLabels.toString());
             } catch (IOException e) {
                 e.printStackTrace();
@@ -121,9 +124,6 @@ public class Tracker {
         }
 
         // 3. Label Shifting (Global ID Generation)
-        // Shift cluster labels to ensure global uniqueness and temporal continuity
-        // Matches Python logic: clusters = [cluster+max_offlineid+1 if cluster != -1
-        // else -i ...]
         for (int i = 0; i < newClusterLabels.size(); i++) {
             int cluster = newClusterLabels.get(i);
             if (cluster != -1) {
@@ -145,8 +145,7 @@ public class Tracker {
         }
 
         // 5. Inter-Window Association (Global Tracking)
-        // Associate with past window if available
-        if (number_of_winodws_processed >= 1) {
+        if (windowIndex >= 1) {
             newClusterLabels = SCPT.associateClusterBetweenPeriod(
                     featureList,
                     newClusterLabels,
@@ -157,22 +156,23 @@ public class Tracker {
                     TrackingParameters.epsilonScpt);
 
             if (TrackingParameters.isDebug) {
-                String filePath = "C:\\OURs\\Thesis\\dumps\\after-associateClusterBetweenPeriod\\clusters-java_"
-                        + (number_of_winodws_processed) + ".txt";
+                String filePath = TrackingParameters.OUTPUT_DIR
+                        + "\\after-associateClusterBetweenPeriod\\clusters-java_" + cameraId + "_" + (windowIndex)
+                        + ".txt";
 
-                try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
-                    writer.write(newClusterLabels.toString());
+                try {
+                    java.nio.file.Path path = java.nio.file.Paths.get(filePath);
+                    java.nio.file.Files.createDirectories(path.getParent());
+                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(path.toFile()))) {
+                        writer.write(newClusterLabels.toString());
+                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-
-                System.out.println("pastClusters: " + pastClusters);
-                System.out.println("clusterLabels after associateClusterBetweenPeriod: " + newClusterLabels);
             }
         }
 
         // 6. State Update for Next Window
-        // Store current data as past data for the next window
         pastFeatures = new ArrayList<>(featureList);
         pastClusters = new ArrayList<>(newClusterLabels);
         pastFrames = new ArrayList<>(frameNumbers);
@@ -180,33 +180,7 @@ public class Tracker {
         long durationMs = (System.nanoTime() - start) / 1_000_000;
         agglomerative_clustering_time_tracker += durationMs;
 
-        if (TrackingParameters.isDebug) {
-            // This code snippet saves the distance matrix and frame numbers to CSV files to
-            // be compared with original code.
-            // try {
-            // debug.saveDoubleMatrix(TrackingParameters.OUTPUT_DIR +
-            // "\\distance_matrix.csv", distanceMatrix);
-            // } catch (IOException e) {
-            // throw new RuntimeException(e);
-            // }
-            try {
-                debug.saveIntList(TrackingParameters.OUTPUT_DIR + "\\frame_numbers.txt", frameNumbers);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            try {
-                debug.saveIntList(TrackingParameters.OUTPUT_DIR + "\\serial_numbers.txt", serialNumbers);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            // try {
-            // debug.saveIntList(TrackingParameters.OUTPUT_DIR + "\\cluster_labels.txt",
-            // clusterLabelsList);
-            // } catch (IOException e) {
-            // throw new RuntimeException(e);
-            // }
-        }
-
+        // 7. Post-Processing (NMS, Warp, etc.)
         if (TrackingParameters.sequential_nms) {
             newClusterLabels = ClusteringUtils.sequentialNonMaximumSuppression(
                     newClusterLabels,
@@ -217,10 +191,14 @@ public class Tracker {
                     TrackingParameters.merge_nonoverlap);
 
             if (TrackingParameters.isDebug) {
-                String filePath = "C:\\OURs\\Thesis\\dumps\\after-sequential_nms\\clusters-java_"
-                        + (number_of_winodws_processed) + ".txt";
-                try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
-                    writer.write(newClusterLabels.toString());
+                String filePath = TrackingParameters.OUTPUT_DIR + "\\after-sequential_nms\\clusters-java_" + cameraId
+                        + "_" + (windowIndex) + ".txt";
+                try {
+                    java.nio.file.Path path = java.nio.file.Paths.get(filePath);
+                    java.nio.file.Files.createDirectories(path.getParent());
+                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(path.toFile()))) {
+                        writer.write(newClusterLabels.toString());
+                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -236,10 +214,14 @@ public class Tracker {
                     TrackingParameters.alpha);
 
             if (TrackingParameters.isDebug) {
-                String filePath = "C:\\OURs\\Thesis\\dumps\\after-separate_warp\\clusters-java_"
-                        + (number_of_winodws_processed) + ".txt";
-                try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
-                    writer.write(newClusterLabels.toString());
+                String filePath = TrackingParameters.OUTPUT_DIR + "\\after-separate_warp\\clusters-java_" + cameraId
+                        + "_" + (windowIndex) + ".txt";
+                try {
+                    java.nio.file.Path path = java.nio.file.Paths.get(filePath);
+                    java.nio.file.Files.createDirectories(path.getParent());
+                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(path.toFile()))) {
+                        writer.write(newClusterLabels.toString());
+                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -252,10 +234,14 @@ public class Tracker {
                     TrackingParameters.short_tracklet_th);
 
             if (TrackingParameters.isDebug) {
-                String filePath = "C:\\OURs\\Thesis\\dumps\\after-exclude_short\\clusters-java_"
-                        + (number_of_winodws_processed) + ".txt";
-                try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
-                    writer.write(newClusterLabels.toString());
+                String filePath = TrackingParameters.OUTPUT_DIR + "\\after-exclude_short\\clusters-java_" + cameraId
+                        + "_" + (windowIndex) + ".txt";
+                try {
+                    java.nio.file.Path path = java.nio.file.Paths.get(filePath);
+                    java.nio.file.Files.createDirectories(path.getParent());
+                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(path.toFile()))) {
+                        writer.write(newClusterLabels.toString());
+                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -270,43 +256,36 @@ public class Tracker {
                     TrackingParameters.stop_track_th);
 
             if (TrackingParameters.isDebug) {
-                String filePath = "C:\\OURs\\Thesis\\dumps\\after-exclude_motionless\\clusters-java_"
-                        + (number_of_winodws_processed) + ".txt";
-                try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
-                    writer.write(newClusterLabels.toString());
+                String filePath = TrackingParameters.OUTPUT_DIR + "\\after-exclude_motionless\\clusters-java_"
+                        + cameraId + "_" + (windowIndex) + ".txt";
+                try {
+                    java.nio.file.Path path = java.nio.file.Paths.get(filePath);
+                    java.nio.file.Files.createDirectories(path.getParent());
+                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(path.toFile()))) {
+                        writer.write(newClusterLabels.toString());
+                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
         }
 
-        System.out.println("newClusterLabels: " + Arrays.toString(newClusterLabels.toArray()));
+        // Emit SingleCameraResult event
+        com.espertech.esper.example.IOT.streams.SingleCameraResult result = new com.espertech.esper.example.IOT.streams.SingleCameraResult(
+                cameraId,
+                windowIndex,
+                lasttimestamp,
+                newClusterLabels,
+                idList,
+                boundingBoxList,
+                featureList);
+        EventEPLUtil.streamEvent(result, "SingleCameraResult");
 
-        // Map<Integer, List<Integer>> clusters = new HashMap<>();
-        // for (int i = 0; i < clusterLabels.length; i++) {
-        // int label = newClusterLabels.get(i);
-        // int id = idList.get(i);
-        // clusters.computeIfAbsent(label, k -> new ArrayList<>()).add(id);
-        // }
-        //
-        // // 2. Print each cluster in order
-        // clusters.keySet().stream()
-        // .sorted()
-        // .forEach(label -> {
-        // List<Integer> members = clusters.get(label);
-        // System.out.printf("Cluster %d: %s%n", label, members);
-        // });
+        System.out.println("[" + cameraId + "] Window " + windowIndex + " Finished. Time: "
+                + HelperUtils.elapsedMillis(start_time) + " ms");
         System.out.println("--------------------------------------------------------------------------");
-        System.out.println("Window period: " + (lasttimestamp - first_timestamp));
-        System.out.println("First ID: " + first_id + " And Last Id: " + last_id);
-        System.out.println("First Frame: " + first_frame + " And Last Frame: " + last_frame);
-        System.out.println("Time taken: " + HelperUtils.elapsedMillis(start_time) + " ms");
-        System.out.println("--------------------------------------------------------------------------");
-        if (TrackingParameters.isDebug
-                && ((number_of_winodws_processed + 1) >= TrackingParameters.max_number_of_windows_to_process)) {
-            exit(0);
-        }
-        number_of_winodws_processed += 1;
+
+        windowIndex += 1;
     }
 
     public UpdateListener getListener() {
