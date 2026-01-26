@@ -65,6 +65,10 @@ public class EmbeddingFeatureStreamer {
             if (!Files.isDirectory(camera))
                 continue;
 
+            if (!camera.getFileName().toString().startsWith("camera_")) {
+                continue;
+            }
+
             if (!selectedCamera.equalsIgnoreCase("all")) {
                 if (!camera.getFileName().toString()
                         .equals("camera_" + selectedCamera)) {
