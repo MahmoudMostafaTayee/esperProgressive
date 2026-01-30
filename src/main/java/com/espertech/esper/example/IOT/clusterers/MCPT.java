@@ -1548,6 +1548,12 @@ public class MCPT {
     // ==================== MCPT DUMP HELPERS ====================
 
     private static void dumpMcptMatrix(double[][] matrix, String filename) {
+        if (matrix == null || matrix.length == 0) {
+            logger.warn("MCPT Matrix {} is empty or null!", filename);
+            return;
+        } else {
+            logger.info("Dumping MCPT Matrix {} with size {}x{}", filename, matrix.length, matrix[0].length);
+        }
         try {
             java.nio.file.Path dir = java.nio.file.Paths.get(TrackingParameters.OUTPUT_DIR, "mcpt-dumps");
             java.nio.file.Files.createDirectories(dir);
@@ -1573,6 +1579,12 @@ public class MCPT {
     }
 
     private static void dumpMcptClusters(List<Integer> clusters, String filename) {
+        if (clusters == null || clusters.isEmpty()) {
+            logger.warn("MCPT Clusters {} is empty!", filename);
+            return;
+        } else {
+            logger.info("Dumping MCPT Clusters {} with size {}", filename, clusters.size());
+        }
         try {
             java.nio.file.Path dir = java.nio.file.Paths.get(TrackingParameters.OUTPUT_DIR, "mcpt-dumps");
             java.nio.file.Files.createDirectories(dir);
@@ -1589,6 +1601,12 @@ public class MCPT {
     }
 
     private static void dumpMcptCameraDict(Map<Integer, CameraDict> cameraDict, String filename) {
+        if (cameraDict == null || cameraDict.isEmpty()) {
+            logger.warn("MCPT Camera Dict {} is empty!", filename);
+            return;
+        } else {
+            logger.info("Dumping MCPT Camera Dict {} with {} cameras", filename, cameraDict.size());
+        }
         try {
             java.nio.file.Path dir = java.nio.file.Paths.get(TrackingParameters.OUTPUT_DIR, "mcpt-dumps");
             java.nio.file.Files.createDirectories(dir);
@@ -1596,12 +1614,17 @@ public class MCPT {
 
             try (java.io.BufferedWriter writer = new java.io.BufferedWriter(
                     new java.io.FileWriter(filePath.toFile()))) {
-                for (Map.Entry<Integer, CameraDict> entry : cameraDict.entrySet()) {
-                    writer.write("Camera " + entry.getKey() + ":");
+                // Sort cameras
+                List<Integer> sortedCameras = new ArrayList<>(cameraDict.keySet());
+                Collections.sort(sortedCameras);
+
+                for (Integer cameraId : sortedCameras) {
+                    CameraDict dict = cameraDict.get(cameraId);
+                    writer.write("Camera " + cameraId + ":");
                     writer.newLine();
-                    writer.write("  indices: " + entry.getValue().indices);
+                    writer.write("  indices: " + dict.indices);
                     writer.newLine();
-                    writer.write("  uniqueLocalIds: " + entry.getValue().uniqueLocalIds);
+                    writer.write("  uniqueLocalIds: " + dict.uniqueLocalIds);
                     writer.newLine();
                 }
             }
@@ -1613,6 +1636,12 @@ public class MCPT {
 
     private static void dumpMcptGlobalIds(Map<Integer, Map<String, Map<String, Object>>> trackingResults,
             String filename) {
+        if (trackingResults == null || trackingResults.isEmpty()) {
+            logger.warn("MCPT Global IDs {} is empty!", filename);
+            return;
+        } else {
+            logger.info("Dumping MCPT Global IDs {} for {} cameras", filename, trackingResults.size());
+        }
         try {
             java.nio.file.Path dir = java.nio.file.Paths.get(TrackingParameters.OUTPUT_DIR, "mcpt-dumps");
             java.nio.file.Files.createDirectories(dir);
@@ -1620,14 +1649,26 @@ public class MCPT {
 
             try (java.io.BufferedWriter writer = new java.io.BufferedWriter(
                     new java.io.FileWriter(filePath.toFile()))) {
-                for (Map.Entry<Integer, Map<String, Map<String, Object>>> camEntry : trackingResults.entrySet()) {
-                    writer.write("Camera " + camEntry.getKey() + ":");
+
+                // Sort cameras
+                List<Integer> sortedCameras = new ArrayList<>(trackingResults.keySet());
+                Collections.sort(sortedCameras);
+
+                for (Integer cameraId : sortedCameras) {
+                    writer.write("Camera " + cameraId + ":");
                     writer.newLine();
-                    for (Map.Entry<String, Map<String, Object>> entry : camEntry.getValue().entrySet()) {
-                        Object globalId = entry.getValue().get("GlobalOfflineID");
-                        Object localId = entry.getValue().get("OfflineID");
+
+                    Map<String, Map<String, Object>> camData = trackingResults.get(cameraId);
+                    // Sort serials
+                    List<String> sortedSerials = new ArrayList<>(camData.keySet());
+                    Collections.sort(sortedSerials);
+
+                    for (String serial : sortedSerials) {
+                        Map<String, Object> entry = camData.get(serial);
+                        Object globalId = entry.get("GlobalOfflineID");
+                        Object localId = entry.get("OfflineID");
                         if (globalId != null) {
-                            writer.write("  " + entry.getKey() + ": localId=" + localId + " -> globalId=" + globalId);
+                            writer.write("  " + serial + ": localId=" + localId + " -> globalId=" + globalId);
                             writer.newLine();
                         }
                     }
