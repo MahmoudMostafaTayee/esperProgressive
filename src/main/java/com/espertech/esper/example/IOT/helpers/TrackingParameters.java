@@ -21,10 +21,14 @@ public class TrackingParameters {
     public static String distanceType = "max"; // Python default: "max"
     public static int distanceTh = 5; // Python default: 5
     public static double simTh = 0.75; // Python default: 0.75
+    public static double keypointTh = 0.8;
+    public static double aspectTh = 1.6;
+    public static double replaceValue = -10.0;
     public static int deleteGidTh = 6000;
 
     public static int min_samples = 4;
     public static String clustering_method = "agglomerative";
+    public static String representativeSelectionMethod = "keypoint";
 
     public static exec_level exec_lvl = exec_level.ALL;
     public static double iouTh = 0.9;

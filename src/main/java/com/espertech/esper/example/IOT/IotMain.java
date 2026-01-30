@@ -258,17 +258,17 @@ public class IotMain implements Runnable {
                         com.espertech.esper.example.IOT.clusterers.MCPT.multiCameraPeopleTracking(
                                 calibrationMap, // Pass the calibration map
                                 trackingResults,
-                                "keypoint", // Using keypoint selection
+                                TrackingParameters.representativeSelectionMethod, // Using keypoint selection
                                 TrackingParameters.epsilonMcpt,
                                 TrackingParameters.shortTrackTh,
-                                TrackingParameters.simTh, // Using simTh as keypointTh? No, signature mismatch.
+                                TrackingParameters.keypointTh,
                                 TrackingParameters.keypointConditionTh,
-                                false, // replaceSimilarityByWCoordinate (Disabled for now unless calibration loaded)
+                                TrackingParameters.replaceSimilarityByWCoordinate, // replaceSimilarityByWCoordinate (Disabled for now unless calibration loaded)
                                 TrackingParameters.distanceType,
                                 TrackingParameters.distanceTh,
-                                -10.0, // replaceValue
+                                TrackingParameters.replaceValue, // replaceValue
                                 new int[] { 1920, 1080 }, // imageSize
-                                1.6, // aspectTh
+                                TrackingParameters.aspectTh, // aspectTh
                                 2000, // stackMaxSize
                                 winIdx
                         );

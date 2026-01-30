@@ -4,6 +4,7 @@ import com.espertech.esper.example.IOT.helpers.TrackingParameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import java.io.FileReader;
 import java.nio.file.Files;
@@ -1422,6 +1423,42 @@ public class MCPT {
         logger.info("short_track_th: {}", shortTrackTh);
         logger.info("epsilon: {}", epsilon);
 
+        // DUMP: Parameters
+        if (TrackingParameters.isDebug) {
+            Map<String, Object> params = new LinkedHashMap<>();
+            // params.put("representativeSelectionMethod", representativeSelectionMethod);
+            // params.put("epsilon", epsilon);
+            // params.put("shortTrackTh", shortTrackTh);
+            // params.put("keypointTh", keypointTh);
+            // params.put("keypointConditionTh", keypointConditionTh);
+            // params.put("replaceSimilarityByWCoordinate", replaceSimilarityByWCoordinate);
+            // params.put("distanceType", distanceType);
+            // params.put("distanceTh", distanceTh);
+            // params.put("replaceValue", replaceValue);
+            // params.put("imageSize", imageSize);
+            // params.put("aspectTh", aspectTh);
+            // params.put("stackMaxSize", stackMaxSize);
+            // params.put("winIdx", winIdx);
+            // params.put("calibrationMapKeys", calibrationMap.keySet()); // Just keys for
+            // calibration
+
+            // Deep copy tracking results and filter out Keypoints for dumping
+            Map<Integer, Map<String, Map<String, Object>>> filteredTrackingResults = new HashMap<>();
+            for (Map.Entry<Integer, Map<String, Map<String, Object>>> camEntry : trackingResults.entrySet()) {
+                Map<String, Map<String, Object>> camData = new HashMap<>();
+                for (Map.Entry<String, Map<String, Object>> serialEntry : camEntry.getValue().entrySet()) {
+                    Map<String, Object> trackletData = new HashMap<>(serialEntry.getValue());
+                    trackletData.remove("Keypoints");
+                    trackletData.remove("Feature");
+                    camData.put(serialEntry.getKey(), trackletData);
+                }
+                filteredTrackingResults.put(camEntry.getKey(), camData);
+            }
+            params.put("trackingResults", filteredTrackingResults);
+
+            dumpMcptParams(params, "mcpt-params-java_" + winIdx);
+        }
+
         // Measure World Coordinates (using streamed calibration data)
         trackingResults = measureWorldCoordinate(calibrationMap, trackingResults);
 
@@ -1546,6 +1583,22 @@ public class MCPT {
     }
 
     // ==================== MCPT DUMP HELPERS ====================
+
+    private static void dumpMcptParams(Map<String, Object> params, String filename) {
+        try {
+            java.nio.file.Path dir = java.nio.file.Paths.get(TrackingParameters.OUTPUT_DIR, "mcpt-dumps");
+            java.nio.file.Files.createDirectories(dir);
+            java.nio.file.Path filePath = dir.resolve(filename + ".json");
+
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            try (java.io.FileWriter writer = new java.io.FileWriter(filePath.toFile())) {
+                gson.toJson(params, writer);
+            }
+            logger.info("Dumped MCPT params to: {}", filePath);
+        } catch (java.io.IOException e) {
+            logger.error("Failed to dump MCPT params: " + filename, e);
+        }
+    }
 
     private static void dumpMcptMatrix(double[][] matrix, String filename) {
         if (matrix == null || matrix.length == 0) {
