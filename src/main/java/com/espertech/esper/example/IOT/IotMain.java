@@ -263,15 +263,16 @@ public class IotMain implements Runnable {
                                 TrackingParameters.shortTrackTh,
                                 TrackingParameters.keypointTh,
                                 TrackingParameters.keypointConditionTh,
-                                TrackingParameters.replaceSimilarityByWCoordinate, // replaceSimilarityByWCoordinate (Disabled for now unless calibration loaded)
+                                TrackingParameters.replaceSimilarityByWCoordinate, // replaceSimilarityByWCoordinate
+                                                                                   // (Disabled for now unless
+                                                                                   // calibration loaded)
                                 TrackingParameters.distanceType,
                                 TrackingParameters.distanceTh,
                                 TrackingParameters.replaceValue, // replaceValue
                                 new int[] { 1920, 1080 }, // imageSize
                                 TrackingParameters.aspectTh, // aspectTh
                                 2000, // stackMaxSize
-                                winIdx
-                        );
+                                winIdx);
 
                         // Output results (Optional, for verification)
                         for (Integer cam : trackingResults.keySet()) {

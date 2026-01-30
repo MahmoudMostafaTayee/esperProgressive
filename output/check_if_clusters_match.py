@@ -87,29 +87,45 @@ def run_checks():
         python_files = {}
 
         for file in os.listdir(directory):
-            if file.startswith("clusters-java_") and file.endswith(".txt"):
-                idx = file.split("_")[-1].replace(".txt", "")
-                java_files[idx] = os.path.join(directory, file)
+            if not file.endswith(".txt"):
+                continue
 
-            elif file.startswith("clusters-python_") and file.endswith(".txt"):
-                idx = file.split("_")[-1].replace(".txt", "")
-                python_files[idx] = os.path.join(directory, file)
+            # Parse suffix: ..._{camera_id}_{window_no}.txt
+            # We split by "_" and attempt to parse the last two segments as integers.
+            # This handles "camera_0001" vs "1" (via int conversion) and varying prefixes.
+            parts = file.replace(".txt", "").split("_")
+            if len(parts) < 3:
+                continue
 
-        common_indices = sorted(set(java_files) & set(python_files))
+            try:
+                # Last part is window_no, second to last is camera_id
+                win_no = int(parts[-1])
+                cam_id = int(parts[-2])
+                key = (cam_id, win_no)
+            except ValueError:
+                continue
 
-        if not common_indices:
-            print("[INFO] No matching windows found")
+            if file.startswith("clusters-java_"):
+                java_files[key] = os.path.join(directory, file)
+            elif file.startswith("clusters-python_"):
+                python_files[key] = os.path.join(directory, file)
+
+        common_keys = sorted(set(java_files) & set(python_files))
+
+        if not common_keys:
+            print("[INFO] No matching (camera, window) pairs found")
             continue
 
-        for idx in common_indices:
+        for key in common_keys:
+            cam_id, win_no = key
             print("-" * 80)
-            print(f"Time window {idx}")
+            print(f"Camera {cam_id} | Window {win_no}")
 
-            java_clusters = read_cluster_file(java_files[idx])
-            python_clusters = read_cluster_file(python_files[idx])
+            java_clusters = read_cluster_file(java_files[key])
+            python_clusters = read_cluster_file(python_files[key])
 
             if len(java_clusters) != len(python_clusters):
-                print("[ERROR] Length mismatch")
+                print(f"[ERROR] Length mismatch; java({len(java_clusters)}) vs python({len(python_clusters)})")
                 continue
 
             ari = ari_similarity(java_clusters, python_clusters)

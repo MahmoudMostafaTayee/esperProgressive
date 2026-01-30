@@ -916,7 +916,7 @@ public class MCPT {
         }
 
         // Find index with max area among indices with min condition
-        int maxIndex = 0;
+        int maxIndex = indices.get(0);
         double maxArea = 0;
         for (int idx : indices) {
             if (areas.get(idx) > maxArea) {
@@ -1484,6 +1484,25 @@ public class MCPT {
         Map<Integer, Map<Integer, RepresentativeNode>> representativeNodes = decideRepresentativeNodes(
                 trackingResults, representativeSelectionMethod, epsilon, shortTrackTh,
                 keypointTh, imageSize, aspectTh, stackMaxSize);
+
+        // DUMP: Representative nodes
+        if (TrackingParameters.isDebug) {
+            Map<Integer, Map<Integer, Map<String, Object>>> dumpRepNodes = new HashMap<>();
+            for (Map.Entry<Integer, Map<Integer, RepresentativeNode>> camEntry : representativeNodes.entrySet()) {
+                Map<Integer, Map<String, Object>> camRepNodes = new HashMap<>();
+                for (Map.Entry<Integer, RepresentativeNode> nodeEntry : camEntry.getValue().entrySet()) {
+                    Map<String, Object> nodeMap = new HashMap<>();
+                    nodeMap.put("serial", nodeEntry.getValue().serial);
+                    nodeMap.put("score", nodeEntry.getValue().score);
+                    nodeMap.put("allSerials", nodeEntry.getValue().allSerials);
+                    // Exclude feature[] for size
+                    camRepNodes.put(nodeEntry.getKey(), nodeMap);
+                }
+                dumpRepNodes.put(camEntry.getKey(), camRepNodes);
+            }
+            dumpMcptParams(Collections.singletonMap("representativeNodes", dumpRepNodes),
+                    "mcpt-representative-nodes-java_" + winIdx);
+        }
 
         logger.info("Representative features selected");
 

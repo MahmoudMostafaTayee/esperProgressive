@@ -113,7 +113,7 @@ public class Tracker {
 
         // 2. Intra-Window Clustering (Local Tracking)
         List<Integer> newClusterLabels = SCPT.trackingByClustering(featureList, frameNumbers, serialNumbers,
-                boundingBoxList, windowIndex);
+                boundingBoxList, windowIndex, cameraId);
 
         if (TrackingParameters.isDebug) {
             try {

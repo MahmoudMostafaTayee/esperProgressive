@@ -26,7 +26,8 @@ public class SCPT {
             List<Integer> frameNumbers,
             List<Integer> serialNumbers,
             List<Integer[]> boundingBoxList,
-            Integer window_no) {
+            Integer window_no,
+            String camId) {
 
         // 1. Edge Case: Single element
         if (serialNumbers.size() == 1) {
@@ -45,7 +46,7 @@ public class SCPT {
             try {
                 Path dumpDir = Paths.get(TrackingParameters.OUTPUT_DIR, "similatiry-matrix");
                 Files.createDirectories(dumpDir);
-                Path filePath = dumpDir.resolve("java-similarityMatrix_" + window_no + ".txt");
+                Path filePath = dumpDir.resolve("java-similarityMatrix_" + camId + "_" + window_no + ".txt");
                 try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath.toFile()))) {
                     for (double[] row : similarityMatrix) {
                         for (int j = 0; j < row.length; j++) {
@@ -80,7 +81,7 @@ public class SCPT {
             try {
                 Path dumpDir = Paths.get(TrackingParameters.OUTPUT_DIR, "after-bare-clustering");
                 Files.createDirectories(dumpDir);
-                Path filePath_ = dumpDir.resolve("clusters-java_" + window_no + ".txt");
+                Path filePath_ = dumpDir.resolve("clusters-java_" + camId + "_" + window_no + ".txt");
                 Files.writeString(filePath_, Arrays.toString(clusterLabels));
             } catch (IOException e) {
                 logger.error("Failed to dump bare clustering results", e);
