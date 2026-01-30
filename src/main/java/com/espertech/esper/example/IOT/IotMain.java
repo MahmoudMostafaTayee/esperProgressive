@@ -269,7 +269,8 @@ public class IotMain implements Runnable {
                                 -10.0, // replaceValue
                                 new int[] { 1920, 1080 }, // imageSize
                                 1.6, // aspectTh
-                                2000 // stackMaxSize
+                                2000, // stackMaxSize
+                                winIdx
                         );
 
                         // Output results (Optional, for verification)

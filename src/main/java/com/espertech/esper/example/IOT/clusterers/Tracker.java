@@ -116,10 +116,14 @@ public class Tracker {
                 boundingBoxList, windowIndex);
 
         if (TrackingParameters.isDebug) {
-            String filePath = TrackingParameters.OUTPUT_DIR + "\\clusters-java_" + cameraId + "_" + (windowIndex)
-                    + ".txt";
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
-                writer.write(newClusterLabels.toString());
+            try {
+                java.nio.file.Path dumpDir = java.nio.file.Paths.get(TrackingParameters.OUTPUT_DIR,
+                        "after-trackingByClustering");
+                java.nio.file.Files.createDirectories(dumpDir);
+                java.nio.file.Path filePath = dumpDir.resolve("clusters-java_" + cameraId + "_" + windowIndex + ".txt");
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath.toFile()))) {
+                    writer.write(newClusterLabels.toString());
+                }
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -287,6 +291,7 @@ public class Tracker {
 
         System.out.println("[" + cameraId + "] Window " + windowIndex + " Finished. Time: "
                 + HelperUtils.elapsedMillis(start_time) + " ms");
+        System.out.println("first_id: " + first_id + ", last_id: " + last_id);
         System.out.println("--------------------------------------------------------------------------");
 
         windowIndex += 1;

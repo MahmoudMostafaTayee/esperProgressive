@@ -41,22 +41,25 @@ public class SCPT {
                 featuresArray,
                 TrackingParameters.epsilonScpt);
 
-        String filePath = "C:\\OURs\\Thesis\\dumps\\similatiry-matrix\\java-similarityMatrix_"
-                + (window_no)
-                + ".txt";
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
-            for (double[] row : similarityMatrix) {
-                for (int j = 0; j < row.length; j++) {
-                    writer.write(String.valueOf(row[j]));
-                    if (j < row.length - 1) {
-                        writer.write(", ");
+        if (TrackingParameters.isDebug) {
+            try {
+                Path dumpDir = Paths.get(TrackingParameters.OUTPUT_DIR, "similatiry-matrix");
+                Files.createDirectories(dumpDir);
+                Path filePath = dumpDir.resolve("java-similarityMatrix_" + window_no + ".txt");
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath.toFile()))) {
+                    for (double[] row : similarityMatrix) {
+                        for (int j = 0; j < row.length; j++) {
+                            writer.write(String.valueOf(row[j]));
+                            if (j < row.length - 1) {
+                                writer.write(", ");
+                            }
+                        }
+                        writer.newLine();
                     }
                 }
-                writer.newLine();
+            } catch (IOException e) {
+                logger.error("Failed to dump similarity matrix", e);
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
 
         // Ensure diagonal is 1 (matching Python's explicit np.fill_diagonal)
@@ -73,16 +76,15 @@ public class SCPT {
         HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
         int[] clusterLabels = hc.partition(TrackingParameters.epsilonScpt);
 
-        Path filePath_ = Paths.get(
-                "C:", "OURs", "Thesis", "dumps", "after-bare-clustering",
-                "clusters-java_" + window_no + ".txt");
-
-        try {
-            Files.writeString(
-                    filePath_,
-                    Arrays.toString(clusterLabels));
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (TrackingParameters.isDebug) {
+            try {
+                Path dumpDir = Paths.get(TrackingParameters.OUTPUT_DIR, "after-bare-clustering");
+                Files.createDirectories(dumpDir);
+                Path filePath_ = dumpDir.resolve("clusters-java_" + window_no + ".txt");
+                Files.writeString(filePath_, Arrays.toString(clusterLabels));
+            } catch (IOException e) {
+                logger.error("Failed to dump bare clustering results", e);
+            }
         }
 
         List<Integer> clusterLabelsList = Arrays.stream(clusterLabels)

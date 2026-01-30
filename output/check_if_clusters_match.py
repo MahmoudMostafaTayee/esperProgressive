@@ -14,13 +14,14 @@ from sklearn.metrics import (
 # -------------------------------------------------
 
 DIRECTORIES = [
-    r".\after-bare-clustering",
-    r".\after-trackingByClustering",
-    r".\after-associateClusterBetweenPeriod",
-    r".\after-sequential_nms",
-    r".\after-separate_warp",
-    r".\after-exclude_short",
-    r".\after-exclude_motionless",
+    r".\scene1\after-bare-clustering",
+    r".\scene1\after-trackingByClustering",
+    r".\scene1\after-associateClusterBetweenPeriod",
+    r".\scene1\after-sequential_nms",
+    r".\scene1\after-separate_warp",
+    r".\scene1\after-exclude_short",
+    r".\scene1\after-exclude_motionless",
+    r".\scene1\mcpt-dumps",
 ]
 
 # -------------------------------------------------

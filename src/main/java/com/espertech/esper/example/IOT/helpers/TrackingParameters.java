@@ -17,10 +17,10 @@ public class TrackingParameters {
     public static double epsilonMcpt = 0.4;
     public static int shortTrackTh = 120;
     public static int keypointConditionTh = 1;
-    public static boolean replaceSimilarityByWCoordinate = true;
-    public static String distanceType = "min";
-    public static int distanceTh = 10;
-    public static double simTh = 0.85;
+    public static boolean replaceSimilarityByWCoordinate = false; // Python default: False
+    public static String distanceType = "max"; // Python default: "max"
+    public static int distanceTh = 5; // Python default: 5
+    public static double simTh = 0.75; // Python default: 0.75
     public static int deleteGidTh = 6000;
 
     public static int min_samples = 4;
@@ -30,7 +30,7 @@ public class TrackingParameters {
     public static double iouTh = 0.9;
     public static boolean overlap_suppression = true;
     public static boolean isDebug = true;
-    public static int max_number_of_windows_to_process = 3; // This won't work unless in isDebug is ture.
+    public static int max_number_of_windows_to_process = 1; // This won't work unless in isDebug is ture.
 
     // SNMS Parameters
     public static boolean sequential_nms = true;
@@ -43,10 +43,10 @@ public class TrackingParameters {
     public static int warp_th = 40;
     public static double alpha = 0.5;
 
-    public static boolean exclude_short = true;
-    public static int short_tracklet_th = 5;
+    public static boolean exclude_short = false; // Python default: False
+    public static int short_tracklet_th = 120; // Python default: 120
 
-    public static boolean exclude_motionless = true;
+    public static boolean exclude_motionless = false; // Python default: False
     public static int stop_track_th = 25;
 
     // ===== Runtime-configurable paths =====

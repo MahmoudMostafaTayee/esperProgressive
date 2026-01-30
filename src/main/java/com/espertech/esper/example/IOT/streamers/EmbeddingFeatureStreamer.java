@@ -316,8 +316,8 @@ public class EmbeddingFeatureStreamer {
             EventEPLUtil.streamEvent(
                     frameFeature,
                     "embeddingFeature" + "_" + camera.getFileName().toString());
-            logger.info("Streamed frame {} with {} users from camera {}",
-                    frameNumber, detectedUsers.size(), camera.getFileName());
+//            logger.info("Streamed frame {} with {} users from camera {}",
+//                    frameNumber, detectedUsers.size(), camera.getFileName());
         }
     }
 

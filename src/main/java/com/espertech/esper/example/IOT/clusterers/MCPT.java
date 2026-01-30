@@ -1414,7 +1414,8 @@ public class MCPT {
             double replaceValue,
             int[] imageSize,
             double aspectTh,
-            int stackMaxSize) {
+            int stackMaxSize,
+            int winIdx) {
 
         logger.info("Running multi_camera_people_tracking");
         logger.info("representative_selection_method: {}", representativeSelectionMethod);
@@ -1453,6 +1454,11 @@ public class MCPT {
         double[][] similarityMatrix = createSimilarityMatrixMCPT(
                 representativeNodes, shortTrackTh, keypointConditionTh);
 
+        // DUMP: MCPT similarity matrix (before zero-out)
+        if (TrackingParameters.isDebug) {
+            dumpMcptMatrix(similarityMatrix, "mcpt-similarity-matrix-raw_" + winIdx);
+        }
+
         // Zero out low similarity values
         for (int i = 0; i < similarityMatrix.length; i++) {
             for (int j = 0; j < similarityMatrix[i].length; j++) {
@@ -1460,6 +1466,11 @@ public class MCPT {
                     similarityMatrix[i][j] = 0.0;
                 }
             }
+        }
+
+        // DUMP: MCPT similarity matrix (after zero-out)
+        if (TrackingParameters.isDebug) {
+            dumpMcptMatrix(similarityMatrix, "mcpt-similarity-matrix-zeroed_" + winIdx);
         }
 
         List<Integer> clusters = new ArrayList<>();
@@ -1477,16 +1488,31 @@ public class MCPT {
                 false, replaceSimilarityByWCoordinate, distanceType, distanceTh,
                 replaceValue, shortTrackTh, keypointConditionTh);
 
+        // DUMP: MCPT similarity matrix (after replaceSimilarity)
+        if (TrackingParameters.isDebug) {
+            dumpMcptMatrix(similarityMatrix, "mcpt-similarity-matrix-replaced_" + winIdx);
+        }
+
         // Perform Re-identification using hierarchical clustering
         clusters = SCPT.associateCluster(clusters,
                 convertSimilarityToDistanceMatrix(similarityMatrix),
                 epsilon, true, 2, false);
+
+        // DUMP: Clusters after hierarchical clustering
+        if (TrackingParameters.isDebug) {
+            dumpMcptClusters(clusters, "mcpt-clusters-after-hc_" + winIdx);
+        }
 
         logger.info("Unique clusters after HC: {}", new HashSet<>(clusters).size());
 
         // Create camera dictionary
         Map<Integer, CameraDict> cameraDict = createCameraDict(
                 representativeNodes, shortTrackTh, keypointConditionTh);
+
+        // DUMP: Camera dictionary mapping
+        if (TrackingParameters.isDebug) {
+            dumpMcptCameraDict(cameraDict, "mcpt-camera-dict_" + winIdx);
+        }
 
         // Assign global IDs
         for (Map.Entry<Integer, CameraDict> cameraEntry : cameraDict.entrySet()) {
@@ -1511,7 +1537,106 @@ public class MCPT {
             }
         }
 
+        // DUMP: Final global ID assignments
+        if (TrackingParameters.isDebug) {
+            dumpMcptGlobalIds(trackingResults, "mcpt-global-ids_" + winIdx);
+        }
+
         return trackingResults;
+    }
+
+    // ==================== MCPT DUMP HELPERS ====================
+
+    private static void dumpMcptMatrix(double[][] matrix, String filename) {
+        try {
+            java.nio.file.Path dir = java.nio.file.Paths.get(TrackingParameters.OUTPUT_DIR, "mcpt-dumps");
+            java.nio.file.Files.createDirectories(dir);
+            java.nio.file.Path filePath = dir.resolve(filename + ".txt");
+
+            try (java.io.BufferedWriter writer = new java.io.BufferedWriter(
+                    new java.io.FileWriter(filePath.toFile()))) {
+                for (double[] row : matrix) {
+                    StringBuilder sb = new StringBuilder();
+                    for (int j = 0; j < row.length; j++) {
+                        sb.append(String.format("%.6f", row[j]));
+                        if (j < row.length - 1)
+                            sb.append(", ");
+                    }
+                    writer.write(sb.toString());
+                    writer.newLine();
+                }
+            }
+            logger.info("Dumped MCPT matrix to: {}", filePath);
+        } catch (java.io.IOException e) {
+            logger.error("Failed to dump MCPT matrix: " + filename, e);
+        }
+    }
+
+    private static void dumpMcptClusters(List<Integer> clusters, String filename) {
+        try {
+            java.nio.file.Path dir = java.nio.file.Paths.get(TrackingParameters.OUTPUT_DIR, "mcpt-dumps");
+            java.nio.file.Files.createDirectories(dir);
+            java.nio.file.Path filePath = dir.resolve(filename + ".txt");
+
+            try (java.io.BufferedWriter writer = new java.io.BufferedWriter(
+                    new java.io.FileWriter(filePath.toFile()))) {
+                writer.write(clusters.toString());
+            }
+            logger.info("Dumped MCPT clusters to: {}", filePath);
+        } catch (java.io.IOException e) {
+            logger.error("Failed to dump MCPT clusters: " + filename, e);
+        }
+    }
+
+    private static void dumpMcptCameraDict(Map<Integer, CameraDict> cameraDict, String filename) {
+        try {
+            java.nio.file.Path dir = java.nio.file.Paths.get(TrackingParameters.OUTPUT_DIR, "mcpt-dumps");
+            java.nio.file.Files.createDirectories(dir);
+            java.nio.file.Path filePath = dir.resolve(filename + ".txt");
+
+            try (java.io.BufferedWriter writer = new java.io.BufferedWriter(
+                    new java.io.FileWriter(filePath.toFile()))) {
+                for (Map.Entry<Integer, CameraDict> entry : cameraDict.entrySet()) {
+                    writer.write("Camera " + entry.getKey() + ":");
+                    writer.newLine();
+                    writer.write("  indices: " + entry.getValue().indices);
+                    writer.newLine();
+                    writer.write("  uniqueLocalIds: " + entry.getValue().uniqueLocalIds);
+                    writer.newLine();
+                }
+            }
+            logger.info("Dumped MCPT camera dict to: {}", filePath);
+        } catch (java.io.IOException e) {
+            logger.error("Failed to dump MCPT camera dict: " + filename, e);
+        }
+    }
+
+    private static void dumpMcptGlobalIds(Map<Integer, Map<String, Map<String, Object>>> trackingResults,
+            String filename) {
+        try {
+            java.nio.file.Path dir = java.nio.file.Paths.get(TrackingParameters.OUTPUT_DIR, "mcpt-dumps");
+            java.nio.file.Files.createDirectories(dir);
+            java.nio.file.Path filePath = dir.resolve(filename + ".txt");
+
+            try (java.io.BufferedWriter writer = new java.io.BufferedWriter(
+                    new java.io.FileWriter(filePath.toFile()))) {
+                for (Map.Entry<Integer, Map<String, Map<String, Object>>> camEntry : trackingResults.entrySet()) {
+                    writer.write("Camera " + camEntry.getKey() + ":");
+                    writer.newLine();
+                    for (Map.Entry<String, Map<String, Object>> entry : camEntry.getValue().entrySet()) {
+                        Object globalId = entry.getValue().get("GlobalOfflineID");
+                        Object localId = entry.getValue().get("OfflineID");
+                        if (globalId != null) {
+                            writer.write("  " + entry.getKey() + ": localId=" + localId + " -> globalId=" + globalId);
+                            writer.newLine();
+                        }
+                    }
+                }
+            }
+            logger.info("Dumped MCPT global IDs to: {}", filePath);
+        } catch (java.io.IOException e) {
+            logger.error("Failed to dump MCPT global IDs: " + filename, e);
+        }
     }
 
     private static double[][] convertSimilarityToDistanceMatrix(double[][] similarityMatrix) {
