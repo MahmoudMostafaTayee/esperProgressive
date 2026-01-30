@@ -63,6 +63,7 @@ public class Tracker {
         List<Integer> serialNumbers = new ArrayList<>();
         List<Integer> idList = new ArrayList<>();
         List<Integer[]> boundingBoxList = new ArrayList<>();
+        List<List<List<Float>>> keypointsList = new ArrayList<>();
 
         long start = System.nanoTime();
         boolean flag = true;
@@ -95,6 +96,7 @@ public class Tracker {
                 });
 
                 featureList.add(feature.stream().mapToDouble(Float::doubleValue).toArray());
+                keypointsList.add(user.getKeypoints());
                 frameNumbers.add(curFrame);
                 serialNumbers.add(id);
                 idList.add(id);
@@ -278,7 +280,9 @@ public class Tracker {
                 newClusterLabels,
                 idList,
                 boundingBoxList,
-                featureList);
+                featureList,
+                keypointsList,
+                frameNumbers);
         EventEPLUtil.streamEvent(result, "SingleCameraResult");
 
         System.out.println("[" + cameraId + "] Window " + windowIndex + " Finished. Time: "

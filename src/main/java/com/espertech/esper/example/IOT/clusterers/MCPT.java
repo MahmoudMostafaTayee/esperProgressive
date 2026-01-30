@@ -3,6 +3,11 @@ package com.espertech.esper.example.IOT.clusterers;
 import com.espertech.esper.example.IOT.helpers.TrackingParameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import java.io.FileReader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 import java.util.*;
 
@@ -686,6 +691,76 @@ public class MCPT {
     // ==================== KEYPOINT-BASED REPRESENTATIVE NODE SELECTION
     // ====================
 
+    // ==================== WORLD COORDINATE & CALIBRATION ====================
+
+    /**
+     * Measure world coordinates in each node
+     * Python equivalent: measure_world_coordinate
+     */
+    public static Map<Integer, Map<String, Map<String, Object>>> measureWorldCoordinate(
+            int sceneId,
+            Map<Integer, Map<String, Map<String, Object>>> trackingResults) {
+
+        Gson gson = new Gson();
+
+        for (Integer cameraId : trackingResults.keySet()) {
+            Map<String, Map<String, Object>> trackingDict = trackingResults.get(cameraId);
+            String calibrationPath = String.format("Original/scene_%03d/camera_%04d/calibration.json", sceneId,
+                    cameraId);
+
+            // Check if file exists
+            if (!Files.exists(Paths.get(calibrationPath))) {
+                logger.warn("Calibration file not found at {}. Skipping world coordinate calculation for camera {}.",
+                        calibrationPath, cameraId);
+                continue;
+            }
+
+            try (FileReader reader = new FileReader(calibrationPath)) {
+                java.lang.reflect.Type type = new TypeToken<Map<String, Object>>() {
+                }.getType();
+                Map<String, Object> calibrationJson = gson.fromJson(reader, type);
+
+                @SuppressWarnings("unchecked")
+                ArrayList<ArrayList<Double>> homographyList = (ArrayList<ArrayList<Double>>) calibrationJson
+                        .get("homography matrix");
+
+                double[][] homographyMatrix = new double[3][3];
+                for (int i = 0; i < 3; i++) {
+                    for (int j = 0; j < 3; j++) {
+                        homographyMatrix[i][j] = homographyList.get(i).get(j);
+                    }
+                }
+
+                for (String serial : trackingDict.keySet()) {
+                    Map<String, Object> value = trackingDict.get(serial);
+                    @SuppressWarnings("unchecked")
+                    Map<String, Integer> coord = (Map<String, Integer>) value.get("Coordinate");
+
+                    int x1 = coord.get("x1");
+                    int x2 = coord.get("x2");
+                    int y2 = coord.get("y2");
+
+                    double x = (x1 + x2) / 2.0;
+                    double y = (double) y2;
+
+                    double[] bboxWC = translateWorldCoordinate(x, y, homographyMatrix);
+
+                    Map<String, Double> worldCoord = new HashMap<>();
+                    worldCoord.put("x", bboxWC[0]);
+                    worldCoord.put("y", bboxWC[1]);
+
+                    value.put("WorldCoordinate", worldCoord);
+                }
+
+                logger.info("World coordinates calculated for camera {}", cameraId);
+
+            } catch (Exception e) {
+                logger.error("Error reading calibration file for camera " + cameraId, e);
+            }
+        }
+        return trackingResults;
+    }
+
     /**
      * Evaluate pose estimation keypoint quality
      * Python equivalent: eval_keypoints
@@ -1326,6 +1401,7 @@ public class MCPT {
      * cameras
      */
     public static Map<Integer, Map<String, Map<String, Object>>> multiCameraPeopleTracking(
+            Map<Integer, double[][]> calibrationMap,
             Map<Integer, Map<String, Map<String, Object>>> trackingResults,
             String representativeSelectionMethod,
             double epsilon,
@@ -1344,6 +1420,27 @@ public class MCPT {
         logger.info("representative_selection_method: {}", representativeSelectionMethod);
         logger.info("short_track_th: {}", shortTrackTh);
         logger.info("epsilon: {}", epsilon);
+
+        // Measure World Coordinates (using streamed calibration data)
+        trackingResults = measureWorldCoordinate(calibrationMap, trackingResults);
+
+        // Determine availability (check first element of first camera)
+        boolean worldCoordAvailable = false;
+        if ((!trackingResults.isEmpty())) {
+            Map<String, Map<String, Object>> firstCam = trackingResults.values().iterator().next();
+            if (!firstCam.isEmpty()) {
+                Map<String, Object> firstTrack = firstCam.values().iterator().next();
+                if (firstTrack.containsKey("WorldCoordinate")) {
+                    worldCoordAvailable = true;
+                }
+            }
+        }
+
+        if (replaceSimilarityByWCoordinate && !worldCoordAvailable) {
+            logger.warn(
+                    "replaceSimilarityByWCoordinate requested but World Coordinates not available (no calibration data?). Disabling.");
+            replaceSimilarityByWCoordinate = false;
+        }
 
         // Get representative nodes
         Map<Integer, Map<Integer, RepresentativeNode>> representativeNodes = decideRepresentativeNodes(
@@ -1371,6 +1468,8 @@ public class MCPT {
         }
 
         logger.info("Number of tracklets: {}", clusters.size());
+        logger.info("Unique clusters: {}", new HashSet<>(clusters).size()); // Incorrect usage of current list but for
+                                                                            // log symmetry
 
         // Replace similarity based on constraints
         similarityMatrix = replaceSimilarity(
@@ -1383,7 +1482,7 @@ public class MCPT {
                 convertSimilarityToDistanceMatrix(similarityMatrix),
                 epsilon, true, 2, false);
 
-        logger.info("Unique clusters: {}", new HashSet<>(clusters).size());
+        logger.info("Unique clusters after HC: {}", new HashSet<>(clusters).size());
 
         // Create camera dictionary
         Map<Integer, CameraDict> cameraDict = createCameraDict(
@@ -1416,6 +1515,9 @@ public class MCPT {
     }
 
     private static double[][] convertSimilarityToDistanceMatrix(double[][] similarityMatrix) {
+        if (similarityMatrix.length == 0) {
+            return new double[0][0];
+        }
         double[][] distanceMatrix = new double[similarityMatrix.length][similarityMatrix[0].length];
         for (int i = 0; i < similarityMatrix.length; i++) {
             for (int j = 0; j < similarityMatrix[i].length; j++) {
@@ -1423,5 +1525,53 @@ public class MCPT {
             }
         }
         return distanceMatrix;
+    }
+
+    /**
+     * Measure world coordinates using cached calibration data
+     */
+    public static Map<Integer, Map<String, Map<String, Object>>> measureWorldCoordinate(
+            Map<Integer, double[][]> calibrationMap,
+            Map<Integer, Map<String, Map<String, Object>>> trackingResults) {
+
+        for (Integer cameraId : trackingResults.keySet()) {
+            Map<String, Map<String, Object>> trackingDict = trackingResults.get(cameraId);
+
+            if (!calibrationMap.containsKey(cameraId)) {
+                logger.warn("No calibration data found for camera {}. Skipping WC calculation.", cameraId);
+                continue;
+            }
+
+            double[][] homographyMatrix = calibrationMap.get(cameraId);
+
+            try {
+                for (String serial : trackingDict.keySet()) {
+                    Map<String, Object> value = trackingDict.get(serial);
+                    @SuppressWarnings("unchecked")
+                    Map<String, Integer> coord = (Map<String, Integer>) value.get("Coordinate");
+
+                    int x1 = coord.get("x1");
+                    int x2 = coord.get("x2");
+                    int y2 = coord.get("y2");
+
+                    double x = (x1 + x2) / 2.0;
+                    double y = (double) y2;
+
+                    double[] bboxWC = translateWorldCoordinate(x, y, homographyMatrix);
+
+                    Map<String, Double> worldCoord = new HashMap<>();
+                    worldCoord.put("x", bboxWC[0]);
+                    worldCoord.put("y", bboxWC[1]);
+
+                    value.put("WorldCoordinate", worldCoord);
+                }
+
+                logger.info("World coordinates calculated for camera {}", cameraId);
+
+            } catch (Exception e) {
+                logger.error("Error calculating world coordinates for camera " + cameraId, e);
+            }
+        }
+        return trackingResults;
     }
 }

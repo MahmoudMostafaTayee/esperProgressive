@@ -10,9 +10,12 @@ public class SingleCameraResult {
     private List<Integer> idList;
     private List<Integer[]> boundingBoxList;
     private List<double[]> featureList;
+    private List<List<List<Float>>> keypointsList;
+    private List<Integer> frameNumbers;
 
     public SingleCameraResult(String cameraId, int windowIndex, long timestamp, List<Integer> clusterLabels,
-            List<Integer> idList, List<Integer[]> boundingBoxList, List<double[]> featureList) {
+            List<Integer> idList, List<Integer[]> boundingBoxList, List<double[]> featureList,
+            List<List<List<Float>>> keypointsList, List<Integer> frameNumbers) {
         this.cameraId = cameraId;
         this.windowIndex = windowIndex;
         this.timestamp = timestamp;
@@ -20,6 +23,8 @@ public class SingleCameraResult {
         this.idList = idList;
         this.boundingBoxList = boundingBoxList;
         this.featureList = featureList;
+        this.keypointsList = keypointsList;
+        this.frameNumbers = frameNumbers;
     }
 
     public String getCameraId() {
@@ -48,6 +53,14 @@ public class SingleCameraResult {
 
     public List<double[]> getFeatureList() {
         return featureList;
+    }
+
+    public List<List<List<Float>>> getKeypointsList() {
+        return keypointsList;
+    }
+
+    public List<Integer> getFrameNumbers() {
+        return frameNumbers;
     }
 
     @Override

@@ -68,6 +68,10 @@ public class IotMain implements Runnable {
         EventEPLUtil.addEventType("SingleCameraResult",
                 com.espertech.esper.example.IOT.streams.SingleCameraResult.class);
 
+        // Register CameraCalibration event
+        EventEPLUtil.addEventType("CameraCalibration",
+                com.espertech.esper.example.IOT.streams.CameraCalibration.class);
+
         logger.info("Setting up runtime");
         EventEPLUtil.initiateRuntime();
     }
@@ -123,6 +127,7 @@ public class IotMain implements Runnable {
         // someExampleQueries();
         // wildTrackDatasetQueries();
 
+        prepareCalibrationQueries();
         embeddingFeatureQueries();
         multiCameraAggregationQueries();
         afterClusteringQueries();
@@ -130,6 +135,36 @@ public class IotMain implements Runnable {
         launchStreams();
 
         logger.info("Done.");
+    }
+
+    // Global map to hold calibration data
+    public static final java.util.Map<Integer, double[][]> calibrationMap = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private void prepareCalibrationQueries() {
+        // Create an Esper Table for calibration
+        String createTableEPL = "create table CalibrationTable (cameraId int primary key, homographyMatrix Object);";
+        EventEPLUtil.addEpl(createTableEPL);
+
+        // Insert incoming CameraCalibration events into the table
+        String insertEPL = "insert into CalibrationTable select cameraId, homographyMatrix from CameraCalibration;";
+        EventEPLUtil.addEpl(insertEPL);
+
+        // Listener to keep local map updated (Optional, or just select from table when
+        // needed)
+        // For efficiency in the heavy MCPT loop, a local concurrent map is faster than
+        // querying the engine every time.
+        // We can listen to the stream itself to update our map.
+        String updateMapEPL = "select * from CameraCalibration";
+        EventEPLUtil.compileDeployAddListener(updateMapEPL, (newEvents, oldEvents, statement, runtime) -> {
+            if (newEvents != null) {
+                for (EventBean event : newEvents) {
+                    com.espertech.esper.example.IOT.streams.CameraCalibration cc = (com.espertech.esper.example.IOT.streams.CameraCalibration) event
+                            .getUnderlying();
+                    calibrationMap.put(cc.getCameraId(), cc.getHomographyMatrix());
+                    logger.info("Updated calibration map for camera " + cc.getCameraId());
+                }
+            }
+        });
     }
 
     private void embeddingFeatureQueries() {
@@ -151,8 +186,8 @@ public class IotMain implements Runnable {
         int numCameras = cameraList.size();
 
         System.out.println(">>> DEPLOYING AGGREGATION QUERY...");
-        String aggregationEPL = "select windowIndex, count(*) as cnt " +
-                "from SingleCameraResult " +
+        String aggregationEPL = "select window( * ) as results " +
+                "from SingleCameraResult.win:time(2 min) " +
                 "group by windowIndex " +
                 "having count(*) = " + numCameras + " " +
                 "output first every 59 seconds"; // Output once per windowIndex when ready
@@ -160,10 +195,94 @@ public class IotMain implements Runnable {
         EventEPLUtil.compileDeployAddListener(aggregationEPL, (newEvents, oldEvents, statement, runtime) -> {
             if (newEvents != null) {
                 for (EventBean event : newEvents) {
-                    int winIdx = (int) event.get("windowIndex");
-                    long count = (long) event.get("cnt");
-                    System.out.println(
-                            ">>> AGGREGATED RESULT: Window " + winIdx + " is ready with " + count + " cameras.");
+                    com.espertech.esper.example.IOT.streams.SingleCameraResult[] results = (com.espertech.esper.example.IOT.streams.SingleCameraResult[]) event
+                            .get("results");
+                    if (results != null && results.length > 0) {
+                        int winIdx = results[0].getWindowIndex();
+                        System.out.println(">>> AGGREGATED RESULT: Window " + winIdx + " is ready with "
+                                + results.length + " cameras.");
+
+                        // Prepare data for MCPT
+                        java.util.Map<Integer, java.util.Map<String, java.util.Map<String, Object>>> trackingResults = new java.util.HashMap<>();
+
+                        for (com.espertech.esper.example.IOT.streams.SingleCameraResult scr : results) {
+                            // com.espertech.esper.example.IOT.streams.SingleCameraResult scr =
+                            // (com.espertech.esper.example.IOT.streams.SingleCameraResult)
+                            // res.getUnderlying();
+                            int cameraId = Integer.parseInt(scr.getCameraId().replace("camera_", ""));
+
+                            java.util.Map<String, java.util.Map<String, Object>> trackingDict = new java.util.HashMap<>();
+                            java.util.List<Integer> clusterLabels = scr.getClusterLabels();
+                            java.util.List<Integer> idList = scr.getIdList();
+                            java.util.List<Integer[]> boundingBoxList = scr.getBoundingBoxList();
+                            java.util.List<double[]> featureList = scr.getFeatureList();
+                            java.util.List<java.util.List<java.util.List<Float>>> keypointsList = scr
+                                    .getKeypointsList();
+                            java.util.List<Integer> frameNumbers = scr.getFrameNumbers();
+
+                            for (int i = 0; i < clusterLabels.size(); i++) {
+                                // Serial number is just the ID here
+                                String serial = String.valueOf(idList.get(i));
+
+                                java.util.Map<String, Object> data = new java.util.HashMap<>();
+                                data.put("OfflineID", clusterLabels.get(i));
+                                data.put("Frame", frameNumbers.get(i));
+
+                                Integer[] bbox = boundingBoxList.get(i);
+                                java.util.Map<String, Integer> coord = new java.util.HashMap<>();
+                                // Note: DetectedUser order is x1, x2, y1, y2 ?
+                                // DetectedUser.java: x1, x2, y1, y2
+                                // SingleCameraResult.java stores them as Integer[] { user.getX1(),
+                                // user.getX2(), user.getY1(), user.getY2() }
+                                // SCPT/MCPT logic usually expects x1, y1, x2, y2.
+                                // Let's check DetectedUser.
+                                // DetectedUser: x1, x2, y1, y2.
+                                // Tracker.java adds: user.getX1(), user.getX2(), user.getY1(), user.getY2()
+                                // So bbox[0]=x1, bbox[1]=x2, bbox[2]=y1, bbox[3]=y2
+                                // Map expects keys: x1, y1, x2, y2.
+                                coord.put("x1", bbox[0]);
+                                coord.put("x2", bbox[1]);
+                                coord.put("y1", bbox[2]);
+                                coord.put("y2", bbox[3]);
+                                data.put("Coordinate", coord);
+
+                                data.put("Feature", featureList.get(i));
+                                data.put("Keypoints", keypointsList.get(i));
+
+                                trackingDict.put(serial, data);
+                            }
+                            trackingResults.put(cameraId, trackingDict);
+                        }
+
+                        // Run MCPT
+                        com.espertech.esper.example.IOT.clusterers.MCPT.multiCameraPeopleTracking(
+                                calibrationMap, // Pass the calibration map
+                                trackingResults,
+                                "keypoint", // Using keypoint selection
+                                TrackingParameters.epsilonMcpt,
+                                TrackingParameters.shortTrackTh,
+                                TrackingParameters.simTh, // Using simTh as keypointTh? No, signature mismatch.
+                                TrackingParameters.keypointConditionTh,
+                                false, // replaceSimilarityByWCoordinate (Disabled for now unless calibration loaded)
+                                TrackingParameters.distanceType,
+                                TrackingParameters.distanceTh,
+                                -10.0, // replaceValue
+                                new int[] { 1920, 1080 }, // imageSize
+                                1.6, // aspectTh
+                                2000 // stackMaxSize
+                        );
+
+                        // Output results (Optional, for verification)
+                        for (Integer cam : trackingResults.keySet()) {
+                            java.util.Map<String, java.util.Map<String, Object>> camRes = trackingResults.get(cam);
+                            for (String serial : camRes.keySet()) {
+                                if (camRes.get(serial).containsKey("GlobalOfflineID")) {
+                                    // System.out.println("MCPT Assigned: Cam " + cam + " Serial " + serial +
+                                    // " -> GlobalID " + camRes.get(serial).get("GlobalOfflineID"));
+                                }
+                            }
+                        }
+                    }
                 }
             }
         });

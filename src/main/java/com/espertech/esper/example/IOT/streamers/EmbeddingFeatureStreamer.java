@@ -38,6 +38,9 @@ public class EmbeddingFeatureStreamer {
     private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     public static void streamEmbeddingFeatures() {
+        // Stream calibration data first
+        streamCalibrationData();
+
         Map<Path, Map<Path, List<Path>>> sceneData = initScenesData(Paths.get(BASE_PATH));
         long frameIntervalMillis = (long) ((ONE_SEC_TIME_STEP * 1.0) / TrackingParameters.fps);
 
@@ -60,6 +63,106 @@ public class EmbeddingFeatureStreamer {
                 processScene(sceneEntry);
             }
         }, 0, frameIntervalMillis, TimeUnit.MILLISECONDS);
+    }
+
+    public static void streamCalibrationData() {
+        logger.info("Streaming calibration data...");
+        // Iterate over selected cameras and load calibration.json
+        // We need to find the calibration files. They are usually in
+        // "Original/scene_XXX/camera_XXXX/calibration.json"
+        // But here we are in "Datasets/EmbedFeature/scene...".
+        // The calibration path logic in MCPT was:
+        // String.format("Original/scene_%03d/camera_%04d/calibration.json", sceneId,
+        // cameraId);
+        // We should follow that or make it configurable. Relying on MCPT's logic for
+        // path.
+
+        // Determine which cameras we are interested in.
+        // For simplicity, we can stream for ALL cameras available in the scene/dataset
+        // or just checked lazily.
+        // Let's iterate through the camera folders we find in features dir and try to
+        // find corresponding calibration using the relative path assumption.
+
+        int sceneId = TrackingParameters.scene;
+        // Construct path to Original data based on assumption relative to project root?
+        // TrackingParameters doesn't have a base dir for "Original".
+        // MCPT used relative path "Original/...". Let's assume the running directory is
+        // the project root.
+
+        // We need the list of cameras first.
+        String filter = TrackingParameters.CAMERA_FILTER;
+        List<Integer> cameraIds = new ArrayList<>();
+        if (filter.equalsIgnoreCase("all")) {
+            // If all, we might need to discovery them from the directory structure or just
+            // try a range.
+            // Better to discovery from initScenesData logic?
+            // Let's reuse initScenesData logic slightly modified or just iterate 1..4 for
+            // now as hardcoded in IotMain?
+            // No, let's be dynamic.
+            Map<Path, Map<Path, List<Path>>> sceneData = initScenesData(Paths.get(BASE_PATH));
+            for (Map<Path, List<Path>> camMap : sceneData.values()) {
+                for (Path camPath : camMap.keySet()) {
+                    String camName = camPath.getFileName().toString();
+                    if (camName.startsWith("camera_")) {
+                        try {
+                            cameraIds.add(Integer.parseInt(camName.replace("camera_", "")));
+                        } catch (NumberFormatException e) {
+                        }
+                    }
+                }
+            }
+
+        } else {
+            String[] parts = filter.split(",");
+            for (String part : parts) {
+                if (part.trim().matches("\\d+")) {
+                    cameraIds.add(Integer.parseInt(part.trim()));
+                }
+            }
+        }
+
+        Gson gson = new Gson();
+
+        for (Integer cameraId : cameraIds) {
+            String calibrationPath = String.format("Original/scene_%03d/camera_%04d/calibration.json", sceneId,
+                    cameraId);
+            Path path = Paths.get(calibrationPath);
+
+            if (Files.exists(path)) {
+                try (FileReader reader = new FileReader(path.toFile())) {
+                    Type type = new TypeToken<Map<String, Object>>() {
+                    }.getType();
+                    Map<String, Object> calibrationJson = gson.fromJson(reader, type);
+
+                    if (calibrationJson.containsKey("homography matrix")) {
+                        Type listType = new TypeToken<ArrayList<ArrayList<Double>>>() {
+                        }.getType();
+                        // Safely parse the specific field if possible, or cast object
+                        Object matrixObj = calibrationJson.get("homography matrix");
+                        String matrixJson = gson.toJson(matrixObj); // Intermediate serialization to ensure strict type
+                                                                    // parsing or just cast if known
+                        ArrayList<ArrayList<Double>> homographyList = gson.fromJson(matrixJson, listType);
+
+                        double[][] homographyMatrix = new double[3][3];
+                        for (int i = 0; i < 3; i++) {
+                            for (int j = 0; j < 3; j++) {
+                                homographyMatrix[i][j] = homographyList.get(i).get(j);
+                            }
+                        }
+
+                        com.espertech.esper.example.IOT.streams.CameraCalibration event = new com.espertech.esper.example.IOT.streams.CameraCalibration(
+                                cameraId, homographyMatrix);
+                        EventEPLUtil.streamEvent(event, "CameraCalibration");
+                        logger.info("Streamed calibration for camera_" + cameraId);
+                    }
+
+                } catch (Exception e) {
+                    logger.error("Error loading calibration for camera " + cameraId, e);
+                }
+            } else {
+                logger.warn("Calibration file not found at " + calibrationPath);
+            }
+        }
     }
 
     private static void processScene(Map.Entry<Path, Map<Path, List<Path>>> sceneEntry) {
