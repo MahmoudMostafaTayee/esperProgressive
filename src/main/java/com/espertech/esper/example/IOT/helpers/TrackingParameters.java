@@ -16,12 +16,12 @@ public class TrackingParameters {
     public static int fps = 30;
     public static double epsilonMcpt = 0.4;
     public static int shortTrackTh = 120;
-    public static int keypointConditionTh = 1;
+    public static int keypointConditionTh = 2;
     public static boolean replaceSimilarityByWCoordinate = false; // Python default: False
     public static String distanceType = "max"; // Python default: "max"
     public static int distanceTh = 5; // Python default: 5
     public static double simTh = 0.75; // Python default: 0.75
-    public static double keypointTh = 0.8;
+    public static double keypointTh = 0.7;
     public static double aspectTh = 1.6;
     public static double replaceValue = -10.0;
     public static int deleteGidTh = 6000;
