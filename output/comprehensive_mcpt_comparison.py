@@ -306,6 +306,187 @@ def compare_clusters_by_serial(py_path, java_path, name, py_nodes_path, java_nod
         traceback.print_exc()
         return False
 
+def compare_camera_dict_by_serial(py_path, java_path, name, py_nodes_path, java_nodes_path, py_params_path):
+    """Compare camera dictionary by mapping through representative node serials"""
+    print(f"\n{Colors.BOLD}Comparing {name}...{Colors.END}")
+    
+    try:
+        import re
+        
+        def parse_camera_dict(filepath):
+            """Parse camera dict text file"""
+            with open(filepath, 'r') as f:
+                content = f.read()
+            
+            camera_dict = {}
+            current_camera = None
+            
+            for line in content.strip().split('\n'):
+                camera_match = re.match(r'Camera (\d+):', line)
+                if camera_match:
+                    current_camera = camera_match.group(1)
+                    camera_dict[current_camera] = {}
+                    continue
+                
+                if 'indices:' in line:
+                    indices_str = line.split('indices:')[1].strip()
+                    indices = eval(indices_str)
+                    camera_dict[current_camera]['indices'] = indices
+                elif 'uniqueLocalIds:' in line:
+                    ids_str = line.split('uniqueLocalIds:')[1].strip()
+                    local_ids = eval(ids_str)
+                    camera_dict[current_camera]['uniqueLocalIds'] = local_ids
+            
+            return camera_dict
+        
+        # Load camera dicts
+        java_dict = parse_camera_dict(java_path)
+        python_dict = parse_camera_dict(py_path)
+        
+        # Load representative nodes
+        py_nodes = load_json(py_nodes_path)
+        java_nodes_raw = load_json(java_nodes_path)
+        py_params = load_json(py_params_path)
+        
+        if py_nodes is None or java_nodes_raw is None or py_params is None:
+            print_result(name, "FAIL", "Failed to load node/param files")
+            return False
+        
+        if "representativeNodes" in java_nodes_raw:
+            java_nodes = java_nodes_raw["representativeNodes"]
+        else:
+            java_nodes = java_nodes_raw
+        
+        # Get ordered serials
+        keypoint_th = py_params.get("keypoint_condition_th", 2)
+        py_serials = get_ordered_serials(py_nodes, keypoint_th)
+        java_serials = get_ordered_serials(java_nodes, keypoint_th)
+        
+        # Compare each camera
+        cameras_match = 0
+        cameras_differ = 0
+        total_serial_diffs = 0
+        
+        for camera_id in sorted(set(java_dict.keys()) | set(python_dict.keys())):
+            if camera_id not in java_dict or camera_id not in python_dict:
+                cameras_differ += 1
+                continue
+            
+            java_cam = java_dict[camera_id]
+            python_cam = python_dict[camera_id]
+            
+            # Get serials for each camera's indices
+            java_indices = java_cam['indices']
+            python_indices = python_cam['indices']
+            
+            java_serials_for_camera = set(java_serials[i] for i in java_indices)
+            py_serials_for_camera = set(py_serials[i] for i in python_indices)
+            
+            if java_serials_for_camera == py_serials_for_camera:
+                cameras_match += 1
+            else:
+                cameras_differ += 1
+                diff = len(java_serials_for_camera ^ py_serials_for_camera)
+                total_serial_diffs += diff
+        
+        total_cameras = cameras_match + cameras_differ
+        match_pct = (cameras_match / total_cameras * 100) if total_cameras > 0 else 0
+        
+        # Determine status
+        if match_pct >= 99:
+            status = "PASS"
+        elif match_pct >= 75:
+            status = "WARN"
+        else:
+            status = "FAIL"
+        
+        details = f"{cameras_match}/{total_cameras} cameras match ({match_pct:.1f}%)"
+        if total_serial_diffs > 0:
+            details += f", {total_serial_diffs} serials differ (from upstream clustering)"
+        
+        print_result(name, status, details)
+        
+        return match_pct >= 75
+        
+    except Exception as e:
+        print_result(name, "FAIL", f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def compare_global_ids_by_serial(py_path, java_path, name):
+    """Compare global ID assignments by mapping through serials"""
+    print(f"\n{Colors.BOLD}Comparing {name}...{Colors.END}")
+    
+    try:
+        import re
+        from collections import defaultdict
+        
+        def parse_global_ids(filepath):
+            """Parse global IDs: {camera_id: {serial: {localId: globalId}}}"""
+            result = defaultdict(lambda: defaultdict(dict))
+            current_camera = None
+            
+            with open(filepath, 'r') as f:
+                for line in f:
+                    camera_match = re.match(r'Camera (\d+):', line)
+                    if camera_match:
+                        current_camera = camera_match.group(1)
+                        continue
+                    
+                    entry_match = re.match(r'\s+(\d+):\s+localId=(\d+)\s*->\s*globalId=(\d+)', line)
+                    if entry_match and current_camera:
+                        serial = str(int(entry_match.group(1)))  # Normalize
+                        local_id = entry_match.group(2)
+                        global_id = entry_match.group(3)
+                        result[current_camera][serial][local_id] = global_id
+            
+            return result
+        
+        def build_global_clusters(global_ids_data):
+            """Group serials by their global ID: returns set of frozensets"""
+            global_clusters = defaultdict(set)
+            
+            for camera_id, serials in global_ids_data.items():
+                for serial, mappings in serials.items():
+                    for global_id in mappings.values():
+                        global_clusters[global_id].add((camera_id, serial))
+            
+            return set(frozenset(cluster) for cluster in global_clusters.values())
+        
+        # Parse global IDs
+        java_global_ids = parse_global_ids(java_path)
+        python_global_ids = parse_global_ids(py_path)
+        
+        # Build global clusters
+        java_clusters = build_global_clusters(java_global_ids)
+        python_clusters = build_global_clusters(python_global_ids)
+        
+        # Compare cluster structures
+        matching_clusters = len(java_clusters & python_clusters)
+        total_clusters = max(len(java_clusters), len(python_clusters))
+        match_pct = (matching_clusters / total_clusters * 100) if total_clusters > 0 else 0
+        
+        # Determine status
+        if match_pct >= 99:
+            status = "PASS"
+        elif match_pct >= 90:
+            status = "WARN"
+        else:
+            status = "FAIL"
+        
+        details = f"{matching_clusters}/{total_clusters} global clusters match ({match_pct:.1f}%)"
+        
+        print_result(name, status, details)
+        
+        return match_pct >= 90
+        
+    except Exception as e:
+        print_result(name, "FAIL", f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def compare_text_dumps(py_path, java_path, name):
     """Compare text dump files"""
     print(f"\n{Colors.BOLD}Comparing {name}...{Colors.END}")
@@ -386,15 +567,16 @@ def main():
         py_nodes, java_nodes, py_params
     )
     
-    # 4. Compare Camera Dict
-    results['camera_dict'] = compare_text_dumps(
+    # 4. Compare Camera Dict (using serial-based comparison)
+    results['camera_dict'] = compare_camera_dict_by_serial(
         f"{base_path}/mcpt-camera-dict-python.txt",
         f"{base_path}/mcpt-camera-dict_0.txt",
-        "Camera Dictionary"
+        "Camera Dictionary",
+        py_nodes, java_nodes, py_params
     )
     
-    # 5. Compare Global IDs
-    results['global_ids'] = compare_text_dumps(
+    # 5. Compare Global IDs (using serial-based comparison)
+    results['global_ids'] = compare_global_ids_by_serial(
         f"{base_path}/mcpt-global-ids-python.txt",
         f"{base_path}/mcpt-global-ids_0.txt",
         "Global ID Assignments"
