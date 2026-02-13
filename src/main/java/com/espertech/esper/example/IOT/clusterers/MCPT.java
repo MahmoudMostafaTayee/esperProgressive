@@ -86,11 +86,17 @@ public class MCPT {
         List<double[]> featureList = new ArrayList<>();
 
         // Collect features from representative nodes (features are already in memory)
-        for (Map.Entry<Integer, Map<Integer, RepresentativeNode>> cameraEntry : representativeNodes.entrySet()) {
-            Map<Integer, RepresentativeNode> tmpRepresentativeNodes = cameraEntry.getValue();
+        List<Integer> sortedCameraIds = new ArrayList<>(representativeNodes.keySet());
+        Collections.sort(sortedCameraIds);
 
-            for (Map.Entry<Integer, RepresentativeNode> localEntry : tmpRepresentativeNodes.entrySet()) {
-                RepresentativeNode value = localEntry.getValue();
+        for (Integer cameraId : sortedCameraIds) {
+            Map<Integer, RepresentativeNode> tmpRepresentativeNodes = representativeNodes.get(cameraId);
+
+            List<Integer> sortedLocalIds = new ArrayList<>(tmpRepresentativeNodes.keySet());
+            Collections.sort(sortedLocalIds);
+
+            for (Integer localId : sortedLocalIds) {
+                RepresentativeNode value = tmpRepresentativeNodes.get(localId);
                 List<String> serials = value.allSerials;
 
                 // Filter by track length
@@ -116,7 +122,53 @@ public class MCPT {
         }
 
         double[][] featuresArray = featureList.toArray(new double[0][]);
-        return SCPT.createSimilarityMatrixSCPT(featuresArray, TrackingParameters.epsilonMcpt);
+
+        // CRITICAL FIX: Create DENSE similarity matrix (no epsilon thresholding)
+        // Python's create_similarity_matrix_mcpt creates full cosine similarity,
+        // then zeros values < (1-epsilon) in a separate step
+        int n = featuresArray.length;
+        double[][] similarityMatrix = new double[n][n];
+
+        // Compute full cosine similarity matrix
+        for (int i = 0; i < n; i++) {
+            similarityMatrix[i][i] = 1.0;
+
+            for (int j = i + 1; j < n; j++) {
+                // Compute cosine similarity
+                double[] a = featuresArray[i];
+                double[] b = featuresArray[j];
+
+                double dotProduct = 0.0;
+                double normA = 0.0;
+                double normB = 0.0;
+
+                for (int k = 0; k < a.length; k++) {
+                    dotProduct += a[k] * b[k];
+                    normA += a[k] * a[k];
+                    normB += b[k] * b[k];
+                }
+
+                normA = Math.sqrt(normA);
+                normB = Math.sqrt(normB);
+
+                double similarity;
+                if (normA == 0 && normB == 0) {
+                    similarity = 1.0;
+                } else if (normA == 0 || normB == 0) {
+                    similarity = 0.0;
+                } else {
+                    similarity = dotProduct / (normA * normB);
+                }
+
+                // Simulate float16 precision to match Python's .astype(np.float16)
+                similarity = SCPT.simulateFloat16(similarity);
+
+                similarityMatrix[i][j] = similarity;
+                similarityMatrix[j][i] = similarity;
+            }
+        }
+
+        return similarityMatrix;
     }
 
     /**
@@ -276,9 +328,11 @@ public class MCPT {
             Map<Integer, RepresentativeNode> tmpRepresentativeNodes = representativeNodes.get(cameraId);
             List<Integer> localIds = new ArrayList<>();
 
-            for (Map.Entry<Integer, RepresentativeNode> entry : tmpRepresentativeNodes.entrySet()) {
-                Integer localId = entry.getKey();
-                RepresentativeNode node = entry.getValue();
+            List<Integer> sortedLocalIds = new ArrayList<>(tmpRepresentativeNodes.keySet());
+            Collections.sort(sortedLocalIds);
+
+            for (Integer localId : sortedLocalIds) {
+                RepresentativeNode node = tmpRepresentativeNodes.get(localId);
                 List<String> serials = node.allSerials;
 
                 if (serials.size() < shortTrackTh) {
@@ -373,8 +427,10 @@ public class MCPT {
         }
 
         // Populate mappings
-        for (Map.Entry<Integer, Map<Integer, RepresentativeNode>> cameraEntry : representativeNodes.entrySet()) {
-            Integer cameraId = cameraEntry.getKey();
+        List<Integer> sortedCameraIds = new ArrayList<>(representativeNodes.keySet());
+        Collections.sort(sortedCameraIds);
+
+        for (Integer cameraId : sortedCameraIds) {
             Map<String, Map<String, Object>> trackingDict = trackingResults.get(cameraId);
             CameraDict camDict = cameraDict.get(cameraId);
             List<Integer> indices = camDict.indices;
@@ -502,8 +558,10 @@ public class MCPT {
             Map<Integer, CameraDict> cameraDict,
             double replaceValue) {
 
-        for (Map.Entry<Integer, Map<Integer, RepresentativeNode>> cameraEntry : representativeNodes.entrySet()) {
-            Integer cameraId = cameraEntry.getKey();
+        List<Integer> sortedCameraIds = new ArrayList<>(representativeNodes.keySet());
+        Collections.sort(sortedCameraIds);
+
+        for (Integer cameraId : sortedCameraIds) {
             Map<String, Map<String, Object>> trackingDict = trackingResults.get(cameraId);
             CameraDict camDict = cameraDict.get(cameraId);
             List<Integer> indices = camDict.indices;
@@ -1004,16 +1062,19 @@ public class MCPT {
                 localIdSerialsDict.put(localId, new ArrayList<>());
             }
 
-            for (Map.Entry<String, Map<String, Object>> entry : trackingDict.entrySet()) {
-                String serial = entry.getKey();
-                Integer localId = (Integer) entry.getValue().get("OfflineID");
+            List<String> sortedSerials = new ArrayList<>(trackingDict.keySet());
+            Collections.sort(sortedSerials);
+
+            for (String serial : sortedSerials) {
+                Map<String, Object> data = trackingDict.get(serial);
+                Integer localId = (Integer) data.get("OfflineID");
                 if (localId >= 0) {
                     localIdSerialsDict.get(localId).add(serial);
                 }
             }
 
             // Get representative node for each cluster
-            for (Integer localId : localIdSerialsDict.keySet()) {
+            for (Integer localId : uniqueLocalIds) {
                 List<String> serials = localIdSerialsDict.get(localId);
 
                 String representativeSerial;
@@ -1551,7 +1612,7 @@ public class MCPT {
 
         // Perform Re-identification using hierarchical clustering
         clusters = SCPT.associateCluster(clusters,
-                convertSimilarityToDistanceMatrix(similarityMatrix),
+                similarityMatrix, // ✅
                 epsilon, true, 2, false);
 
         // DUMP: Clusters after hierarchical clustering

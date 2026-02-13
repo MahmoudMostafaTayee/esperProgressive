@@ -316,8 +316,8 @@ public class EmbeddingFeatureStreamer {
             EventEPLUtil.streamEvent(
                     frameFeature,
                     "embeddingFeature" + "_" + camera.getFileName().toString());
-//            logger.info("Streamed frame {} with {} users from camera {}",
-//                    frameNumber, detectedUsers.size(), camera.getFileName());
+            // logger.info("Streamed frame {} with {} users from camera {}",
+            // frameNumber, detectedUsers.size(), camera.getFileName());
         }
     }
 
@@ -429,13 +429,11 @@ public class EmbeddingFeatureStreamer {
         if (bbox == null || bbox.size() < 4)
             return false;
         // BBox format in JSON: [x1, y1, x2, y2, score] (floats)
-        int bx1 = bbox.get(0).intValue();
-        int by1 = bbox.get(1).intValue();
-        int bx2 = bbox.get(2).intValue();
-        int by2 = bbox.get(3).intValue();
-
-        // Exact match as per integer casting
-        return bx1 == x1 && by1 == y1 && bx2 == x2 && by2 == y2;
+        // Use tolerance of 1 pixel to account for rounding differences
+        return Math.abs(bbox.get(0) - x1) <= 1.0 &&
+                Math.abs(bbox.get(1) - y1) <= 1.0 &&
+                Math.abs(bbox.get(2) - x2) <= 1.0 &&
+                Math.abs(bbox.get(3) - y2) <= 1.0;
     }
 
     private static class PoseData {

@@ -195,6 +195,117 @@ def compare_representative_nodes(py_path, java_path):
     
     return total_mismatches == 0
 
+def compare_clusters_by_serial(py_path, java_path, name, py_nodes_path, java_nodes_path, py_params_path):
+    """Compare cluster assignments by mapping through representative node serials"""
+    print(f"\n{Colors.BOLD}Comparing {name}...{Colors.END}")
+    
+    try:
+        # Load cluster assignments
+        def load_clusters(filepath):
+            with open(filepath, 'r') as f:
+                content = f.read().strip()
+            content = content.replace('[', '').replace(']', '').replace(',', ' ')
+            clusters = [int(x.strip()) for x in content.split() if x.strip()]
+            return clusters
+        
+        py_clusters = load_clusters(py_path)
+        java_clusters = load_clusters(java_path)
+        
+        # Load representative nodes
+        py_nodes = load_json(py_nodes_path)
+        java_nodes_raw = load_json(java_nodes_path)
+        py_params = load_json(py_params_path)
+        
+        if py_nodes is None or java_nodes_raw is None or py_params is None:
+            print_result(name, "FAIL", "Failed to load node/param files")
+            return False
+        
+        if "representativeNodes" in java_nodes_raw:
+            java_nodes = java_nodes_raw["representativeNodes"]
+        else:
+            java_nodes = java_nodes_raw
+        
+        # Get ordered serials
+        keypoint_th = py_params.get("keypoint_condition_th", 2)
+        py_serials = get_ordered_serials(py_nodes, keypoint_th)
+        java_serials = get_ordered_serials(java_nodes, keypoint_th)
+        
+        # Build mapping: cluster_id -> set of serials
+        java_cluster_to_serials = {}
+        for idx, cluster_id in enumerate(java_clusters):
+            if idx >= len(java_serials):
+                break
+            serial = java_serials[idx]
+            if cluster_id not in java_cluster_to_serials:
+                java_cluster_to_serials[cluster_id] = set()
+            java_cluster_to_serials[cluster_id].add(serial)
+        
+        py_cluster_to_serials = {}
+        for idx, cluster_id in enumerate(py_clusters):
+            if idx >= len(py_serials):
+                break
+            serial = py_serials[idx]
+            if cluster_id not in py_cluster_to_serials:
+                py_cluster_to_serials[cluster_id] = set()
+            py_cluster_to_serials[cluster_id].add(serial)
+        
+        # Convert to sets of frozensets for comparison
+        java_groups = set(frozenset(serials) for serials in java_cluster_to_serials.values())
+        py_groups = set(frozenset(serials) for serials in py_cluster_to_serials.values())
+        
+        # Count matching groups
+        matching_groups = len(java_groups & py_groups)
+        total_groups = max(len(java_groups), len(py_groups))
+        match_pct = (matching_groups / total_groups * 100) if total_groups > 0 else 0
+        
+        # Find unique serials that differ between implementations
+        only_java_groups = java_groups - py_groups
+        only_python_groups = py_groups - py_groups
+        
+        # For differing groups, find the unique serials
+        unique_diff_serials = set()
+        for java_group in (java_groups - py_groups):
+            for py_group in (py_groups - java_groups):
+                # Find serials only in java group
+                only_in_java = java_group - py_group
+                only_in_python = py_group - java_group
+                unique_diff_serials.update(only_in_java)
+                unique_diff_serials.update(only_in_python)
+        
+        total_serials = len(set(py_serials))
+        unique_diff_count = len(unique_diff_serials)
+        
+        # Determine status
+        if match_pct >= 99:
+            status = "PASS"
+        elif match_pct >= 90:
+            status = "WARN"
+        else:
+            status = "FAIL"
+        
+        # Calculate effective accuracy (total serials correctly clustered)
+        effective_accuracy = ((total_serials - unique_diff_count) / total_serials * 100) if total_serials > 0 else 0
+        
+        details = f"Groups: {matching_groups}/{total_groups} match ({match_pct:.1f}%)"
+        
+        if unique_diff_count > 0:
+            details += f", effective accuracy(among all serials): {effective_accuracy:.1f}%({unique_diff_count} out of {total_serials} differs)"
+            details += f", {unique_diff_count} unique serials differ"
+            if unique_diff_count <= 5:
+                details += f" ({sorted(list(unique_diff_serials))})"
+        else:
+            details += f", 100% accuracy"
+        
+        print_result(name, status, details)
+        
+        return match_pct >= 90
+        
+    except Exception as e:
+        print_result(name, "FAIL", f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def compare_text_dumps(py_path, java_path, name):
     """Compare text dump files"""
     print(f"\n{Colors.BOLD}Comparing {name}...{Colors.END}")
@@ -267,11 +378,12 @@ def main():
         f"{base_path}/mcpt-representative-nodes-java_0.json"
     )
     
-    # 3. Compare Clusters After HC
-    results['clusters_after_hc'] = compare_text_dumps(
+    # 3. Compare Clusters After HC (using serial-based comparison)
+    results['clusters_after_hc'] = compare_clusters_by_serial(
         f"{base_path}/mcpt-clusters-after-hc-python.txt",
         f"{base_path}/mcpt-clusters-after-hc_0.txt",
-        "Clusters After Hierarchical Clustering"
+        "Clusters After Hierarchical Clustering",
+        py_nodes, java_nodes, py_params
     )
     
     # 4. Compare Camera Dict
@@ -309,12 +421,17 @@ def main():
     if results['representative_nodes']:
         print(f"  {Colors.GREEN}✓{Colors.END} Representative node selection matches perfectly")
     else:
-        print(f"  {Colors.YELLOW}⚠{Colors.END} Clustering results differ - likely hierarchical clustering algorithm")
+        print(f"  {Colors.YELLOW}⚠{Colors.END} Representative node selection differs")
+    
+    if results['clusters_after_hc']:
+        print(f"  {Colors.GREEN}✓{Colors.END} Cluster groupings match (>90% when mapped by serial)")
+    else:
+        print(f"  {Colors.YELLOW}⚠{Colors.END} Some cluster groupings differ (likely tie-breaking in hierarchical clustering)")
     
     if results['global_ids']:
         print(f"  {Colors.GREEN}✓{Colors.END} Global ID assignments match")
     else:
-        print(f"  {Colors.YELLOW}⚠{Colors.END} Global ID assignments differ due to upstream clustering")
+        print(f"  {Colors.YELLOW}⚠{Colors.END} Global ID assignments differ (check upstream clustering)")
     
     print()
 

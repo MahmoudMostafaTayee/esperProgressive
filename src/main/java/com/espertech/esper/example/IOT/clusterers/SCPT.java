@@ -545,9 +545,9 @@ public class SCPT {
                 }
 
                 double centrality = 0.0;
-                // Match Python's bug: uses default epsilon=0.3 instead of passed epsilon
-                double centralityThreshold = 1.0 - 0.3;
-                centralityThreshold = simulateFloat16(centralityThreshold);
+                double centralityThreshold = 1.0 - epsilon;
+                // centralityThreshold = simulateFloat16(centralityThreshold); // Optional:
+                // Re-enable if Python uses float16 casting here
 
                 for (int idx1 : cluster1Indices) {
                     for (int idx2 : cluster2Indices) {
@@ -999,7 +999,8 @@ public class SCPT {
         double[][] similarityMatrix = new double[n][n];
         // Match Python's behavior where scalar threshold is cast to float16 during
         // comparison
-        double threshold = simulateFloat16(1.0 - epsilon);
+        double threshold = 1.0 - epsilon;
+        // double threshold = simulateFloat16(1.0 - epsilon); // DISABLED
 
         // OPTIMIZATION: Pre-compute magnitudes to avoid recalculating inside the N*N
         // loop
@@ -1016,7 +1017,7 @@ public class SCPT {
                 double similarity = cosineSimilarity(features[i], features[j], magnitudes[i], magnitudes[j]);
 
                 // Simulate np.float16 precision
-                similarity = simulateFloat16(similarity);
+                // similarity = simulateFloat16(similarity); // DISABLED for verification
 
                 if (similarity < threshold) {
                     similarity = 0.0;
@@ -1029,7 +1030,7 @@ public class SCPT {
         return similarityMatrix;
     }
 
-    private static double simulateFloat16(double val) {
+    static double simulateFloat16(double val) {
         long bits = Double.doubleToRawLongBits(val);
         long s = (bits >>> 63) & 0x1;
         long e = (bits >>> 52) & 0x7FF;
