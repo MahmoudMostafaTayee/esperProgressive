@@ -422,25 +422,31 @@ def compare_global_ids_by_serial(py_path, java_path, name):
         import re
         from collections import defaultdict
         
-        def parse_global_ids(filepath):
-            """Parse global IDs: {camera_id: {serial: {localId: globalId}}}"""
+        def parse_global_ids_json(filepath):
+            """Parse global IDs from JSON: {camera_id: {serial: {localId: globalId}}}"""
             result = defaultdict(lambda: defaultdict(dict))
-            current_camera = None
             
-            with open(filepath, 'r') as f:
-                for line in f:
-                    camera_match = re.match(r'Camera (\d+):', line)
-                    if camera_match:
-                        current_camera = camera_match.group(1)
-                        continue
+            try:
+                with open(filepath, 'r') as f:
+                    data = json.load(f)
                     
-                    entry_match = re.match(r'\s+(\d+):\s+localId=(\d+)\s*->\s*globalId=(\d+)', line)
-                    if entry_match and current_camera:
-                        serial = str(int(entry_match.group(1)))  # Normalize
-                        local_id = entry_match.group(2)
-                        global_id = entry_match.group(3)
-                        result[current_camera][serial][local_id] = global_id
-            
+                for frame, entries in data.items():
+                    for entry in entries:
+                        camera_id = str(entry.get('camera'))
+                        serial_raw = entry.get('serial')
+                        try:
+                            # Normalize serial to unpadded string
+                            serial = str(int(str(serial_raw)))
+                        except ValueError:
+                            serial = str(serial_raw)
+                            
+                        local_id = str(entry.get('localId'))
+                        global_id = str(entry.get('globalId'))
+                        
+                        result[camera_id][serial][local_id] = global_id
+            except Exception as e:
+                print(f"Error parsing JSON {filepath}: {e}")
+                
             return result
         
         def build_global_clusters(global_ids_data):
@@ -454,9 +460,9 @@ def compare_global_ids_by_serial(py_path, java_path, name):
             
             return set(frozenset(cluster) for cluster in global_clusters.values())
         
-        # Parse global IDs
-        java_global_ids = parse_global_ids(java_path)
-        python_global_ids = parse_global_ids(py_path)
+        # Parse global IDs (now expecting JSON files)
+        java_global_ids = parse_global_ids_json(java_path)
+        python_global_ids = parse_global_ids_json(py_path)
         
         # Build global clusters
         java_clusters = build_global_clusters(java_global_ids)
@@ -577,8 +583,8 @@ def main():
     
     # 5. Compare Global IDs (using serial-based comparison)
     results['global_ids'] = compare_global_ids_by_serial(
-        f"{base_path}/mcpt-global-ids-python.txt",
-        f"{base_path}/mcpt-global-ids_0.txt",
+        f"{base_path}/mcpt-global-ids-python.json",
+        f"{base_path}/mcpt-global-ids_0.json",
         "Global ID Assignments"
     )
     
