@@ -108,7 +108,7 @@ mvn exec:java -Dexec.mainClass="com.espertech.esper.example.IOT.IotMain" -Dexec.
 --output_dir ./outputs/scene1
 ```
 
-  ---
+---
 
   ## 📂 Dataset Structure
 
@@ -127,3 +127,24 @@ mvn exec:java -Dexec.mainClass="com.espertech.esper.example.IOT.IotMain" -Dexec.
 ## 📚 Reference
 
 **Overlap Suppression Clustering for Offline Multi-Camera People Tracking**
+
+
+
+
+
+
+
+For visualizations:
+```bash
+# Annotate Java MCPT results for camera 1
+python annotate_mcpt_tracking.py --scene scene_001 --camera 1 --impl java
+
+# Annotate Python results
+python annotate_mcpt_tracking.py --scene scene_001 --camera 1 --impl python
+
+# Generate comparison video
+python generate_videos.py --scene scene_001 --camera 1 --generate-comparison
+```
+
+
+

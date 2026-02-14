@@ -16,6 +16,57 @@ from visualization_utils import (
 )
 
 
+def load_global_ids_json(filepath):
+    """
+    Load global IDs from JSON dump.
+    Returns: dict {camera_id: {serial: global_id}}
+    """
+    try:
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+            
+        global_ids_map = {} # Structure: {camera_id: {serial: global_id}}
+        
+        # Data is frame_num -> list of objects
+        for frame_num, entries in data.items():
+            for entry in entries:
+                camera_id = str(entry.get('camera'))
+                if camera_id not in global_ids_map:
+                    global_ids_map[camera_id] = {}
+                
+                # Normalize serial
+                serial_raw = entry.get('serial')
+                try:
+                    serial = str(int(str(serial_raw)))
+                except ValueError:
+                    serial = str(serial_raw)
+                    
+                global_id = entry.get('globalId')
+                global_ids_map[camera_id][serial] = global_id
+                
+        return global_ids_map
+    except Exception as e:
+        print(f"Error loading JSON {filepath}: {e}")
+        return {}
+
+def get_frames_from_json(filepath, camera_id):
+    """Get list of frames present in the JSON dump for a specific camera"""
+    frames = set()
+    try:
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+            
+        target_cam = str(camera_id)
+        for frame_num, entries in data.items():
+            # Check if this frame has entries for our camera
+            for entry in entries:
+                if str(entry.get('camera')) == target_cam:
+                    frames.add(int(frame_num))
+                    break
+    except Exception as e:
+        print(f"Error reading frames from JSON: {e}")
+    return sorted(list(frames))
+
 def annotate_frames(args):
     """Main annotation function"""
     
@@ -26,25 +77,51 @@ def annotate_frames(args):
     detection_json = scene_dir / f"{camera_str}.json"
     frame_dir = scene_dir / camera_str / "Frame"
     
-    # MCPT dumps directory
+    # MCPT dumps directory and file selection
     if args.impl == "java":
-        global_ids_file = Path(args.mcpt_dumps) / "mcpt-global-ids_0.txt"
+        json_dump = Path(args.mcpt_dumps) / "mcpt-global-ids_0.json"
+        txt_dump = Path(args.mcpt_dumps) / "mcpt-global-ids_0.txt"
     else:  # python
-        global_ids_file = Path(args.mcpt_dumps) / "mcpt-global-ids-python.txt"
+        json_dump = Path(args.mcpt_dumps) / "mcpt-global-ids-python.json"
+        txt_dump = Path(args.mcpt_dumps) / "mcpt-global-ids-python.txt"
     
     # Output directory
     output_dir = Path(args.output_dir) / args.scene / f"{camera_str}_{args.impl}"
     output_dir.mkdir(parents=True, exist_ok=True)
     
     print(f"Loading detections from: {detection_json}")
-    print(f"Loading global IDs from: {global_ids_file}")
     print(f"Frame directory: {frame_dir}")
     print(f"Output directory: {output_dir}")
     
     # Load data
     detections = load_detection_json(detection_json)
-    global_ids = parse_global_ids(global_ids_file)
     
+    # Load Global IDs
+    global_ids = {}
+    frames_to_process = []
+    
+    if json_dump.exists():
+        print(f"Loading global IDs from JSON: {json_dump}")
+        global_ids = load_global_ids_json(json_dump)
+        # Get frames strictly from JSON
+        frames_to_process = get_frames_from_json(json_dump, args.camera)
+        print(f"Found {len(frames_to_process)} frames in JSON dump")
+    elif txt_dump.exists():
+        print(f"Loading global IDs from Text (Legacy): {txt_dump}")
+        global_ids = parse_global_ids(txt_dump)
+        # For text dump, we check keys if possible, or fallback to all frames
+        camera_id = str(args.camera)
+        if camera_id in global_ids:
+             # In text dump, keys are serials. We need to map serial -> frame from detections
+             # This is complex, so for legacy we might just process all frames or infer from serials
+             # But user specifically asked for JSON focus.
+             pass
+        # Fallback for text: process all frames
+        frames_to_process = sorted(set(d['Frame'] for d in detections.values()))
+    else:
+        print(f"Error: No dump file found! Checked {json_dump} and {txt_dump}")
+        return None
+
     # Get color palette
     colors = get_color_palette(50)
     
@@ -52,30 +129,13 @@ def annotate_frames(args):
     camera_id = str(args.camera)
     camera_global_ids = global_ids.get(camera_id, {})
     
-    # Get the set of serials (frame numbers) that were actually streamed
-    # These are the frames that appear in the global IDs dump
-    streamed_serials = set(camera_global_ids.keys())
-    print(f"Found {len(streamed_serials)} streamed frames in global IDs dump")
-    
-    # Convert serials to frame numbers (they're already frame numbers/serials)
-    streamed_frames = sorted(int(s) for s in streamed_serials)
-    
-    # Parse frame range if provided, otherwise use all streamed frames
-    if args.frames:
-        start, end = map(int, args.frames.split('-'))
-        # Filter to only streamed frames within range
-        frames_to_process = [f for f in streamed_frames if start <= f <= end]
-    else:
-        # Process all streamed frames
-        frames_to_process = streamed_frames
-    
     if not frames_to_process:
         print("No frames to process!")
         return None
     
-    print(f"Processing {len(frames_to_process)} streamed frames (from {min(frames_to_process)} to {max(frames_to_process)})")
+    print(f"Processing {len(frames_to_process)} frames (from {min(frames_to_process)} to {max(frames_to_process)})")
     
-    # Process each streamed frame
+    # Process each frame
     for frame_num in tqdm(frames_to_process, desc="Annotating frames"):
         # Load frame image
         frame_path = frame_dir / f"{frame_num:06d}.jpg"
@@ -99,36 +159,29 @@ def annotate_frames(args):
             x1, y1, x2, y2 = bbox["x1"], bbox["y1"], bbox["x2"], bbox["y2"]
             
             # Normalize detection serial (remove leading zeros)
-            # Detection JSON has "00000000", global IDs has "0"
-            normalized_serial = str(int(det_serial))
+            try:
+                normalized_serial = str(int(det_serial))
+            except:
+                normalized_serial = str(det_serial)
             
             # Get global ID mapping for this serial
-            serial_global_map = camera_global_ids.get(normalized_serial, {})
-            
-            # Get OfflineID (local tracking ID) if available
-            offline_id = det_data.get("OfflineID")
-            
-            # Try to get global ID
-            global_id = -1
-            if serial_global_map and offline_id is not None and offline_id >= 0:
-                # Look up global_id using local_id (offline_id)
-                global_id = serial_global_map.get(offline_id, -1)
-            elif serial_global_map:
-                # If we have a mapping but no offline_id, get the first global_id
-                local_ids = sorted(serial_global_map.keys())
-                if local_ids:
-                    global_id = serial_global_map[local_ids[0]]
-                    offline_id = local_ids[0]
+            global_id = camera_global_ids.get(normalized_serial, -1)
             
             # Draw bounding box
-            if global_id >= 0:
+            if global_id != -1 and global_id is not None:
                 # Tracked person - use colored box
-                color = colors[global_id % len(colors)]
+                try:
+                    gid_int = int(global_id)
+                    color = colors[gid_int % len(colors)]
+                except:
+                    color = colors[0]
                 tracked_count += 1
+                offline_id = det_data.get("OfflineID", -1)
             else:
                 # Untracked detection - use gray
                 color = (128, 128, 128)
-                offline_id = -1  # Display -1 for untracked
+                offline_id = -1
+                global_id = -1
             
             # Always draw the box (tracked or not)
             draw_bbox_with_label(image, (x1, y1, x2, y2), global_id, offline_id, color)
@@ -143,7 +196,7 @@ def annotate_frames(args):
         output_path = output_dir / f"frame_{frame_num:06d}.jpg"
         cv2.imwrite(str(output_path), image, [cv2.IMWRITE_JPEG_QUALITY, 95])
     
-    print(f"✓ Annotation complete! Frames saved to: {output_dir}")
+    print(f"Annotation complete! Frames saved to: {output_dir}")
     return output_dir
 
 
