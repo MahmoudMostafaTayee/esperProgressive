@@ -88,15 +88,16 @@ def draw_bbox_with_label(image, bbox, global_id, local_id, color, thickness=2):
     
     # Get text size for background
     font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 0.6
-    label_size = cv2.getTextSize(label, font, font_scale, thickness)[0]
+    font_scale = 1.0  # Increased from 0.6
+    label_thickness = 2
+    label_size = cv2.getTextSize(label, font, font_scale, label_thickness)[0]
     
     # Draw label background
-    label_ymin = max(y1 - label_size[1] - 10, 0)
+    label_ymin = max(y1 - label_size[1] - 15, 0)
     cv2.rectangle(
         image,
         (x1, label_ymin),
-        (x1 + label_size[0] + 10, y1),
+        (x1 + label_size[0] + 15, y1),
         color,
         -1  # Filled
     )
@@ -105,11 +106,11 @@ def draw_bbox_with_label(image, bbox, global_id, local_id, color, thickness=2):
     cv2.putText(
         image,
         label,
-        (x1 + 5, y1 - 5),
+        (x1 + 7, y1 - 7),
         font,
         font_scale,
         (255, 255, 255),  # White text
-        thickness-1
+        label_thickness
     )
 
 

@@ -34,7 +34,7 @@ def create_video_from_frames(frame_dir, output_video, fps=30):
             out.write(frame)
     
     out.release()
-    print(f"✓ Video created: {output_video}")
+    print(f"Video created: {output_video}")
     return True
 
 
@@ -76,7 +76,7 @@ def create_sidebyside_video(java_dir, python_dir, output_video, fps=30):
             out.write(combined)
     
     out.release()
-    print(f"✓ Comparison video created: {output_video}")
+    print(f"Comparison video created: {output_video}")
     return True
 
 
