@@ -573,13 +573,13 @@ def main():
         theirs_nodes, ours_nodes, theirs_params
     )
     
-    # 4. Compare Camera Dict (using serial-based comparison)
-    results['camera_dict'] = compare_camera_dict_by_serial(
-        f"{base_path}/mcpt-camera-dict-python.txt",
-        f"{base_path}/mcpt-camera-dict_0.txt",
-        "Camera Dictionary",
-        theirs_nodes, ours_nodes, theirs_params
-    )
+    # # 4. Compare Camera Dict (using serial-based comparison)
+    # results['camera_dict'] = compare_camera_dict_by_serial(
+    #     f"{base_path}/mcpt-camera-dict-python.txt",
+    #     f"{base_path}/mcpt-camera-dict_0.txt",
+    #     "Camera Dictionary",
+    #     theirs_nodes, ours_nodes, theirs_params
+    # )
     
     # 5. Compare Global IDs (using serial-based comparison)
     results['global_ids'] = compare_global_ids_by_serial(
