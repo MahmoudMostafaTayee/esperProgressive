@@ -153,6 +153,13 @@ public class IotMain implements Runnable {
         launchStreams();
 
         EmbeddingFeatureStreamer.waitForCompletion();
+
+        // Give a small grace period for the final broadcasts to settle
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException ignored) {
+        }
+
         socketServer.stop();
         EventEPLUtil.destroyRuntime();
         logger.info("Done.");

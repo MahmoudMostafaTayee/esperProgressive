@@ -182,6 +182,7 @@ public class EventEPLUtil {
         if (runtime != null) {
             logger.info("Destroying Esper runtime...");
             runtime.destroy();
+            runtime = null;
         }
     }
 }

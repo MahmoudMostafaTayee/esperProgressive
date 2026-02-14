@@ -57,7 +57,9 @@ public class TableSocketServer {
     }
 
     private void handleClient(Socket socket) {
-        try (PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+        PrintWriter out = null;
+        try {
+            out = new PrintWriter(socket.getOutputStream(), true);
             clients.add(out);
             firstClientLatch.countDown(); // Signal that at least one client is connected
             // Keep connection open until client disconnects or server stops
@@ -67,6 +69,10 @@ public class TableSocketServer {
         } catch (Exception e) {
             logger.debug("Client disconnected: {}", socket.getRemoteSocketAddress());
         } finally {
+            if (out != null) {
+                clients.remove(out);
+                out.close();
+            }
             try {
                 socket.close();
             } catch (Exception ignored) {
