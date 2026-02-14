@@ -194,7 +194,9 @@ def annotate_frames(args):
         
         # Save annotated frame
         output_path = output_dir / f"frame_{frame_num:06d}.jpg"
-        cv2.imwrite(str(output_path), image, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        success = cv2.imwrite(str(output_path), image, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        if not success:
+            print(f"FAILED to save frame {frame_num} to {output_path}")
     
     print(f"Annotation complete! Frames saved to: {output_dir}")
     return output_dir
