@@ -73,6 +73,10 @@ public class IotMain implements Runnable {
         EventEPLUtil.addEventType("CameraCalibration",
                 com.espertech.esper.example.IOT.streams.CameraCalibration.class);
 
+        // Register GlobalPersonEvent event
+        EventEPLUtil.addEventType("GlobalPersonEvent",
+                com.espertech.esper.example.IOT.streams.GlobalPersonEvent.class);
+
         logger.info("Setting up runtime");
         EventEPLUtil.initiateRuntime();
     }
@@ -319,16 +323,34 @@ public class IotMain implements Runnable {
                                     2000, // stackMaxSize
                                     winIdx);
 
-                            // Output results (Optional, for verification)
+                            // Send GlobalPersonEvent for tracker table
+                            long timestamp = EventEPLUtil.getCurrentTime();
                             for (Integer cam : trackingResults.keySet()) {
                                 java.util.Map<String, java.util.Map<String, Object>> camRes = trackingResults.get(cam);
                                 for (String serial : camRes.keySet()) {
-                                    if (camRes.get(serial).containsKey("GlobalOfflineID")) {
-                                        // System.out.println("MCPT Assigned: Cam " + cam + " Serial " + serial +
-                                        // " -> GlobalID " + camRes.get(serial).get("GlobalOfflineID"));
+                                    java.util.Map<String, Object> attrs = camRes.get(serial);
+                                    if (attrs.containsKey("GlobalOfflineID")) {
+                                        int globalId = (int) attrs.get("GlobalOfflineID");
+                                        int localId = (int) attrs.get("OfflineID");
+                                        java.util.Map<String, Integer> coord = (java.util.Map<String, Integer>) attrs
+                                                .get("Coordinate");
+                                        int x = (coord.get("x1") + coord.get("x2")) / 2;
+                                        int y = coord.get("y2");
+
+                                        // Flexible attributes map for Case Management style
+                                        java.util.Map<String, Object> eventAttrs = new java.util.HashMap<>(attrs);
+                                        eventAttrs.remove("Feature"); // Too large for table usually
+                                        eventAttrs.remove("Keypoints");
+
+                                        GlobalPersonEvent gpe = new GlobalPersonEvent(
+                                                globalId, cam, serial, localId, x, y, timestamp, eventAttrs);
+                                        EventEPLUtil.streamEvent(gpe, "GlobalPersonEvent");
                                     }
                                 }
                             }
+                            // Trigger table print
+                            EventEPLUtil.streamEvent(new com.espertech.esper.example.IOT.streams.TriggerEvent(),
+                                    "TriggerEvent");
                         }
                     }
                 }
@@ -337,34 +359,32 @@ public class IotMain implements Runnable {
     }
 
     private void afterClusteringQueries() {
-        // String eplTable = """
-        // create table PersonTable (
-        // personId string primary key,
-        // features float[],
-        // lastSeen long
-        // );
-        // """;
+        // Global ID Tracking Table (Case Management Style)
+        EventEPLUtil.addEpl("""
+                    create table GlobalIDTable (
+                        globalId int primary key,
+                        lastSeen long,
+                        attributes java.util.Map
+                    );
+                """);
 
-        // String eplInsertOrUpdate = """
-        // on PersonTracker as pd
-        // merge PersonTable as pt
-        // where pt.personId = pd.personId
-        // when matched then
-        // update set pt.features = pd.features, pt.lastSeen = pd.timestamp
-        // when not matched then
-        // insert (personId, features, lastSeen) values (pd.personId, pd.features,
-        // pd.timestamp);
-        // """;
+        EventEPLUtil.addEpl("""
+                    on GlobalPersonEvent as gpe
+                    merge into GlobalIDTable as gt
+                    where gt.globalId = gpe.globalId
+                    when matched then
+                        update set gt.lastSeen = gpe.timestamp, gt.attributes = gpe.attributes
+                    when not matched then
+                        insert select gpe.globalId as globalId, gpe.timestamp as lastSeen, gpe.attributes as attributes;
+                """);
 
-        // String eplSchema = """
-        // create schema PersonTracker(personId string, timestamp long);
-        // """;
-        // EventEPLUtil.addEpl(eplSchema);
+        // Clean up persons from GlobalIDTable who haven’t been seen in 2 minutes (MCPT
+        // window is large)
+        EventEPLUtil.addEpl("on pattern [every timer:interval(10000)]\n" +
+                "delete from GlobalIDTable\n" +
+                "where current_timestamp() - lastSeen > 120000;");
 
-        // EventEPLUtil.addEpl("""
-        // create schema TriggerEvent();
-        // """);
-
+        // Existing PersonTable queries (can stay or be replaced)
         EventEPLUtil.addEpl("""
                     create table PersonTable (
                         personId int primary key,
@@ -389,23 +409,25 @@ public class IotMain implements Runnable {
 
         String eplSelect = """
                     on TriggerEvent
-                    select personId, lastSeen from PersonTable;
+                    select globalId, lastSeen, attributes from GlobalIDTable;
                 """;
         EventEPLUtil.addEpl(
                 eplSelect,
                 (EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime) -> {
-                    String listenerName = "Tracking persons table";
+                    String listenerName = "Global ID Table Status";
                     if (newEvents != null) {
+                        System.out.println("--- Global ID Table Update ---");
                         for (EventBean event : newEvents) {
-                            int personId = (int) event.get("personId");
-                            personId += 1;
+                            int globalId = (int) event.get("globalId");
                             long lastSeen = (long) event.get("lastSeen");
-                            System.out.printf("%s: Person %d last seen at %d (Current Time: %d)%n",
+                            java.util.Map attrs = (java.util.Map) event.get("attributes");
+                            System.out.printf("%s: GlobalID %d last seen at %d. Attributes: %s%n",
                                     listenerName,
-                                    personId,
+                                    globalId,
                                     lastSeen,
-                                    EventEPLUtil.getCurrentTime());
+                                    attrs != null ? attrs.toString() : "none");
                         }
+                        System.out.println("------------------------------");
                     }
                 });
         EventEPLUtil.deployAll();
