@@ -6,24 +6,26 @@ import time
 def listen_to_table(host='localhost', port=9999):
     print(f"Connecting to Global ID Table at {host}:{port}...", flush=True)
     
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(1.0) # Allow periodic checks for KeyboardInterrupt
-    
+    s = None
     connected = False
     while not connected:
         try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(1.0) # Allow periodic checks for KeyboardInterrupt
             s.connect((host, port))
             connected = True
             print("Connected! Waiting for updates (Press Ctrl+C to stop)...\n", flush=True)
         except ConnectionRefusedError:
             print(f"Waiting for Java app to start on {host}:{port}...", flush=True)
+            if s: s.close()
             time.sleep(2)
         except KeyboardInterrupt:
             print("\nStopped by user.")
-            s.close()
+            if s: s.close()
             return
         except Exception as e:
             print(f"Connection error: {e}")
+            if s: s.close()
             time.sleep(2)
 
     buffer = ""
