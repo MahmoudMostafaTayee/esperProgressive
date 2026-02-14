@@ -38,28 +38,28 @@ def create_video_from_frames(frame_dir, output_video, fps=30):
     return True
 
 
-def create_sidebyside_video(java_dir, python_dir, output_video, fps=30):
+def create_sidebyside_video(ours_dir, theirs_dir, output_video, fps=30):
     """Create side-by-side comparison video"""
-    java_frames = sorted(java_dir.glob("frame_*.jpg"))
-    python_frames = sorted(python_dir.glob("frame_*.jpg"))
+    ours_frames = sorted(ours_dir.glob("frame_*.jpg"))
+    theirs_frames = sorted(theirs_dir.glob("frame_*.jpg"))
     
-    if not java_frames or not python_frames:
+    if not ours_frames or not theirs_frames:
         print("Missing frames for comparison")
         return False
     
     # Match frames by number
-    java_dict = {f.stem.split('_')[1]: f for f in java_frames}
-    python_dict = {f.stem.split('_')[1]: f for f in python_frames}
+    ours_dict = {f.stem.split('_')[1]: f for f in ours_frames}
+    theirs_dict = {f.stem.split('_')[1]: f for f in theirs_frames}
     
-    common_frames = sorted(set(java_dict.keys()) & set(python_dict.keys()))
+    common_frames = sorted(set(ours_dict.keys()) & set(theirs_dict.keys()))
     
     if not common_frames:
         print("No matching frames found")
         return False
     
     # Get dimensions
-    first_java = cv2.imread(str(java_dict[common_frames[0]]))
-    height, width = first_java.shape[:2]
+    first_ours = cv2.imread(str(ours_dict[common_frames[0]]))
+    height, width = first_ours.shape[:2]
     
     # Create video writer (double width for side-by-side)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -67,12 +67,12 @@ def create_sidebyside_video(java_dir, python_dir, output_video, fps=30):
     
     print(f"Creating comparison video: {output_video.name}")
     for frame_num in tqdm(common_frames, desc="Combining frames"):
-        java_frame = cv2.imread(str(java_dict[frame_num]))
-        python_frame = cv2.imread(str(python_dict[frame_num]))
+        ours_frame = cv2.imread(str(ours_dict[frame_num]))
+        theirs_frame = cv2.imread(str(theirs_dict[frame_num]))
         
-        if java_frame is not None and python_frame is not None:
+        if ours_frame is not None and theirs_frame is not None:
             # Concatenate horizontally
-            combined = np.hstack([java_frame, python_frame])
+            combined = np.hstack([ours_frame, theirs_frame])
             out.write(combined)
     
     out.release()
@@ -93,10 +93,10 @@ def main():
     parser.add_argument("--fps", type=int, default=30, help="Frames per second")
     parser.add_argument("--generate-comparison", action="store_true",
                         help="Generate side-by-side comparison video")
-    parser.add_argument("--java-only", action="store_true",
-                        help="Generate only Java video")
-    parser.add_argument("--python-only", action="store_true",
-                        help="Generate only Python video")
+    parser.add_argument("--ours-only", action="store_true",
+                        help="Generate only 'Ours' video")
+    parser.add_argument("--theirs-only", action="store_true",
+                        help="Generate only 'Theirs' video")
     
     args = parser.parse_args()
     
@@ -104,34 +104,34 @@ def main():
     base_dir = Path(args.base_dir) / args.scene
     camera_str = f"camera_{args.camera:04d}"
     
-    java_frame_dir = base_dir / f"{camera_str}_java"
-    python_frame_dir = base_dir / f"{camera_str}_python"
+    ours_frame_dir = base_dir / f"{camera_str}_ours"
+    theirs_frame_dir = base_dir / f"{camera_str}_theirs"
     
     output_dir = Path(args.output_dir) / args.scene
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Generate videos
-    if not args.python_only:
-        if java_frame_dir.exists():
-            java_video = output_dir / f"{camera_str}_java.mp4"
-            create_video_from_frames(java_frame_dir, java_video, args.fps)
+    if not args.theirs_only:
+        if ours_frame_dir.exists():
+            ours_video = output_dir / f"{camera_str}_ours.mp4"
+            create_video_from_frames(ours_frame_dir, ours_video, args.fps)
         else:
-            print(f"Java frames not found: {java_frame_dir}")
+            print(f"Ours frames not found: {ours_frame_dir}")
     
-    if not args.java_only:
-        if python_frame_dir.exists():
-            python_video = output_dir / f"{camera_str}_python.mp4"
-            create_video_from_frames(python_frame_dir, python_video, args.fps)
+    if not args.ours_only:
+        if theirs_frame_dir.exists():
+            theirs_video = output_dir / f"{camera_str}_theirs.mp4"
+            create_video_from_frames(theirs_frame_dir, theirs_video, args.fps)
         else:
-            print(f"Python frames not found: {python_frame_dir}")
+            print(f"Theirs frames not found: {theirs_frame_dir}")
     
     # Generate comparison video
     if args.generate_comparison:
-        if java_frame_dir.exists() and python_frame_dir.exists():
+        if ours_frame_dir.exists() and theirs_frame_dir.exists():
             comparison_video = output_dir / f"{camera_str}_comparison.mp4"
-            create_sidebyside_video(java_frame_dir, python_frame_dir, comparison_video, args.fps)
+            create_sidebyside_video(ours_frame_dir, theirs_frame_dir, comparison_video, args.fps)
         else:
-            print("Both Java and Python frames needed for comparison")
+            print("Both Ours and Theirs frames needed for comparison")
 
 
 if __name__ == "__main__":

@@ -122,7 +122,7 @@ def create_frame_overlay(image, frame_num, camera_id, impl_type, tracked_count):
         image: OpenCV image
         frame_num: Frame number
         camera_id: Camera ID
-        impl_type: "Java" or "Python"
+        impl_type: "ours" or "theirs"
         tracked_count: Number of tracked persons in frame
     """
     overlay = image.copy()

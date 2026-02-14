@@ -2,8 +2,8 @@
 Annotate MCPT tracking results on video frames.
 
 Usage:
-    python annotate_mcpt_tracking.py --scene scene_001 --camera 1 --impl java
-    python annotate_mcpt_tracking.py --scene scene_001 --camera 1 --impl python --frames 1-500
+    python annotate_mcpt_tracking.py --scene scene_001 --camera 1 --impl ours
+    python annotate_mcpt_tracking.py --scene scene_001 --camera 1 --impl theirs --frames 1-500
 """
 import argparse
 import cv2
@@ -78,10 +78,10 @@ def annotate_frames(args):
     frame_dir = scene_dir / camera_str / "Frame"
     
     # MCPT dumps directory and file selection
-    if args.impl == "java":
+    if args.impl == "ours":
         json_dump = Path(args.mcpt_dumps) / "mcpt-global-ids_0.json"
         txt_dump = Path(args.mcpt_dumps) / "mcpt-global-ids_0.txt"
-    else:  # python
+    else:  # theirs
         json_dump = Path(args.mcpt_dumps) / "mcpt-global-ids-python.json"
         txt_dump = Path(args.mcpt_dumps) / "mcpt-global-ids-python.txt"
     
@@ -204,7 +204,7 @@ def main():
     parser = argparse.ArgumentParser(description="Annotate MCPT tracking on video frames")
     parser.add_argument("--scene", type=str, default="scene_001", help="Scene ID (e.g., scene_001)")
     parser.add_argument("--camera", type=int, default=1, help="Camera number (1-4)")
-    parser.add_argument("--impl", type=str, choices=["java", "python"], required=True,
+    parser.add_argument("--impl", type=str, choices=["ours", "theirs"], required=True,
                         help="Implementation type")
     parser.add_argument("--frames", type=str, default=None,
                         help="Frame range to process (e.g., '1-500'), default: all")

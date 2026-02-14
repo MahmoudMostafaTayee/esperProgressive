@@ -526,14 +526,14 @@ def compare_text_dumps(py_path, java_path, name):
 def main():
     base_path = "c:/OURs/Thesis/Real-Time_Multi-Camera_People_Tracking_using_Event_Stream_Processing/output/scene1/mcpt-dumps"
     
-    print_header("MCPT Pipeline Comprehensive Comparison")
+    print_header("MCPT Pipeline Comprehensive Comparison (Ours vs Theirs)")
     
     results = {}
     
     # Define alignment files
-    py_nodes = f"{base_path}/mcpt-representative-nodes-python.json"
-    java_nodes = f"{base_path}/mcpt-representative-nodes-java_0.json"
-    py_params = f"{base_path}/mcpt-params-python.json"
+    theirs_nodes = f"{base_path}/mcpt-representative-nodes-python.json"
+    ours_nodes = f"{base_path}/mcpt-representative-nodes-java_0.json"
+    theirs_params = f"{base_path}/mcpt-params-python.json"
 
     # 1. Compare Similarity Matrices
     print_header("Similarity Matrices")
@@ -541,21 +541,21 @@ def main():
         f"{base_path}/mcpt-similarity-matrix-raw-python.txt",
         f"{base_path}/mcpt-similarity-matrix-raw_0.txt",
         "RAW Similarity Matrix",
-        py_nodes, java_nodes, py_params
+        theirs_nodes, ours_nodes, theirs_params
     )
     
     results['replaced_matrix'] = compare_matrices(
         f"{base_path}/mcpt-similarity-matrix-replaced-python.txt",
         f"{base_path}/mcpt-similarity-matrix-replaced_0.txt",
         "REPLACED Similarity Matrix",
-        py_nodes, java_nodes, py_params
+        theirs_nodes, ours_nodes, theirs_params
     )
     
     results['zeroed_matrix'] = compare_matrices(
         f"{base_path}/mcpt-similarity-matrix-zeroed-python.txt",
         f"{base_path}/mcpt-similarity-matrix-zeroed_0.txt",
         "ZEROED Similarity Matrix",
-        py_nodes, java_nodes, py_params
+        theirs_nodes, ours_nodes, theirs_params
     )
     
     # 2. Compare Representative Nodes
@@ -570,7 +570,7 @@ def main():
         f"{base_path}/mcpt-clusters-after-hc-python.txt",
         f"{base_path}/mcpt-clusters-after-hc_0.txt",
         "Clusters After Hierarchical Clustering",
-        py_nodes, java_nodes, py_params
+        theirs_nodes, ours_nodes, theirs_params
     )
     
     # 4. Compare Camera Dict (using serial-based comparison)
@@ -578,7 +578,7 @@ def main():
         f"{base_path}/mcpt-camera-dict-python.txt",
         f"{base_path}/mcpt-camera-dict_0.txt",
         "Camera Dictionary",
-        py_nodes, java_nodes, py_params
+        theirs_nodes, ours_nodes, theirs_params
     )
     
     # 5. Compare Global IDs (using serial-based comparison)
@@ -589,7 +589,7 @@ def main():
     )
     
     # Summary
-    print_header("Summary")
+    print_header("Summary (Ours vs Theirs)")
     
     passed = sum(1 for v in results.values() if v)
     total = len(results)
@@ -602,7 +602,7 @@ def main():
     
     print(f"\n{Colors.BOLD}Key Findings:{Colors.END}")
     if results['raw_matrix']:
-        print(f"  {Colors.GREEN}✓{Colors.END} Similarity matrix generation is now correct (dense matrices)")
+        print(f"  {Colors.GREEN}✓{Colors.END} Similarity matrix generation matches (Ours vs Theirs)")
     else:
         print(f"  {Colors.RED}✗{Colors.END} Similarity matrices still differ")
     
@@ -614,12 +614,12 @@ def main():
     if results['clusters_after_hc']:
         print(f"  {Colors.GREEN}✓{Colors.END} Cluster groupings match (>90% when mapped by serial)")
     else:
-        print(f"  {Colors.YELLOW}⚠{Colors.END} Some cluster groupings differ (likely tie-breaking in hierarchical clustering)")
+        print(f"  {Colors.YELLOW}⚠{Colors.END} Some cluster groupings differ (tie-breaking etc)")
     
     if results['global_ids']:
         print(f"  {Colors.GREEN}✓{Colors.END} Global ID assignments match")
     else:
-        print(f"  {Colors.YELLOW}⚠{Colors.END} Global ID assignments differ (check upstream clustering)")
+        print(f"  {Colors.YELLOW}⚠{Colors.END} Global ID assignments differ")
     
     print()
 
