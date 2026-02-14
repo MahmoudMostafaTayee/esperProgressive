@@ -136,8 +136,9 @@ public class IotMain implements Runnable {
 
         // Add shutdown hook for graceful exit
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            logger.info("Shutdown hook triggered, stopping socket server...");
+            logger.info("Shutdown hook triggered, stopping socket server and Esper runtime...");
             socketServer.stop();
+            EventEPLUtil.destroyRuntime();
         }));
 
         // someExampleQueries();
@@ -153,6 +154,7 @@ public class IotMain implements Runnable {
 
         EmbeddingFeatureStreamer.waitForCompletion();
         socketServer.stop();
+        EventEPLUtil.destroyRuntime();
         logger.info("Done.");
     }
 

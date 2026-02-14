@@ -16,8 +16,8 @@ import java.util.List;
 
 public class EventEPLUtil {
     private static final Logger logger = LoggerFactory.getLogger(EventEPLUtil.class);
-    private static final long ONE_SEC_TIME_STEP = 1000L;  // 1 second (in milliseconds)
-    private static long timeTracker = System.currentTimeMillis();  // Shared time tracker
+    private static final long ONE_SEC_TIME_STEP = 1000L; // 1 second (in milliseconds)
+    private static long timeTracker = System.currentTimeMillis(); // Shared time tracker
     private static final Configuration configuration = new Configuration();
     private static String runtimeURI;
     private static EPRuntime runtime;
@@ -26,11 +26,13 @@ public class EventEPLUtil {
     private static class EplEntry {
         final String epl;
         final UpdateListener listener;
+
         EplEntry(String epl, UpdateListener listener) {
             this.epl = epl;
             this.listener = listener;
         }
     }
+
     private static final List<EplEntry> pendingEpls = new ArrayList<>();
 
     private EventEPLUtil() {
@@ -109,7 +111,7 @@ public class EventEPLUtil {
         }
     }
 
-    public static void compileDeployAddListener(String eplQuery, UpdateListener listener){
+    public static void compileDeployAddListener(String eplQuery, UpdateListener listener) {
         EPStatement statement;
         statement = EventEPLUtil.compileDeploy(eplQuery);
         EventEPLUtil.add_listener(statement, listener);
@@ -136,8 +138,9 @@ public class EventEPLUtil {
         }
     }
 
-    private static void add_listener(EPStatement statement, UpdateListener listener){
-        // EPStatement statement = runtime.getDeploymentService().getStatement(deploymentId, eplQuery_name);
+    private static void add_listener(EPStatement statement, UpdateListener listener) {
+        // EPStatement statement =
+        // runtime.getDeploymentService().getStatement(deploymentId, eplQuery_name);
         if (statement != null) {
             statement.addListener(listener);
         } else {
@@ -158,7 +161,7 @@ public class EventEPLUtil {
 
     public static void advanceTime(double percentage) {
         long timeStep = (long) (ONE_SEC_TIME_STEP * percentage);
-//        System.out.println("Time step: " + timeStep);
+        // System.out.println("Time step: " + timeStep);
         timeTracker += timeStep;
         runtime.getEventService().advanceTime(timeTracker);
         logger.debug("Time advanced to: {} ms", timeTracker);
@@ -173,5 +176,12 @@ public class EventEPLUtil {
 
     public static long getCurrentTime() {
         return timeTracker;
+    }
+
+    public static void destroyRuntime() {
+        if (runtime != null) {
+            logger.info("Destroying Esper runtime...");
+            runtime.destroy();
+        }
     }
 }
