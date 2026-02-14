@@ -295,6 +295,7 @@ public class EmbeddingFeatureStreamer {
                 DetectedUser user = new DetectedUser(
                         featureList,
                         parsed.uNum,
+                        parsed.curFrame,
                         parsed.x1,
                         parsed.x2,
                         parsed.y1,

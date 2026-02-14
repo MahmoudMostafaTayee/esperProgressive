@@ -1778,34 +1778,53 @@ public class MCPT {
         try {
             java.nio.file.Path dir = java.nio.file.Paths.get(TrackingParameters.OUTPUT_DIR, "mcpt-dumps");
             java.nio.file.Files.createDirectories(dir);
-            java.nio.file.Path filePath = dir.resolve(filename + ".txt");
+            java.nio.file.Path filePath = dir.resolve(filename + ".json");
 
-            try (java.io.BufferedWriter writer = new java.io.BufferedWriter(
-                    new java.io.FileWriter(filePath.toFile()))) {
+            // Organize by frame number
+            // Frame -> List of entries
+            Map<Integer, List<Map<String, Object>>> frames = new TreeMap<>();
 
-                // Sort cameras
-                List<Integer> sortedCameras = new ArrayList<>(trackingResults.keySet());
-                Collections.sort(sortedCameras);
+            for (Map.Entry<Integer, Map<String, Map<String, Object>>> camEntry : trackingResults.entrySet()) {
+                Integer cameraId = camEntry.getKey();
+                Map<String, Map<String, Object>> camData = camEntry.getValue();
 
-                for (Integer cameraId : sortedCameras) {
-                    writer.write("Camera " + cameraId + ":");
-                    writer.newLine();
+                for (Map.Entry<String, Map<String, Object>> serialEntry : camData.entrySet()) {
+                    String serial = serialEntry.getKey();
+                    Map<String, Object> attrs = serialEntry.getValue();
 
-                    Map<String, Map<String, Object>> camData = trackingResults.get(cameraId);
-                    // Sort serials
-                    List<String> sortedSerials = new ArrayList<>(camData.keySet());
-                    Collections.sort(sortedSerials);
+                    Object globalIdObj = attrs.get("GlobalOfflineID");
+                    Object localIdObj = attrs.get("OfflineID");
+                    Object frameObj = attrs.get("Frame");
+                    Object coordObj = attrs.get("Coordinate");
 
-                    for (String serial : sortedSerials) {
-                        Map<String, Object> entry = camData.get(serial);
-                        Object globalId = entry.get("GlobalOfflineID");
-                        Object localId = entry.get("OfflineID");
-                        if (globalId != null) {
-                            writer.write("  " + serial + ": localId=" + localId + " -> globalId=" + globalId);
-                            writer.newLine();
-                        }
+                    if (globalIdObj != null && frameObj instanceof Integer) {
+                        Integer frameNum = (Integer) frameObj;
+
+                        Map<String, Object> entry = new LinkedHashMap<>();
+                        entry.put("camera", cameraId);
+                        entry.put("serial", serial);
+                        entry.put("localId", localIdObj);
+                        entry.put("globalId", globalIdObj);
+                        entry.put("bbox", coordObj); // Already a Map<String, Integer>
+
+                        frames.computeIfAbsent(frameNum, k -> new ArrayList<>()).add(entry);
                     }
                 }
+            }
+
+            // Sort entries within each frame by camera then globalId
+            for (List<Map<String, Object>> entryList : frames.values()) {
+                Collections.sort(entryList, (a, b) -> {
+                    int camComp = ((Integer) a.get("camera")).compareTo((Integer) b.get("camera"));
+                    if (camComp != 0)
+                        return camComp;
+                    return ((Integer) a.get("globalId")).compareTo((Integer) b.get("globalId"));
+                });
+            }
+
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            try (java.io.FileWriter writer = new java.io.FileWriter(filePath.toFile())) {
+                gson.toJson(frames, writer);
             }
             logger.info("Dumped MCPT global IDs to: {}", filePath);
         } catch (java.io.IOException e) {
