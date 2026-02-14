@@ -15,6 +15,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -35,7 +36,12 @@ public class EmbeddingFeatureStreamer {
     private static final long ONE_SEC_TIME_STEP = 1000L;
     private static final Map<Path, Integer> cameraOffsets = new HashMap<>();
     private static final Map<Path, Map<Integer, List<PoseData>>> cameraPoseCache = new HashMap<>();
-    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        return t;
+    });
+    private static final CountDownLatch completionLatch = new CountDownLatch(1);
 
     public static void streamEmbeddingFeatures() {
         // Stream calibration data first
@@ -53,6 +59,7 @@ public class EmbeddingFeatureStreamer {
                         + TrackingParameters.max_number_of_windows_to_process + " windows). Global maxFrames limit: "
                         + maxFrames);
                 scheduler.shutdown();
+                completionLatch.countDown();
                 return;
             }
             framesStreamed++;
@@ -63,6 +70,16 @@ public class EmbeddingFeatureStreamer {
                 processScene(sceneEntry);
             }
         }, 0, frameIntervalMillis, TimeUnit.MILLISECONDS);
+    }
+
+    public static void waitForCompletion() {
+        try {
+            completionLatch.await();
+            logger.info("Streaming completed.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.error("Interrupted while waiting for streaming completion", e);
+        }
     }
 
     public static void streamCalibrationData() {

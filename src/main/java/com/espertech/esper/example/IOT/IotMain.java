@@ -12,6 +12,8 @@ import com.espertech.esper.example.IOT.streamers.*;
 import com.espertech.esper.example.IOT.streams.*;
 import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.example.IOT.utils.GenericIotEventListener;
+import com.espertech.esper.example.IOT.utils.TableSocketServer;
+import com.google.gson.Gson;
 
 import com.espertech.esper.example.IOT.clusterers.Tracker;
 import com.espertech.esper.runtime.client.EPRuntime;
@@ -49,6 +51,8 @@ public class IotMain implements Runnable {
             "camera_0001", "camera_0002", "camera_0003", "camera_0004");
 
     private java.util.List<String> cameraList;
+    private final TableSocketServer socketServer = new TableSocketServer(9999);
+    private final Gson gson = new Gson();
 
     private void initiateRunTime() {
         EventEPLUtil.setConfiguration();
@@ -128,6 +132,13 @@ public class IotMain implements Runnable {
 
     public void run() {
         initiateRunTime();
+        socketServer.start();
+
+        // Add shutdown hook for graceful exit
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            logger.info("Shutdown hook triggered, stopping socket server...");
+            socketServer.stop();
+        }));
 
         // someExampleQueries();
         // wildTrackDatasetQueries();
@@ -137,8 +148,11 @@ public class IotMain implements Runnable {
         multiCameraAggregationQueries();
         afterClusteringQueries();
 
+        socketServer.waitForFirstClient();
         launchStreams();
 
+        EmbeddingFeatureStreamer.waitForCompletion();
+        socketServer.stop();
         logger.info("Done.");
     }
 
@@ -416,18 +430,31 @@ public class IotMain implements Runnable {
                 (EventBean[] newEvents, EventBean[] oldEvents, EPStatement statement, EPRuntime runtime) -> {
                     String listenerName = "Global ID Table Status";
                     if (newEvents != null) {
+                        java.util.List<java.util.Map<String, Object>> rows = new java.util.ArrayList<>();
                         System.out.println("--- Global ID Table Update ---");
                         for (EventBean event : newEvents) {
                             int globalId = (int) event.get("globalId");
                             long lastSeen = (long) event.get("lastSeen");
                             java.util.Map attrs = (java.util.Map) event.get("attributes");
+
                             System.out.printf("%s: GlobalID %d last seen at %d. Attributes: %s%n",
                                     listenerName,
                                     globalId,
                                     lastSeen,
                                     attrs != null ? attrs.toString() : "none");
+
+                            java.util.Map<String, Object> row = new java.util.HashMap<>();
+                            row.put("globalId", globalId);
+                            row.put("lastSeen", lastSeen);
+                            row.put("attributes", attrs);
+                            rows.add(row);
                         }
                         System.out.println("------------------------------");
+
+                        // Broadcast to Python clients
+                        if (!rows.isEmpty()) {
+                            socketServer.broadcast(gson.toJson(rows));
+                        }
                     }
                 });
         EventEPLUtil.deployAll();
