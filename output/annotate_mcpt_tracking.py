@@ -215,7 +215,7 @@ def main():
                         default="C:/OURs/Thesis/Real-Time_Multi-Camera_People_Tracking_using_Event_Stream_Processing/output/scene1/mcpt-dumps",
                         help="Directory containing MCPT dumps")
     parser.add_argument("--output-dir", type=str,
-                        default="C:/OURs/Thesis/Visualizations",
+                        default="C:/OURs/Thesis/Real-Time_Multi-Camera_People_Tracking_using_Event_Stream_Processing/Visualizations",
                         help="Output directory for annotated frames")
     
     args = parser.parse_args()

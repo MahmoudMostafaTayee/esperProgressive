@@ -85,10 +85,10 @@ def main():
     parser.add_argument("--scene", type=str, default="scene_001", help="Scene ID")
     parser.add_argument("--camera", type=int, default=1, help="Camera number")
     parser.add_argument("--base-dir", type=str,
-                        default="C:/OURs/Thesis/Visualizations",
+                        default="C:/OURs/Thesis/Real-Time_Multi-Camera_People_Tracking_using_Event_Stream_Processing/Visualizations",
                         help="Base directory with annotated frames")
     parser.add_argument("--output-dir", type=str,
-                        default="C:/OURs/Thesis/Visualizations",
+                        default="C:/OURs/Thesis/Real-Time_Multi-Camera_People_Tracking_using_Event_Stream_Processing/Visualizations",
                         help="Output directory for videos")
     parser.add_argument("--fps", type=int, default=30, help="Frames per second")
     parser.add_argument("--generate-comparison", action="store_true",

@@ -84,7 +84,7 @@ def draw_bbox_with_label(image, bbox, global_id, local_id, color, thickness=2):
     cv2.rectangle(image, (x1, y1), (x2, y2), color, thickness)
     
     # Prepare label
-    label = f"G:{global_id} L:{local_id}"
+    label = f"{global_id}"
     
     # Get text size for background
     font = cv2.FONT_HERSHEY_SIMPLEX
