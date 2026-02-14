@@ -88,7 +88,7 @@ def main():
                         default="C:/OURs/Thesis/Visualizations",
                         help="Base directory with annotated frames")
     parser.add_argument("--output-dir", type=str,
-                        default="C:/OURs/Thesis/Videos",
+                        default="C:/OURs/Thesis/Visualizations",
                         help="Output directory for videos")
     parser.add_argument("--fps", type=int, default=30, help="Frames per second")
     parser.add_argument("--generate-comparison", action="store_true",
