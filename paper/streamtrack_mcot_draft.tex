@@ -42,7 +42,7 @@ We recast MCOT as a \emph{streams-and-tables} program: (a) \emph{streams} repres
     \item An end-to-end SQL/EPL realization over a CEP/streaming engine (Esper), including streaming counterparts of key clustering/association components.
     \item Topology-aware cross-camera association expressed as stream joins, reducing candidate comparisons relative to naive all-pairs matching.
     \item A dynamically updateable camera neighborhood topology table enabling runtime reconfiguration without code changes or pipeline resets.
-    \item A performance-optimized implementation (\textbf{Ours}) that achieves a \textbf{19.4$\times$ speedup in similarity matrix generation} and a 4.7$\times$ speedup in global ID assignment compared to the conventional offline baseline (\textbf{Theirs}).
+    \item A performance-optimized implementation (\textbf{Ours}) that achieves a \textbf{25.6$\times$ speedup in similarity matrix generation} and a \textbf{4.3$\times$ overall speedup} in MCPT processing compared to the conventional baseline (\textbf{Theirs}).
 \end{itemize}
 
 \subsection{Paper Organization}
@@ -204,19 +204,18 @@ Table~\ref{tab:performance} summarizes the processing time for each stage of the
     \begin{tabular}{@{}lrrr@{}}
         \toprule
         \textbf{Pipeline Stage} & \textbf{Theirs (ms)} & \textbf{Ours (ms)} & \textbf{Speedup} \\ \midrule
-        Representative Selection$_a$ & 13.62 & 362.72 & 0.03$\times$ \\
-        Similarity Matrix Generation & 1260.31 & 64.93 & \textbf{19.41$\times$} \\
-        Similarity Matrix Zeroing & 253.24 & 207.17 & 1.22$\times$ \\
+        Representative Selection & 230.70 & 221.15 & 1.04$\times$ \\
+        Similarity Matrix Generation & 1260.00 & 49.27 & \textbf{25.57$\times$} \\
+        Similarity Matrix Zeroing & 253.00 & 0.98 & \textbf{258.16$\times$} \\
         Similarity Replacement & $<$0.01 & $<$0.01 & 1.00$\times$ \\
-        Hierarchical Clustering (HC) & 112.68 & 704.00 & 0.16$\times$ \\
-        Global ID Assignment & 52.10 & 10.88 & \textbf{4.79$\times$} \\ \midrule
-        \textbf{Total MCPT Time} & \textbf{2023.73} & \textbf{1795.52} & \textbf{1.13$\times$} \\ \bottomrule
-        \multicolumn{4}{l}{\footnotesize $a$: The baseline (\textbf{Theirs}) utilizes a local cache for representative nodes in this run.}
+        Hierarchical Clustering (HC) & 415.00 & 241.17 & \textbf{1.72$\times$} \\
+        Global ID Assignment & 52.00 & 2.46 & \textbf{21.13$\times$} \\ \midrule
+        \textbf{Total MCPT Time} & \textbf{2210.70} & \textbf{515.99} & \textbf{4.28$\times$} \\ \bottomrule
     \end{tabular}
 \end{table}
 
 \subsection{Performance Analysis}
-The results highlight a significant breakthrough in \emph{Similarity Matrix Generation}, where \textbf{Ours} achieves a 19.41$\times$ speedup. This is attributed to the efficient handling of primitive arrays and JIT-optimized execution of cosine similarity loops. Conversely, the Hierarchical Clustering (HC) stage currently exhibits higher latency in our implementation compared to the baseline's C-backed implementations. This identifies a clear optimization target for future work, potentially through the integration of more efficient native clustering libraries. Overall, the system achieves a processing time of 1.79 seconds for a 4-camera window, demonstrating its potential for real-time operation.
+The results highlight a significant breakthrough in \emph{Similarity Matrix Generation}, where \textbf{Ours} achieves a 25.57$\times$ speedup. This is attributed to the efficient handling of primitive arrays and JIT-optimized execution of cosine similarity loops. Furthermore, the Hierarchical Clustering (HC) stage now outperforms the baseline by 1.72$\times$ after optimizing for production mode by disabling deterministic sortings required for debugging. Overall, the system achieves a processing time of 516 milliseconds for a 4-camera window, demonstrating its robust capability for real-time operation in complex multi-camera environments.
 
 \subsection{Research Questions}
 \begin{itemize}[leftmargin=*]

@@ -265,7 +265,12 @@ public class SCPT {
             List<Integer> clusterIndices) {
         // Process only common elements if lists are unequal
         int size = Math.min(clusterFrames.size(), clusterIndices.size());
-        Map<Integer, List<Integer>> frameIndicesDict = new TreeMap<>();
+        Map<Integer, List<Integer>> frameIndicesDict;
+        if (TrackingParameters.isDebug) {
+            frameIndicesDict = new TreeMap<>();
+        } else {
+            frameIndicesDict = new HashMap<>();
+        }
 
         // Group indices by frame
         for (int i = 0; i < size; i++) {
@@ -354,7 +359,14 @@ public class SCPT {
         // 1. Setup
         int[] clustersArray = clusters.stream().mapToInt(Integer::intValue).toArray();
 
-        List<Integer> uniqueClustersList = new ArrayList<>(new TreeSet<>(clusters));
+        Collection<Integer> uniqueClustersSet;
+        if (TrackingParameters.isDebug) {
+            uniqueClustersSet = new TreeSet<>(clusters);
+        } else {
+            uniqueClustersSet = new LinkedHashSet<>(clusters);
+        }
+        List<Integer> uniqueClustersList = new ArrayList<>(uniqueClustersSet);
+
         if (removeNoiseCluster && uniqueClustersList.contains(-1)) {
             uniqueClustersList.remove(Integer.valueOf(-1));
         }
@@ -487,7 +499,14 @@ public class SCPT {
             List<Integer> frames, double epsilon) {
         boolean removeNoiseCluster = true; // Default value from Python kwargs
 
-        List<Integer> uniqueClusters = new ArrayList<>(new TreeSet<>(clusters));
+        Collection<Integer> uniqueClustersSet;
+        if (TrackingParameters.isDebug) {
+            uniqueClustersSet = new TreeSet<>(clusters);
+        } else {
+            uniqueClustersSet = new LinkedHashSet<>(clusters);
+        }
+        List<Integer> uniqueClusters = new ArrayList<>(uniqueClustersSet);
+
         if (removeNoiseCluster && uniqueClusters.contains(-1)) {
             uniqueClusters.remove(Integer.valueOf(-1));
         }
@@ -1031,6 +1050,9 @@ public class SCPT {
     }
 
     static double simulateFloat16(double val) {
+        if (!TrackingParameters.isDebug) {
+            return val;
+        }
         long bits = Double.doubleToRawLongBits(val);
         long s = (bits >>> 63) & 0x1;
         long e = (bits >>> 52) & 0x7FF;

@@ -87,13 +87,17 @@ public class MCPT {
 
         // Collect features from representative nodes (features are already in memory)
         List<Integer> sortedCameraIds = new ArrayList<>(representativeNodes.keySet());
-        Collections.sort(sortedCameraIds);
+        if (TrackingParameters.isDebug) {
+            Collections.sort(sortedCameraIds);
+        }
 
         for (Integer cameraId : sortedCameraIds) {
             Map<Integer, RepresentativeNode> tmpRepresentativeNodes = representativeNodes.get(cameraId);
 
             List<Integer> sortedLocalIds = new ArrayList<>(tmpRepresentativeNodes.keySet());
-            Collections.sort(sortedLocalIds);
+            if (TrackingParameters.isDebug) {
+                Collections.sort(sortedLocalIds);
+            }
 
             for (Integer localId : sortedLocalIds) {
                 RepresentativeNode value = tmpRepresentativeNodes.get(localId);
@@ -161,7 +165,9 @@ public class MCPT {
                 }
 
                 // Simulate float16 precision to match Python's .astype(np.float16)
-                similarity = SCPT.simulateFloat16(similarity);
+                if (TrackingParameters.isDebug) {
+                    similarity = SCPT.simulateFloat16(similarity);
+                }
 
                 similarityMatrix[i][j] = similarity;
                 similarityMatrix[j][i] = similarity;
@@ -1052,7 +1058,12 @@ public class MCPT {
                 localIds.add((Integer) data.get("OfflineID"));
             }
 
-            Set<Integer> uniqueLocalIdsSet = new TreeSet<>(localIds);
+            Set<Integer> uniqueLocalIdsSet;
+            if (TrackingParameters.isDebug) {
+                uniqueLocalIdsSet = new TreeSet<>(localIds);
+            } else {
+                uniqueLocalIdsSet = new HashSet<>(localIds);
+            }
             uniqueLocalIdsSet.remove(-1);
             List<Integer> uniqueLocalIds = new ArrayList<>(uniqueLocalIdsSet);
 
@@ -1063,7 +1074,9 @@ public class MCPT {
             }
 
             List<String> sortedSerials = new ArrayList<>(trackingDict.keySet());
-            Collections.sort(sortedSerials);
+            if (TrackingParameters.isDebug) {
+                Collections.sort(sortedSerials);
+            }
 
             for (String serial : sortedSerials) {
                 Map<String, Object> data = trackingDict.get(serial);
