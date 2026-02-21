@@ -1484,6 +1484,8 @@ public class MCPT {
         logger.info("short_track_th: {}", shortTrackTh);
         logger.info("epsilon: {}", epsilon);
 
+        long tStart = System.nanoTime();
+
         // DUMP: Parameters
         if (TrackingParameters.isDebug) {
             Map<String, Object> params = new LinkedHashMap<>();
@@ -1521,7 +1523,9 @@ public class MCPT {
         }
 
         // Measure World Coordinates (using streamed calibration data)
+        long tWCoordStart = System.nanoTime();
         trackingResults = measureWorldCoordinate(calibrationMap, trackingResults);
+        long tWCoordEnd = System.nanoTime();
 
         // Determine availability (check first element of first camera)
         boolean worldCoordAvailable = false;
@@ -1542,9 +1546,11 @@ public class MCPT {
         }
 
         // Get representative nodes
+        long tRepStart = System.nanoTime();
         Map<Integer, Map<Integer, RepresentativeNode>> representativeNodes = decideRepresentativeNodes(
                 trackingResults, representativeSelectionMethod, epsilon, shortTrackTh,
                 keypointTh, imageSize, aspectTh, stackMaxSize);
+        long tRepEnd = System.nanoTime();
 
         // DUMP: Representative nodes
         if (TrackingParameters.isDebug) {
@@ -1568,8 +1574,10 @@ public class MCPT {
         logger.info("Representative features selected");
 
         // Create similarity matrix
+        long tSimStart = System.nanoTime();
         double[][] similarityMatrix = createSimilarityMatrixMCPT(
                 representativeNodes, shortTrackTh, keypointConditionTh);
+        long tSimRaw = System.nanoTime();
 
         // DUMP: MCPT similarity matrix (before zero-out)
         if (TrackingParameters.isDebug) {
@@ -1584,6 +1592,7 @@ public class MCPT {
                 }
             }
         }
+        long tSimZeroed = System.nanoTime();
 
         // DUMP: MCPT similarity matrix (after zero-out)
         if (TrackingParameters.isDebug) {
@@ -1600,10 +1609,12 @@ public class MCPT {
                                                                             // log symmetry
 
         // Replace similarity based on constraints
+        long tReplaceStart = System.nanoTime();
         similarityMatrix = replaceSimilarity(
                 representativeNodes, similarityMatrix, trackingResults, clusters,
                 false, replaceSimilarityByWCoordinate, distanceType, distanceTh,
                 replaceValue, shortTrackTh, keypointConditionTh);
+        long tReplaceEnd = System.nanoTime();
 
         // DUMP: MCPT similarity matrix (after replaceSimilarity)
         if (TrackingParameters.isDebug) {
@@ -1611,9 +1622,11 @@ public class MCPT {
         }
 
         // Perform Re-identification using hierarchical clustering
+        long tHcStart = System.nanoTime();
         clusters = SCPT.associateCluster(clusters,
                 similarityMatrix, // ✅
                 epsilon, true, 2, false);
+        long tHcEnd = System.nanoTime();
 
         // DUMP: Clusters after hierarchical clustering
         if (TrackingParameters.isDebug) {
@@ -1623,6 +1636,7 @@ public class MCPT {
         logger.info("Unique clusters after HC: {}", new HashSet<>(clusters).size());
 
         // Create camera dictionary
+        long tPostStart = System.nanoTime();
         Map<Integer, CameraDict> cameraDict = createCameraDict(
                 representativeNodes, shortTrackTh, keypointConditionTh);
 
@@ -1653,6 +1667,22 @@ public class MCPT {
                 }
             }
         }
+        long tPostEnd = System.nanoTime();
+
+        // PERFORMANCE LOGS
+        System.out.println("\n" + "=".repeat(50));
+        System.out.println("PERFORMANCE REPORT (MCPT - Java) | Window: " + winIdx);
+        System.out.println("-".repeat(50));
+        System.out.printf("Stage 1: Measure World Coordinates:  %.2f ms%n", (tWCoordEnd - tWCoordStart) / 1_000_000.0);
+        System.out.printf("Stage 2: Representative Selection:    %.2f ms%n", (tRepEnd - tRepStart) / 1_000_000.0);
+        System.out.printf("Stage 3: Matrix Gen (Raw):           %.2f ms%n", (tSimRaw - tSimStart) / 1_000_000.0);
+        System.out.printf("Stage 4: Matrix Zeroing:             %.2f ms%n", (tSimZeroed - tSimRaw) / 1_000_000.0);
+        System.out.printf("Stage 5: Similarity Replace (World): %.2f ms%n",
+                (tReplaceEnd - tReplaceStart) / 1_000_000.0);
+        System.out.printf("Stage 6: Clustering (HC):            %.2f ms%n", (tHcEnd - tHcStart) / 1_000_000.0);
+        System.out.printf("Stage 7: Global ID Assignment:       %.2f ms%n", (tPostEnd - tPostStart) / 1_000_000.0);
+        System.out.printf("Total MCPT Time:                     %.2f ms%n", (tPostEnd - tStart) / 1_000_000.0);
+        System.out.println("=".repeat(50) + "\n");
 
         // DUMP: Final global ID assignments
         if (TrackingParameters.isDebug) {
