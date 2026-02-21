@@ -217,6 +217,13 @@ Table~\ref{tab:performance} summarizes the processing time for each stage of the
 \subsection{Performance Analysis}
 The results highlight a significant breakthrough in \emph{Similarity Matrix Generation}, where \textbf{Ours} achieves a 25.57$\times$ speedup. This is attributed to the efficient handling of primitive arrays and JIT-optimized execution of cosine similarity loops. Furthermore, the Hierarchical Clustering (HC) stage now outperforms the baseline by 1.72$\times$ after optimizing for production mode by disabling deterministic sortings required for debugging. Overall, the system achieves a processing time of 516 milliseconds for a 4-camera window, demonstrating its robust capability for real-time operation in complex multi-camera environments.
 
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=0.8\linewidth]{Evidance/cam_01_00}
+        \caption{Visual comparison of tracking results for Camera 01 (Window 0). The frame illustrates the parity between the Python baseline (\textbf{Theirs}) and our Java/Esper implementation (\textbf{Ours}), confirming that the performance optimizations do not compromise tracking coverage or identity consistency.}
+        \label{fig:visual_comparison}
+    \end{figure}
+
 \subsection{Research Questions}
 \begin{itemize}[leftmargin=*]
     \item \textbf{RQ1:} Does the streams-and-tables re-architecture preserve tracking quality compared to the baseline pipeline?
