@@ -6,6 +6,10 @@ import numpy as np
 import json
 import sys
 from pathlib import Path
+import matplotlib
+matplotlib.use('Agg') # Headless backend for environments without a display
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Fix Unicode encoding for Windows console
 if sys.platform == 'win32':
@@ -123,7 +127,7 @@ def compare_matrices(py_path, java_path, name, py_nodes_path, java_nodes_path, p
     if not is_pass:
         print(f"    Top difference: {max_diff:.6f}")
         
-    return is_pass
+    return is_pass, (sub_py, sub_java, diff.flatten())
 
 def load_json(path):
     """Load JSON file"""
@@ -298,7 +302,7 @@ def compare_clusters_by_serial(py_path, java_path, name, py_nodes_path, java_nod
         
         print_result(name, status, details)
         
-        return match_pct >= 90
+        return match_pct, effective_accuracy
         
     except Exception as e:
         print_result(name, "FAIL", f"Error: {e}")
@@ -485,7 +489,7 @@ def compare_global_ids_by_serial(py_path, java_path, name):
         
         print_result(name, status, details)
         
-        return match_pct >= 90
+        return match_pct
         
     except Exception as e:
         print_result(name, "FAIL", f"Error: {e}")
@@ -537,26 +541,29 @@ def main():
 
     # 1. Compare Similarity Matrices
     print_header("Similarity Matrices")
-    results['raw_matrix'] = compare_matrices(
+    raw_mat_info = compare_matrices(
         f"{base_path}/mcpt-similarity-matrix-raw-python.txt",
         f"{base_path}/mcpt-similarity-matrix-raw_0.txt",
         "RAW Similarity Matrix",
         theirs_nodes, ours_nodes, theirs_params
     )
+    results['raw_matrix'] = raw_mat_info[0]
     
-    results['replaced_matrix'] = compare_matrices(
+    replaced_mat_info = compare_matrices(
         f"{base_path}/mcpt-similarity-matrix-replaced-python.txt",
         f"{base_path}/mcpt-similarity-matrix-replaced_0.txt",
         "REPLACED Similarity Matrix",
         theirs_nodes, ours_nodes, theirs_params
     )
+    results['replaced_matrix'] = replaced_mat_info[0]
     
-    results['zeroed_matrix'] = compare_matrices(
+    zeroed_mat_info = compare_matrices(
         f"{base_path}/mcpt-similarity-matrix-zeroed-python.txt",
         f"{base_path}/mcpt-similarity-matrix-zeroed_0.txt",
         "ZEROED Similarity Matrix",
         theirs_nodes, ours_nodes, theirs_params
     )
+    results['zeroed_matrix'] = zeroed_mat_info[0]
     
     # 2. Compare Representative Nodes
     print_header("Representative Nodes & Clustering")
@@ -566,12 +573,13 @@ def main():
     )
     
     # 3. Compare Clusters After HC (using serial-based comparison)
-    results['clusters_after_hc'] = compare_clusters_by_serial(
+    cluster_acc = compare_clusters_by_serial(
         f"{base_path}/mcpt-clusters-after-hc-python.txt",
         f"{base_path}/mcpt-clusters-after-hc_0.txt",
         "Clusters After Hierarchical Clustering",
         theirs_nodes, ours_nodes, theirs_params
     )
+    results['clusters_after_hc'] = cluster_acc[0] >= 90
     
     # # 4. Compare Camera Dict (using serial-based comparison)
     # results['camera_dict'] = compare_camera_dict_by_serial(
@@ -582,11 +590,24 @@ def main():
     # )
     
     # 5. Compare Global IDs (using serial-based comparison)
-    results['global_ids'] = compare_global_ids_by_serial(
+    global_id_acc = compare_global_ids_by_serial(
         f"{base_path}/mcpt-global-ids-python.json",
         f"{base_path}/mcpt-global-ids_0.json",
         "Global ID Assignments"
     )
+    results['global_ids'] = global_id_acc >= 90
+    
+    # Collect data for visualization
+    viz_mats = {
+        'Raw Similarity': raw_mat_info[1][:2],
+        'Replaced Similarity': replaced_mat_info[1][:2],
+        'Zeroed Similarity': zeroed_mat_info[1][:2]
+    }
+    diff_values = {
+        'raw': raw_mat_info[1][2],
+        'replaced': replaced_mat_info[1][2],
+        'zeroed': zeroed_mat_info[1][2]
+    }
     
     # Summary
     print_header("Summary (Ours vs Theirs)")
@@ -622,6 +643,82 @@ def main():
         print(f"  {Colors.YELLOW}⚠{Colors.END} Global ID assignments differ")
     
     print()
+    
+    # 6. Generate Visualizations
+    generate_visualizations(base_path, results, viz_mats, cluster_acc, global_id_acc, diff_values)
+
+def generate_visualizations(output_dir, results, viz_mats, cluster_acc, global_id_acc, diff_values):
+    print_header("Generating Scientific Visualizations")
+    viz_path = Path(output_dir) / "plots"
+    viz_path.mkdir(exist_ok=True)
+    
+    # 1. Similarity Matrix Heatmaps
+    for name, (py_mat, java_mat) in viz_mats.items():
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+        
+        sns.heatmap(py_mat, ax=ax1, cmap='viridis', cbar_kws={'label': 'Similarity Score'})
+        ax1.set_title(f'Python Reference: {name}')
+        ax1.set_xlabel('Representative Node Index')
+        ax1.set_ylabel('Representative Node Index')
+        
+        sns.heatmap(java_mat, ax=ax2, cmap='viridis', cbar_kws={'label': 'Similarity Score'})
+        ax2.set_title(f'Java Implementation: {name}')
+        ax2.set_xlabel('Representative Node Index')
+        ax2.set_ylabel('Representative Node Index')
+        
+        plt.tight_layout()
+        save_name = viz_path / f"heatmap_{name.lower().replace(' ', '_')}.png"
+        plt.savefig(save_name, dpi=300)
+        print(f"  Saved heatmap: {save_name}")
+        plt.close()
+
+    # 2. Agreement Parity Chart
+    metrics = {
+        'Clustering (Group)': cluster_acc[0],
+        'Clustering (Serial)': cluster_acc[1],
+        'Global ID Match': global_id_acc
+    }
+    
+    plt.figure(figsize=(10, 6))
+    bars = plt.bar(metrics.keys(), metrics.values(), color=['#4C72B0', '#55A868', '#C44E52'])
+    plt.ylim(0, 110)
+    plt.ylabel('Agreement (%)')
+    plt.title('Implementation Parity Metrics: Python vs Java')
+    
+    # Add values on top of bars
+    for bar in bars:
+        yval = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2, yval + 1, f'{yval:.1f}%', ha='center', va='bottom', fontweight='bold')
+    
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    save_name = viz_path / "parity_metrics.png"
+    plt.savefig(save_name, dpi=300)
+    print(f"  Saved parity chart: {save_name}")
+    plt.close()
+
+    # 3. Numerical Difference Distribution
+    if diff_values:
+        plt.figure(figsize=(10, 6))
+        all_diffs = np.concatenate(list(diff_values.values()))
+        # Only show non-zero differences to see the error distribution
+        small_diffs = all_diffs[all_diffs > 1e-10]
+        
+        if len(small_diffs) > 0:
+            sns.histplot(small_diffs, kde=True, color='purple', bins=50)
+            plt.yscale('log')
+            plt.title('Distribution of Numerical Differences (Non-Zero)')
+            plt.xlabel('Absolute Difference Value')
+        else:
+            plt.text(0.5, 0.5, 'No significant numerical differences found', ha='center', va='center')
+            plt.title('Numerical Differences')
+            
+        plt.grid(True, which="both", ls="-", alpha=0.2)
+        save_name = viz_path / "difference_distribution.png"
+        plt.savefig(save_name, dpi=300)
+        print(f"  Saved difference distribution: {save_name}")
+        plt.close()
+
+    print(f"\n{Colors.GREEN}Successfully generated 3 scientific visualizations in {viz_path}{Colors.END}\n")
 
 if __name__ == "__main__":
     main()
