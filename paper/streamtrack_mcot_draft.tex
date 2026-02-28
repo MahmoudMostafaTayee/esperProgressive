@@ -80,34 +80,40 @@ A \emph{stream} is an unbounded sequence of tuples. A \emph{table} (relation) is
 
 \section{System Overview}\label{sec:overview}
 \subsection{Architecture at a Glance}
-% [DONE] TODO: Add a figure of the operator DAG.
-Figure~\ref{fig:dag} (placeholder) will depict the operator graph from detection ingestion to global identity updates.
+% [DONE] TODO: Add a table of the operator DAG.
+Table~\ref{tab:dag} detailing the operator graph from detection ingestion to global identity updates.
 
-\begin{figure}[t]
+\begin{table}[t]
     \centering
-	% [DONE] TODO: Replace with actual diagram.
-    \includegraphics[width=0.9\linewidth]{Evidence/cam_01_00} % Using cam_01_00 as representative state visualization
     \caption{Conceptual operator graph and state tables. Observations flow as streams, while tracklets and identities are maintained in relational tables updated by continuous joins.}
-    \label{fig:dag}
-\end{figure}
+    \label{tab:dag}
+    \begin{tabular}{@{}lll@{}}
+        \toprule
+        \textbf{Pipeline Stage} & \textbf{Operator} & \textbf{Output Stream / State Table} \\ \midrule
+        Ingestion & Feature Enrichment & \texttt{embeddingFeature} stream \\
+        Tracking & Single-Camera Tracking & \texttt{embeddingFeature} windowed batch \\
+        Association & Topology-Aware Join & \texttt{SingleCameraResult} aggregation \\
+        Selection & Representative Selection & Native MCPT Logic \\
+        Clustering & Global ID Maintenance & \texttt{GlobalIDTable} table \\ \bottomrule
+    \end{tabular}
+\end{table}
 
 \subsection{Data Model: Streams and Tables}
+\subsection{Data Model: Streams and Tables}
 % [DONE] TODO: Replace with final schemas; keep names consistent with EPL/SQL later.
-\paragraph{Streams (examples).}
+\paragraph{Streams.}
 \begin{itemize}[leftmargin=*]
-    \item $\texttt{Detections}(\textit{camId}, \textit{ts\_ingest}, \textit{bbox}, \textit{score}, \textit{emb}, \textit{frameId}, \dots)$
-    \item $\texttt{TrackletEvents}(\textit{camId}, \textit{trackletId}, \textit{ts\_ingest}, \textit{eventType}, \dots)$
-    \item $\texttt{Representatives}(\textit{camId}, \textit{trackletId}, \textit{ts\_ingest}, \textit{repEmb}, \textit{quality}, \dots)$
-    \item $\texttt{CrossCamCandidates}(\textit{srcCam}, \textit{dstCam}, \textit{srcTracklet}, \textit{dstTracklet}, \textit{ts\_ingest}, \textit{sim}, \dots)$
-    \item $\texttt{IdentityUpdates}(\textit{globalId}, \textit{trackletId}, \textit{action}, \textit{confidence}, \textit{ts\_ingest}, \dots)$
+    \item $\texttt{embeddingFeature}(\textit{cameraId}, \textit{curFrame}, \textit{timestamp}, \textit{detectedUsers}[])$ 
+    \item $\texttt{SingleCameraResult}(\textit{cameraId}, \textit{windowIndex}, \textit{clusterLabels}[], \textit{featureList}[], \textit{frameNumbers}[], \textit{timestamps}[], \dots)$
+    \item $\texttt{GlobalPersonEvent}(\textit{globalId}, \textit{cameraId}, \textit{serial}, \textit{localId}, \textit{x}, \textit{y}, \textit{timestamp}, \textit{attributes}\{\})$
+    \item $\texttt{TrackExpiredEvent}(\textit{globalId})$
 \end{itemize}
 
-\paragraph{State Tables (examples).}
+\paragraph{State Tables.}
 \begin{itemize}[leftmargin=*]
-    \item $\texttt{ActiveTracklets}(\textit{camId}, \textit{trackletId}, \textit{lastTs\_ingest}, \textit{state}, \textit{embStats}, \dots)$
-    \item $\texttt{GlobalIdentities}(\textit{globalId}, \textit{members}, \textit{centroidEmb}, \textit{lastTs\_ingest}, \dots)$
-    \item $\texttt{CameraTopology}(\textit{srcCam}, \textit{dstCam}, \textit{enabled}, \textit{delayMin}, \textit{delayMax}, \textit{gateParams}, \dots)$
-    \item $\texttt{Calibration}(\textit{camId}, \textit{params}, \dots)$ (optional)
+    \item $\texttt{GlobalIDTable}(\textit{globalId}, \textit{lastSeen}, \textit{attributes}\{\textit{Cameras}[], \textit{Timestamp}, \textit{Coordinate}\})$
+    \item $\texttt{CalibrationTable}(\textit{cameraId}, \textit{homographyMatrix})$
+    \item $\texttt{CameraTopologyTable}(\textit{cameraId}, \textit{neighborId}, \textit{enabled})$
 \end{itemize}
 
 \subsection{Execution Semantics}
@@ -121,32 +127,32 @@ This stage ingests per-camera detections and attaches feature vectors (appearanc
 
 \subsection{Single-Camera Tracking as Stateful Stream Processing}
 % [DONE] TODO: Formalize tracklet creation/update/end; specify association rules and state updates.
-Single-camera tracking is implemented as a stateful windowed operator. It maintains the \texttt{ActiveTracklets} state table, which is updated by detection streams. The operator performs frame-to-frame association and emits tracklet lifecycle events (start, update, end) and incremental summaries of appearance and motion.
+Single-camera tracking is implemented as a stateful windowed operator. It maintains detection history within a sliding window to perform frame-to-frame association. The operator emits \texttt{SingleCameraResult} events which contain consolidated tracklet features and detection-level timestamps, providing the foundation for inter-window and cross-camera matching.
 
 \subsection{Streaming Conflict Resolution / Overlap Suppression (Optional)}
 % TODO: Provide streaming equivalent of overlap suppression and how it is implemented with windowed constraints.
 When detections/tracklets violate spatial overlap constraints within short ingestion-time windows, a conflict-resolution operator suppresses inconsistent hypotheses and triggers re-association.
-
-\subsection{Representative Selection Operator}
-% [DONE] TODO: Define quality scoring and windowed ranking to pick representatives.
-To reduce cross-camera communication and computation, a continuous operator selects the top-$k$ representative observations for each active tracklet. Selection is based on criteria such as the presence of keypoints (e.g., face, torso) and embedding stability within the window.
-
-\subsection{Online Clustering / Global Identity Maintenance}
-% [DONE] TODO: Describe streaming clustering or incremental linkage approach.
-Global identities are maintained in the \texttt{GlobalIDTable}. We implement a streaming version of hierarchical clustering that incrementally updates global identity memberships. When a high-confidence cross-camera association is found via stream joins (see Section~\ref{sec:joins}), the table is updated with a merge event.
 
 \section{Cross-Camera Tracking via Topology-Aware Stream Joins}\label{sec:joins}
 \subsection{Naive Cross-Camera Matching Cost}
 % [DONE] TODO: Define baseline candidate generation and its complexity.
 Naive cross-camera association compares tracklets across all camera pairs in the network. For $m$ cameras, this results in $O(m^2)$ pairwise comparisons, which becomes a scalability bottleneck as the network grows. In high-density scenes, this lead to a quadratic explosion of candidate matches.
 
-\subsection{Topology-Aware Candidate Generation}
+\subsection{Topology-Aware Candidate Generation (Association)}
 % [DONE] TODO: Provide join formulation and gating predicates (time, similarity, optional space).
-We formulation cross-camera association as a stream join constrained by a dynamically updateable neighborhood graph. The join only evaluates pairs $(c_i, c_j)$ for which an edge exists in the \texttt{CameraTopology} table. By applying this spatial gating, we reduce the candidate space to local neighborhoods, drastically lowering the computational overhead of similarity matrix generation.
+We formulation cross-camera association as a stream join constrained by a dynamically updateable neighborhood graph. The join only evaluates pairs $(c_i, c_j)$ for which an edge exists in the \texttt{CameraTopology} (or via predefined aggregation groups in Esper). By applying this spatial gating, we reduce the candidate space to local neighborhoods, drastically lowering the computational overhead of similarity matrix generation.
 
 \subsection{Camera Topology as a Reconfigurable State Table}
 % [DONE] TODO: Explain update mechanism and runtime effect.
-A key system feature is the treatment of camera neighborhoods as a first-class relational table. Administrators can update the \texttt{CameraTopology} table at runtime (e.g., adding a new camera, disabling a malfunctioning link) via simple DML operations. These changes take effect immediately for the next window of tracklets, enabling zero-downtime reconfiguration of the tracking pipeline.
+A key system feature is the treatment of camera neighborhoods as a manageable relational configuration. We implement a \texttt{CameraTopologyTable} in Esper which stores the active neighbor graph. Administrators can update this table at runtime (e.g., adding a new camera, disabling a malfunctioning link) by streaming \texttt{CameraTopology} events or executing DML operations. These changes take effect immediately for the next window of tracklets, enabling zero-downtime reconfiguration of the tracking pipeline without redeploying complex aggregation queries.
+
+\subsection{Representative Selection Operator}
+% [DONE] TODO: Define quality scoring and windowed ranking to pick representatives.
+Once cameras are successfully joined and aggregated, the MCPT module natively selects the top-$k$ representative observations for each associated tracklet. Selection is based on criteria such as the presence of keypoints (e.g., face, torso) and embedding stability within the window.
+
+\subsection{Online Clustering / Global Identity Maintenance}
+% [DONE] TODO: Describe streaming clustering or incremental linkage approach.
+Global identities are maintained in the \texttt{GlobalIDTable}. We implement a person-centric summary logic where the system aggregates all detections of a specific identity across all cameras within a processing window. Instead of streaming every individual detection point, the system emits a single \texttt{GlobalPersonEvent} per identity per window, capturing their latest sighting (timestamp and coordinates) and the full set of cameras on which they were visible (e.g., \texttt{Cameras: [1, 2, 4]}). When the CEP engine detects a track expiration (e.g., unseen for 2 minutes), it emits a \texttt{TrackExpiredEvent} stream which signals the external tracking logic to evict heavy state bindings, keeping the relational CEP engine performance optimized.
 
 \subsection{Join Planning and Optimization}
 % TODO: Discuss selectivity, indexes/partitioning, and how topology sparsity helps.
@@ -155,37 +161,72 @@ Topology sparsity reduces the join search space and improves throughput. We late
 \section{Implementation in SQL/EPL on Esper}\label{sec:implementation}
 \subsection{Why SQL-first on a CEP Engine}
 % [DONE] TODO: Argue for inspectability, modularity, and operational benefits.
-Implementing MCOT via SQL/EPL on a Complex Event Processing (CEP) engine like Esper provides several operational advantages: (i) \textbf{Inspectability:} Developers can query intermediate state tables (e.g., \texttt{GlobalIDTable}) at runtime to debug association failures. (ii) \textbf{Modularity:} New operators can be added by simply deploying new EPL statements. (iii) \textbf{Performance:} The engine optimizes windowing and join planning using JIT compilation, as reflected in the 25$\times$ speedup observed in similarity generation.
+Implementing MCOT via SQL/EPL on a Complex Event Processing (CEP) engine like Esper provides several operational advantages: (i) \textbf{Inspectability:} Developers can query intermediate state tables (e.g., \texttt{GlobalIDTable}) at runtime to debug association failures. (ii) \textbf{Modularity:} New operators can be added by simply deploying new EPL statements. (iii) \textbf{Memory Safe:} The engine gracefully handles complex event lifecycle rules like \texttt{TrackExpiredEvent}, ensuring deterministic garbage collection of heavy vision tensors. (iv) \textbf{Performance:} The system optimizes windowing and join planning using JIT compilation, as reflected in the 25$\times$ speedup observed in similarity generation.
 
 \subsection{Handling Ordering and Jitter under Ingestion Time}
 Using ingestion-time semantics simplifies real-time deployment by avoiding the complexities of event-time watermarking. While minor jitter may occur, the system remains stable by using small slack windows in the joins and state eviction based on engine-time staleness.
 
 \subsection{EPL Operator Templates}
 % [DONE] TODO: Add actual EPL snippets later. Keep structure stable.
-Representative EPL templates from the Esper implementation are shown below:
+Representative EPL templates from the Esper implementation mapping to the pipeline stages in Table~\ref{tab:dag} are shown below:
 
-\paragraph{(T1) Tracklet state maintenance.}
+\paragraph{1. Ingestion \& Feature Enrichment.}
 \begin{verbatim}
+-- (Implicitly handled during ingestion into the Detections Stream)
+-- Features are extracted and attached before sending to Esper:
+-- e.g., streamEvent(new embeddingFeature(...), "embeddingFeature_camera_0001");
+\end{verbatim}
+
+\paragraph{2. Single-Camera Tracking.}
+\begin{verbatim}
+-- Maintains ActiveTracklets table
 select detectedUsers, curFrame, timestamp 
 from embeddingFeature_camera_0001.win:length_batch(120)
 \end{verbatim}
 
-\paragraph{(T2) Topology-aware join.}
+\paragraph{3. Topology-Aware Join (Association).}
 \begin{verbatim}
-select window(*) as results 
+-- Emits CrossCamCandidates stream (Aggregation Group)
+select window( * ) as results 
 from SingleCameraResult(cameraId in ('camera_0001', 'camera_0002')).win:time(2 min) 
 group by windowIndex 
 having count(*) = 2 
 output first every 59 seconds;
 \end{verbatim}
 
-\paragraph{(T3) Global identity updates.}
+\paragraph{5. Global ID Maintenance (Clustering).}
 \begin{verbatim}
+-- Maintains GlobalIDTable with latest state and person-centric summaries
 on GlobalPersonEvent as gpe
 merge into GlobalIDTable as gt
 where gt.globalId = gpe.globalId
-when matched then update set gt.lastSeen = gpe.timestamp
-when not matched then insert select gpe.globalId, gpe.timestamp;
+when matched then
+    update set gt.lastSeen = gpe.timestamp, gt.attributes = gpe.attributes
+when not matched then
+    insert select gpe.globalId as globalId, gpe.timestamp as lastSeen, gpe.attributes as attributes;
+
+-- Emit TrackExpiredEvent and clean up GlobalIDTable (with Priority handling)
+@Priority(10) on pattern [every timer:interval(10000)]
+insert into TrackExpiredEvent select globalId from GlobalIDTable
+where current_timestamp() - lastSeen > 120000;
+
+@Priority(1) on pattern [every timer:interval(10000)]
+delete from GlobalIDTable
+where current_timestamp() - lastSeen > 120000;
+\end{verbatim}
+
+\paragraph{6. Runtime Topology Reconfiguration.}
+\begin{verbatim}
+-- Define relational neighboorhood graph
+-- (Esper 9 composite primary key syntax)
+create table CameraTopologyTable (
+    cameraId string, neighborId string, enabled boolean, 
+    primary key(cameraId, neighborId)
+);
+
+-- Update topology at runtime via stream
+insert into CameraTopologyTable 
+select cameraId, neighborId, enabled from CameraTopology;
 \end{verbatim}
 
 
@@ -214,10 +255,10 @@ Table~\ref{tab:performance} summarizes the processing time for each stage of the
     \begin{tabular}{@{}lrrr@{}}
         \toprule
         \textbf{Pipeline Stage} & \textbf{Theirs (ms)} & \textbf{Ours (ms)} & \textbf{Speedup} \\ \midrule
-        Representative Selection & 230.70 & 221.15 & 1.04$\times$ \\
         Similarity Matrix Generation & 1260.00 & 49.27 & \textbf{25.57$\times$} \\
         Similarity Matrix Zeroing & 253.00 & 0.98 & \textbf{258.16$\times$} \\
         Similarity Replacement & $<$0.01 & $<$0.01 & 1.00$\times$ \\
+        Representative Selection & 230.70 & 221.15 & 1.04$\times$ \\
         Hierarchical Clustering (HC) & 415.00 & 241.17 & \textbf{1.72$\times$} \\
         Global ID Assignment & 52.00 & 2.46 & \textbf{21.13$\times$} \\ \midrule
         \textbf{Total MCPT Time} & \textbf{2210.70} & \textbf{515.99} & \textbf{4.28$\times$} \\ \bottomrule
