@@ -91,6 +91,10 @@ public class IotMain implements Runnable {
         EventEPLUtil.addEventType("TrackExpiredEvent",
                 com.espertech.esper.example.IOT.streams.TrackExpiredEvent.class);
 
+        // Register CameraTopology
+        EventEPLUtil.addEventType("CameraTopology",
+                com.espertech.esper.example.IOT.streams.CameraTopology.class);
+
         logger.info("Setting up runtime");
         EventEPLUtil.initiateRuntime();
     }
@@ -155,6 +159,7 @@ public class IotMain implements Runnable {
         // wildTrackDatasetQueries();
 
         prepareCalibrationQueries();
+        prepareTopologyQueries();
         embeddingFeatureQueries();
         multiCameraAggregationQueries();
         afterClusteringQueries();
@@ -203,6 +208,49 @@ public class IotMain implements Runnable {
                 }
             }
         });
+    }
+
+    private void prepareTopologyQueries() {
+        // Create an Esper Table for Camera Topology (Neighborhood Graph)
+        // This allows us to query which cameras are neighbors at runtime.
+        String createTableEPL = "create table CameraTopologyTable (cameraId string primary key, neighborId string primary key, enabled boolean);";
+        EventEPLUtil.addEpl(createTableEPL);
+        EventEPLUtil.addEpl("create index CameraTopologyNeighborIndex on CameraTopologyTable (neighborId);");
+
+        // Insert incoming CameraTopology events into the table to allow runtime updates
+        String insertEPL = "insert into CameraTopologyTable select cameraId, neighborId, enabled from CameraTopology;";
+        EventEPLUtil.addEpl(insertEPL);
+
+        // Initial population from static groups to bootstrap the "Graph"
+        String groupsConfig = TrackingParameters.CAMERA_GROUPS;
+        if (!groupsConfig.equalsIgnoreCase("all")) {
+            String[] groupStrings = groupsConfig.split(";");
+            for (String groupStr : groupStrings) {
+                String[] parts = groupStr.split(",");
+                for (int i = 0; i < parts.length; i++) {
+                    for (int j = i + 1; j < parts.length; j++) {
+                        String camI = normalizeCameraName(parts[i].trim());
+                        String camJ = normalizeCameraName(parts[j].trim());
+                        // Add bidirectional links
+                        EventEPLUtil.addEpl(
+                                "insert into CameraTopologyTable values ('" + camI + "', '" + camJ + "', true)");
+                        EventEPLUtil.addEpl(
+                                "insert into CameraTopologyTable values ('" + camJ + "', '" + camI + "', true)");
+                    }
+                }
+            }
+        }
+
+        logger.info("Initialized CameraTopologyTable with reconfigurable neighborhood data.");
+    }
+
+    private String normalizeCameraName(String token) {
+        if (token.matches("\\d+")) {
+            return String.format("camera_%04d", Integer.parseInt(token));
+        } else if (!token.startsWith("camera_")) {
+            return "camera_" + token;
+        }
+        return token;
     }
 
     private void embeddingFeatureQueries() {
@@ -367,6 +415,7 @@ public class IotMain implements Runnable {
                                     if (attrs.containsKey("GlobalOfflineID")) {
                                         int globalId = (int) attrs.get("GlobalOfflineID");
                                         int localId = (int) attrs.get("OfflineID");
+                                        @SuppressWarnings("unchecked")
                                         java.util.Map<String, Integer> coord = (java.util.Map<String, Integer>) attrs
                                                 .get("Coordinate");
                                         int x = (coord.get("x1") + coord.get("x2")) / 2;
@@ -472,7 +521,8 @@ public class IotMain implements Runnable {
                         for (EventBean event : newEvents) {
                             int globalId = (int) event.get("globalId");
                             long lastSeen = (long) event.get("lastSeen");
-                            java.util.Map attrs = (java.util.Map) event.get("attributes");
+                            java.util.Map<String, Object> attrs = (java.util.Map<String, Object>) event
+                                    .get("attributes");
 
                             System.out.printf("%s: GlobalID %d last seen at %d. Attributes: %s%n",
                                     listenerName,
