@@ -7,27 +7,17 @@ import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.runtime.client.EPRuntime;
 import com.espertech.esper.runtime.client.EPStatement;
 import com.espertech.esper.runtime.client.UpdateListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import smile.clustering.HierarchicalClustering;
-import smile.clustering.linkage.SingleLinkage;
-
 import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
-
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 //import java.io.IOException;
 //import java.util.List;
 
 public class Tracker {
-    private static final Logger logger = LoggerFactory.getLogger(Tracker.class);
 
     private String cameraId;
-    private long agglomerative_clustering_time_tracker = 0;
-    private int numberOfClusters = 1;
     Integer windowIndex = 0;
 
     // State for association across windows
@@ -50,7 +40,6 @@ public class Tracker {
             return;
 
         Instant start_time = Instant.now();
-        Long first_timestamp = 0L;
         long lasttimestamp = 0L;
         Integer first_id = 0;
         Integer last_id = 0;
@@ -64,19 +53,15 @@ public class Tracker {
         List<Integer> idList = new ArrayList<>();
         List<Integer[]> boundingBoxList = new ArrayList<>();
         List<List<List<Float>>> keypointsList = new ArrayList<>();
+        List<Long> timestampsList = new ArrayList<>();
 
-        long start = System.nanoTime();
         boolean flag = true;
-
         for (EventBean e : newEvents) {
             // Get frame-level data
             List<DetectedUser> detectedUsers = (List<DetectedUser>) e.get("detectedUsers");
             Integer curFrame = (Integer) e.get("curFrame");
             Long timestamp = (Long) e.get("timestamp");
 
-            if (flag) {
-                first_timestamp = timestamp;
-            }
             lasttimestamp = timestamp;
 
             // Process each detected user in the frame
@@ -98,6 +83,7 @@ public class Tracker {
                 featureList.add(feature.stream().mapToDouble(Float::doubleValue).toArray());
                 keypointsList.add(user.getKeypoints());
                 frameNumbers.add(curFrame);
+                timestampsList.add(timestamp);
                 serialNumbers.add(id);
                 idList.add(id);
                 flag = false;
@@ -129,7 +115,7 @@ public class Tracker {
             }
         }
 
-        // 3. Label Shifting (Global ID Generation)
+        // 3. Label Shifting (Shift new cluster labels to be uniquely above current max)
         for (int i = 0; i < newClusterLabels.size(); i++) {
             int cluster = newClusterLabels.get(i);
             if (cluster != -1) {
@@ -138,17 +124,8 @@ public class Tracker {
                 newClusterLabels.set(i, -i);
             }
         }
-
-        // 4. Update Max Global ID
-        int currentMax = -1;
-        for (Integer label : newClusterLabels) {
-            if (label > currentMax) {
-                currentMax = label;
-            }
-        }
-        if (currentMax > maxOfflineId) {
-            maxOfflineId = currentMax;
-        }
+        // NOTE: We no longer update maxOfflineId here.
+        // We wait until after association to see which IDs are actually kept.
 
         // 5. Inter-Window Association (Global Tracking)
         if (windowIndex >= 1) {
@@ -182,9 +159,6 @@ public class Tracker {
         pastFeatures = new ArrayList<>(featureList);
         pastClusters = new ArrayList<>(newClusterLabels);
         pastFrames = new ArrayList<>(frameNumbers);
-
-        long durationMs = (System.nanoTime() - start) / 1_000_000;
-        agglomerative_clustering_time_tracker += durationMs;
 
         // 7. Post-Processing (NMS, Warp, etc.)
         if (TrackingParameters.sequential_nms) {
@@ -276,7 +250,16 @@ public class Tracker {
             }
         }
 
-        // Emit SingleCameraResult event
+        // 8. Update Max Offline ID for the next window
+        // This ensures new labels in the next window start strictly after the highest
+        // ID currently in our history or current state.
+        for (Integer label : newClusterLabels) {
+            if (label > maxOfflineId) {
+                maxOfflineId = label;
+            }
+        }
+
+        // 9. Emit SingleCameraResult event
         com.espertech.esper.example.IOT.streams.SingleCameraResult result = new com.espertech.esper.example.IOT.streams.SingleCameraResult(
                 cameraId,
                 windowIndex,
@@ -286,7 +269,8 @@ public class Tracker {
                 boundingBoxList,
                 featureList,
                 keypointsList,
-                frameNumbers);
+                frameNumbers,
+                timestampsList);
         EventEPLUtil.streamEvent(result, "SingleCameraResult");
 
         System.out.println("[" + cameraId + "] Window " + windowIndex + " Finished. Time: "

@@ -362,6 +362,7 @@ public class IotMain implements Runnable {
                                 java.util.List<java.util.List<java.util.List<Float>>> keypointsList = scr
                                         .getKeypointsList();
                                 java.util.List<Integer> frameNumbers = scr.getFrameNumbers();
+                                java.util.List<Long> timestampsList = scr.getTimestamps();
 
                                 for (int i = 0; i < clusterLabels.size(); i++) {
                                     String serial = String.valueOf(idList.get(i));
@@ -369,6 +370,7 @@ public class IotMain implements Runnable {
                                     java.util.Map<String, Object> data = new java.util.HashMap<>();
                                     data.put("OfflineID", clusterLabels.get(i));
                                     data.put("Frame", frameNumbers.get(i));
+                                    data.put("Timestamp", timestampsList.get(i));
 
                                     Integer[] bbox = boundingBoxList.get(i);
                                     java.util.Map<String, Integer> coord = new java.util.HashMap<>();
@@ -406,31 +408,57 @@ public class IotMain implements Runnable {
                                     2000, // stackMaxSize
                                     winIdx);
 
-                            // Send GlobalPersonEvent for tracker table
+                            // Aggregate cameras and find the latest detection per GlobalID
+                            java.util.Map<Integer, java.util.Set<Integer>> globalIdToCameras = new java.util.HashMap<>();
+                            java.util.Map<Integer, com.espertech.esper.example.IOT.streams.GlobalPersonEvent> latestEvents = new java.util.HashMap<>();
                             long timestamp = EventEPLUtil.getCurrentTime();
-                            for (Integer cam : trackingResults.keySet()) {
-                                java.util.Map<String, java.util.Map<String, Object>> camRes = trackingResults.get(cam);
+
+                            for (Integer camId : trackingResults.keySet()) {
+                                java.util.Map<String, java.util.Map<String, Object>> camRes = trackingResults
+                                        .get(camId);
                                 for (String serial : camRes.keySet()) {
                                     java.util.Map<String, Object> attrs = camRes.get(serial);
                                     if (attrs.containsKey("GlobalOfflineID")) {
-                                        int globalId = (int) attrs.get("GlobalOfflineID");
-                                        int localId = (int) attrs.get("OfflineID");
-                                        @SuppressWarnings("unchecked")
-                                        java.util.Map<String, Integer> coord = (java.util.Map<String, Integer>) attrs
-                                                .get("Coordinate");
-                                        int x = (coord.get("x1") + coord.get("x2")) / 2;
-                                        int y = coord.get("y2");
+                                        int gid = (int) attrs.get("GlobalOfflineID");
+                                        long detTimestamp = (long) attrs.get("Timestamp");
 
-                                        // Flexible attributes map for Case Management style
-                                        java.util.Map<String, Object> eventAttrs = new java.util.HashMap<>(attrs);
-                                        eventAttrs.remove("Feature"); // Too large for table usually
-                                        eventAttrs.remove("Keypoints");
+                                        // Update cameras set
+                                        globalIdToCameras.computeIfAbsent(gid, k -> new java.util.TreeSet<>())
+                                                .add(camId);
 
-                                        GlobalPersonEvent gpe = new GlobalPersonEvent(
-                                                globalId, cam, serial, localId, x, y, timestamp, eventAttrs);
-                                        EventEPLUtil.streamEvent(gpe, "GlobalPersonEvent");
+                                        // Keep track of the latest appearance for this person
+                                        if (!latestEvents.containsKey(gid)
+                                                || (long) latestEvents.get(gid).getAttributes()
+                                                        .get("Timestamp") <= detTimestamp) {
+                                            @SuppressWarnings("unchecked")
+                                            java.util.Map<String, Integer> coord = (java.util.Map<String, Integer>) attrs
+                                                    .get("Coordinate");
+                                            int x = (coord.get("x1") + coord.get("x2")) / 2;
+                                            int y = coord.get("y2");
+
+                                            // Cleanup attributes for table
+                                            java.util.Map<String, Object> eventAttrs = new java.util.HashMap<>(attrs);
+                                            eventAttrs.remove("Feature");
+                                            eventAttrs.remove("Keypoints");
+                                            eventAttrs.remove("OfflineID");
+                                            eventAttrs.remove("GlobalOfflineID");
+                                            eventAttrs.remove("Frame"); // User requested Timestamp instead of Frame
+
+                                            latestEvents.put(gid,
+                                                    new com.espertech.esper.example.IOT.streams.GlobalPersonEvent(
+                                                            gid, camId, serial, (int) attrs.get("OfflineID"), x, y,
+                                                            timestamp, eventAttrs));
+                                        }
                                     }
                                 }
+                            }
+
+                            // Stream the summarized events to the GlobalIDTable
+                            for (com.espertech.esper.example.IOT.streams.GlobalPersonEvent gpe : latestEvents
+                                    .values()) {
+                                // Inject the final camera list into the summarized attributes
+                                gpe.getAttributes().put("Cameras", globalIdToCameras.get(gpe.getGlobalId()));
+                                EventEPLUtil.streamEvent(gpe, "GlobalPersonEvent");
                             }
                             // Trigger table print
                             EventEPLUtil.streamEvent(new com.espertech.esper.example.IOT.streams.TriggerEvent(),
@@ -521,6 +549,7 @@ public class IotMain implements Runnable {
                         for (EventBean event : newEvents) {
                             int globalId = (int) event.get("globalId");
                             long lastSeen = (long) event.get("lastSeen");
+                            @SuppressWarnings("unchecked")
                             java.util.Map<String, Object> attrs = (java.util.Map<String, Object>) event
                                     .get("attributes");
 
