@@ -1469,6 +1469,29 @@ public class MCPT {
     // ==================== MAIN MCPT FUNCTION ====================
 
     /**
+     * Compute cosine similarity between two feature arrays.
+     */
+    public static double computeCosineSimilarity(double[] a, double[] b) {
+        if (a == null || b == null)
+            return 0.0;
+        double dotProduct = 0.0;
+        double normA = 0.0;
+        double normB = 0.0;
+        for (int k = 0; k < a.length && k < b.length; k++) {
+            dotProduct += a[k] * b[k];
+            normA += a[k] * a[k];
+            normB += b[k] * b[k];
+        }
+        normA = Math.sqrt(normA);
+        normB = Math.sqrt(normB);
+        if (normA == 0 && normB == 0)
+            return 1.0;
+        if (normA == 0 || normB == 0)
+            return 0.0;
+        return dotProduct / (normA * normB);
+    }
+
+    /**
      * Perform multi-camera people tracking
      * Python equivalent: multi_camera_people_tracking
      * 
@@ -1478,6 +1501,8 @@ public class MCPT {
     public static Map<Integer, Map<String, Map<String, Object>>> multiCameraPeopleTracking(
             Map<Integer, double[][]> calibrationMap,
             Map<Integer, Map<String, Map<String, Object>>> trackingResults,
+            Map<Integer, GlobalTrackState> globalTrackRegistry,
+            java.util.concurrent.atomic.AtomicInteger nextGlobalId,
             String representativeSelectionMethod,
             double epsilon,
             int shortTrackTh,
@@ -1653,6 +1678,88 @@ public class MCPT {
         Map<Integer, CameraDict> cameraDict = createCameraDict(
                 representativeNodes, shortTrackTh, keypointConditionTh);
 
+        // --- NEW: MATCH WINDOW CLUSTERS TO HISTORICAL GLOBAL IDS ---
+        Map<Integer, List<double[]>> clusterFeatures = new HashMap<>();
+        long currentTime = System.currentTimeMillis();
+
+        for (Map.Entry<Integer, CameraDict> cameraEntry : cameraDict.entrySet()) {
+            Integer cameraId = cameraEntry.getKey();
+            Map<Integer, RepresentativeNode> camReps = representativeNodes.get(cameraId);
+            CameraDict dict = cameraEntry.getValue();
+
+            for (int i = 0; i < dict.indices.size(); i++) {
+                int localId = dict.uniqueLocalIds.get(i);
+                int windowClusterId = clusters.get(dict.indices.get(i));
+
+                RepresentativeNode node = camReps.get(localId);
+                if (node != null && node.feature != null) {
+                    clusterFeatures.computeIfAbsent(windowClusterId, k -> new ArrayList<>()).add(node.feature);
+                }
+            }
+        }
+
+        Map<Integer, double[]> clusterAvgFeature = new HashMap<>();
+        for (Map.Entry<Integer, List<double[]>> entry : clusterFeatures.entrySet()) {
+            List<double[]> features = entry.getValue();
+            if (features.isEmpty())
+                continue;
+            int dim = features.get(0).length;
+            double[] avg = new double[dim];
+            for (double[] f : features) {
+                for (int i = 0; i < dim; i++) {
+                    avg[i] += f[i];
+                }
+            }
+            for (int i = 0; i < dim; i++) {
+                avg[i] /= features.size();
+            }
+            clusterAvgFeature.put(entry.getKey(), avg);
+        }
+
+        Map<Integer, Integer> windowClusterToGlobalId = new HashMap<>();
+        Set<Integer> matchedGlobalIds = new HashSet<>();
+
+        for (Map.Entry<Integer, double[]> currentCluster : clusterAvgFeature.entrySet()) {
+            int winClusterId = currentCluster.getKey();
+            double[] currentFeature = currentCluster.getValue();
+
+            int bestGlobalId = -1;
+            double bestSim = -1.0;
+
+            for (Map.Entry<Integer, GlobalTrackState> globalEntry : globalTrackRegistry.entrySet()) {
+                int histGlobalId = globalEntry.getKey();
+                if (matchedGlobalIds.contains(histGlobalId))
+                    continue;
+
+                GlobalTrackState histState = globalEntry.getValue();
+
+                for (double[] histFeature : histState.recentFeatures) {
+                    double sim = computeCosineSimilarity(currentFeature, histFeature);
+                    if (sim > bestSim) {
+                        bestSim = sim;
+                        bestGlobalId = histGlobalId;
+                    }
+                }
+            }
+
+            if (bestSim >= (1.0 - epsilon)) {
+                windowClusterToGlobalId.put(winClusterId, bestGlobalId);
+                matchedGlobalIds.add(bestGlobalId);
+
+                GlobalTrackState matchedState = globalTrackRegistry.get(bestGlobalId);
+                matchedState.addFeature(currentFeature);
+                matchedState.updateLastSeen(currentTime);
+            } else {
+                int newGlobalId = nextGlobalId.getAndIncrement();
+                windowClusterToGlobalId.put(winClusterId, newGlobalId);
+
+                GlobalTrackState newState = new GlobalTrackState(newGlobalId, currentTime);
+                newState.addFeature(currentFeature);
+                globalTrackRegistry.put(newGlobalId, newState);
+            }
+        }
+        // --- END HISTORICAL ID MATCHING ---
+
         // DUMP: Camera dictionary mapping
         if (TrackingParameters.isDebug) {
             dumpMcptCameraDict(cameraDict, "mcpt-camera-dict_" + winIdx);
@@ -1669,7 +1776,9 @@ public class MCPT {
 
             Map<Integer, Integer> localIdClusterDict = new HashMap<>();
             for (int i = 0; i < indices.size(); i++) {
-                localIdClusterDict.put(localIds.get(i), clusters.get(indices.get(i)));
+                int winClusterId = clusters.get(indices.get(i));
+                int globalAssignedId = windowClusterToGlobalId.getOrDefault(winClusterId, winClusterId);
+                localIdClusterDict.put(localIds.get(i), globalAssignedId);
             }
 
             // Assign global IDs to tracking dict

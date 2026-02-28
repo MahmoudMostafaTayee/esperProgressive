@@ -14,6 +14,9 @@ import com.espertech.esper.example.IOT.utils.EventEPLUtil;
 import com.espertech.esper.example.IOT.utils.GenericIotEventListener;
 import com.espertech.esper.example.IOT.utils.TableSocketServer;
 import com.google.gson.Gson;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import com.espertech.esper.example.IOT.clusterers.GlobalTrackState;
 
 import com.espertech.esper.example.IOT.clusterers.Tracker;
 import com.espertech.esper.runtime.client.EPRuntime;
@@ -54,6 +57,9 @@ public class IotMain implements Runnable {
     private final TableSocketServer socketServer = new TableSocketServer(9999);
     private final Gson gson = new Gson();
 
+    public static final java.util.Map<Integer, GlobalTrackState> globalTrackRegistry = new ConcurrentHashMap<>();
+    public static final AtomicInteger nextGlobalId = new AtomicInteger(1);
+
     private void initiateRunTime() {
         EventEPLUtil.setConfiguration();
         EventEPLUtil.addEventType("personView", PersonView.class);
@@ -80,6 +86,10 @@ public class IotMain implements Runnable {
         // Register GlobalPersonEvent event
         EventEPLUtil.addEventType("GlobalPersonEvent",
                 com.espertech.esper.example.IOT.streams.GlobalPersonEvent.class);
+
+        // Register TrackExpiredEvent
+        EventEPLUtil.addEventType("TrackExpiredEvent",
+                com.espertech.esper.example.IOT.streams.TrackExpiredEvent.class);
 
         logger.info("Setting up runtime");
         EventEPLUtil.initiateRuntime();
@@ -332,6 +342,8 @@ public class IotMain implements Runnable {
                             com.espertech.esper.example.IOT.clusterers.MCPT.multiCameraPeopleTracking(
                                     calibrationMap, // Pass the calibration map
                                     trackingResults,
+                                    globalTrackRegistry,
+                                    nextGlobalId,
                                     TrackingParameters.representativeSelectionMethod, // Using keypoint selection
                                     TrackingParameters.epsilonMcpt,
                                     TrackingParameters.shortTrackTh,
@@ -401,11 +413,27 @@ public class IotMain implements Runnable {
                         insert select gpe.globalId as globalId, gpe.timestamp as lastSeen, gpe.attributes as attributes;
                 """);
 
-        // Clean up persons from GlobalIDTable who haven’t been seen in 2 minutes (MCPT
-        // window is large)
-        EventEPLUtil.addEpl("on pattern [every timer:interval(10000)]\n" +
+        // Extract the expired tracks into an event BEFORE deleting them
+        EventEPLUtil.addEpl("@Priority(10) on pattern [every timer:interval(10000)]\n" +
+                "insert into TrackExpiredEvent select globalId from GlobalIDTable\n" +
+                "where current_timestamp() - lastSeen > 120000;");
+
+        // Clean up persons from GlobalIDTable who haven’t been seen in 2 minutes
+        EventEPLUtil.addEpl("@Priority(1) on pattern [every timer:interval(10000)]\n" +
                 "delete from GlobalIDTable\n" +
                 "where current_timestamp() - lastSeen > 120000;");
+
+        EventEPLUtil.compileDeployAddListener("select * from TrackExpiredEvent",
+                (newEvents, oldEvents, statement, runtime) -> {
+                    if (newEvents != null) {
+                        for (com.espertech.esper.common.client.EventBean event : newEvents) {
+                            int expiredId = (int) event.get("globalId");
+                            // Free up the heavy embedding memory!
+                            globalTrackRegistry.remove(expiredId);
+                            logger.info("Track " + expiredId + " expired. Cleaned up features.");
+                        }
+                    }
+                });
 
         // Existing PersonTable queries (can stay or be replaced)
         EventEPLUtil.addEpl("""
