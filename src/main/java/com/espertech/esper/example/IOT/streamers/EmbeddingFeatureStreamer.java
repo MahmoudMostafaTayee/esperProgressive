@@ -342,15 +342,20 @@ public class EmbeddingFeatureStreamer {
     public static Map<Path, Map<Path, List<Path>>> initScenesData(Path basePath) {
         Map<Path, Map<Path, List<Path>>> result = new HashMap<>();
         try {
-            List<Path> scenes = HelperUtils.getSortedDirectories(basePath);
-            for (Path scene : scenes) {
+            int sceneId = TrackingParameters.scene;
+            String sceneDirName = String.format("scene_%03d", sceneId);
+            Path scenePath = basePath.resolve(sceneDirName);
+
+            if (Files.exists(scenePath) && Files.isDirectory(scenePath)) {
                 Map<Path, List<Path>> cameraMap = new HashMap<>();
-                List<Path> cameras = HelperUtils.getSortedDirectories(scene);
+                List<Path> cameras = HelperUtils.getSortedDirectories(scenePath);
                 for (Path camera : cameras) {
                     List<Path> files = HelperUtils.getSortedFiles(camera, "*.npy");
                     cameraMap.put(camera, files);
                 }
-                result.put(scene, cameraMap);
+                result.put(scenePath, cameraMap);
+            } else {
+                logger.error("Scene directory does not exist: " + scenePath);
             }
         } catch (IOException e) {
             e.printStackTrace();

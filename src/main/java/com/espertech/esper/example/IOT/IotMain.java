@@ -51,7 +51,7 @@ public class IotMain implements Runnable {
      * configuration and initializes it.
      */
     private static final java.util.List<String> AVAILABLE_CAMERAS = java.util.Arrays.asList(
-            "camera_0001", "camera_0002", "camera_0003", "camera_0004");
+            "camera_0001", "camera_0011", "camera_0013", "camera_0017");
 
     private java.util.List<String> cameraList;
     private final TableSocketServer socketServer = new TableSocketServer(9999);
@@ -59,6 +59,7 @@ public class IotMain implements Runnable {
 
     public static final java.util.Map<Integer, GlobalTrackState> globalTrackRegistry = new ConcurrentHashMap<>();
     public static final AtomicInteger nextGlobalId = new AtomicInteger(1);
+    private static final java.util.List<com.espertech.esper.example.IOT.streams.CameraTopology> initialTopology = new java.util.ArrayList<>();
 
     private void initiateRunTime() {
         EventEPLUtil.setConfiguration();
@@ -164,6 +165,10 @@ public class IotMain implements Runnable {
         multiCameraAggregationQueries();
         afterClusteringQueries();
 
+        for (com.espertech.esper.example.IOT.streams.CameraTopology t : initialTopology) {
+            EventEPLUtil.streamEvent(t, "CameraTopology");
+        }
+
         socketServer.waitForFirstClient();
         launchStreams();
 
@@ -232,10 +237,10 @@ public class IotMain implements Runnable {
                         String camI = normalizeCameraName(parts[i].trim());
                         String camJ = normalizeCameraName(parts[j].trim());
                         // Add bidirectional links
-                        EventEPLUtil.addEpl(
-                                "insert into CameraTopologyTable values ('" + camI + "', '" + camJ + "', true)");
-                        EventEPLUtil.addEpl(
-                                "insert into CameraTopologyTable values ('" + camJ + "', '" + camI + "', true)");
+                        initialTopology
+                                .add(new com.espertech.esper.example.IOT.streams.CameraTopology(camI, camJ, true));
+                        initialTopology
+                                .add(new com.espertech.esper.example.IOT.streams.CameraTopology(camJ, camI, true));
                     }
                 }
             }
@@ -336,6 +341,7 @@ public class IotMain implements Runnable {
                     "group by windowIndex " +
                     "having count(*) = " + numCameras + " " +
                     "output first every 59 seconds"; // Output once per windowIndex when ready
+            System.out.println(">>> EPL String: " + aggregationEPL);
 
             EventEPLUtil.compileDeployAddListener(aggregationEPL, (newEvents, oldEvents, statement, runtime) -> {
                 if (newEvents != null) {
