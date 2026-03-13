@@ -53,23 +53,57 @@ public class EmbeddingFeatureStreamer {
         int maxFrames = TrackingParameters.max_number_of_windows_to_process * TrackingParameters.timePeriod
                 * TrackingParameters.fps;
 
-        scheduler.scheduleWithFixedDelay(() -> {
-            if (TrackingParameters.isDebug && framesStreamed >= maxFrames) {
-                logger.info("Reached maximum number of windows to process in debug mode ("
-                        + TrackingParameters.max_number_of_windows_to_process + " windows). Global maxFrames limit: "
-                        + maxFrames);
-                scheduler.shutdown();
-                completionLatch.countDown();
-                return;
+        if (TrackingParameters.turboMode) {
+            logger.info("Turbo Mode ENABLED. Streaming at maximum speed.");
+            while (true) {
+                if (TrackingParameters.isDebug && framesStreamed >= maxFrames) {
+                    logger.info("Reached maximum number of windows to process in debug mode ("
+                            + TrackingParameters.max_number_of_windows_to_process
+                            + " windows). Global maxFrames limit: "
+                            + maxFrames);
+                    break;
+                }
+
+                framesStreamed++;
+                boolean anySceneHasMore = false;
+                for (Map.Entry<Path, Map<Path, List<Path>>> sceneEntry : sceneData.entrySet()) {
+                    Path scenePath = sceneEntry.getKey();
+                    if (!Files.isDirectory(scenePath))
+                        continue;
+
+                    // We need a way to know if processScene actually did anything
+                    // Let's modify processScene to return a boolean if more frames are available
+                    boolean sceneHasMore = processScene(sceneEntry);
+                    if (sceneHasMore)
+                        anySceneHasMore = true;
+                }
+
+                if (!anySceneHasMore) {
+                    logger.info("All frames streamed in Turbo Mode.");
+                    break;
+                }
             }
-            framesStreamed++;
-            for (Map.Entry<Path, Map<Path, List<Path>>> sceneEntry : sceneData.entrySet()) {
-                Path scene = sceneEntry.getKey();
-                if (!Files.isDirectory(scene))
-                    continue;
-                processScene(sceneEntry);
-            }
-        }, 0, frameIntervalMillis, TimeUnit.MILLISECONDS);
+            completionLatch.countDown();
+        } else {
+            scheduler.scheduleWithFixedDelay(() -> {
+                if (TrackingParameters.isDebug && framesStreamed >= maxFrames) {
+                    logger.info("Reached maximum number of windows to process in debug mode ("
+                            + TrackingParameters.max_number_of_windows_to_process
+                            + " windows). Global maxFrames limit: "
+                            + maxFrames);
+                    scheduler.shutdown();
+                    completionLatch.countDown();
+                    return;
+                }
+                framesStreamed++;
+                for (Map.Entry<Path, Map<Path, List<Path>>> sceneEntry : sceneData.entrySet()) {
+                    Path scene = sceneEntry.getKey();
+                    if (!Files.isDirectory(scene))
+                        continue;
+                    processScene(sceneEntry);
+                }
+            }, 0, frameIntervalMillis, TimeUnit.MILLISECONDS);
+        }
     }
 
     public static void waitForCompletion() {
@@ -182,7 +216,7 @@ public class EmbeddingFeatureStreamer {
         }
     }
 
-    private static void processScene(Map.Entry<Path, Map<Path, List<Path>>> sceneEntry) {
+    private static boolean processScene(Map.Entry<Path, Map<Path, List<Path>>> sceneEntry) {
         Path scene = sceneEntry.getKey();
         Map<Path, List<Path>> cameras = sceneEntry.getValue();
         Map<Path, Boolean> processingStatus = new HashMap<>();
@@ -231,19 +265,15 @@ public class EmbeddingFeatureStreamer {
             selectedCameras.put(camera, entry.getValue());
         }
 
+        // Simplified status tracking
+        boolean anyCameraHasMore = false;
         for (Map.Entry<Path, List<Path>> cameraEntry : selectedCameras.entrySet()) {
             Path camera = cameraEntry.getKey();
-            processingStatus.put(camera, true);
+            boolean cameraHasMore = processCamera(scene, cameraEntry);
+            if (cameraHasMore)
+                anyCameraHasMore = true;
         }
-
-        for (Map.Entry<Path, List<Path>> cameraEntry : selectedCameras.entrySet()) {
-            Path camera = cameraEntry.getKey();
-            if (!processingStatus.get(camera))
-                continue;
-            boolean cameraHasMoreFiles = processCamera(scene, cameraEntry);
-
-            processingStatus.put(camera, cameraHasMoreFiles);
-        }
+        return anyCameraHasMore;
     }
 
     private static boolean processCamera(Path scene, Map.Entry<Path, List<Path>> cameraEntry) {

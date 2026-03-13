@@ -143,6 +143,7 @@ public class IotMain implements Runnable {
         // SomeExamplesStreamer.streamSomeExamples();
         // WildTrackDatasetStreamer.streamWildTrackDataset();
         EmbeddingFeatureStreamer.streamEmbeddingFeatures();
+        EmbeddingFeatureStreamer.waitForCompletion();
     }
 
     public void run() {
@@ -339,8 +340,7 @@ public class IotMain implements Runnable {
             String aggregationEPL = "select window( * ) as results " +
                     "from SingleCameraResult(cameraId in (" + cameraInClause + ")).win:time(2 min) " +
                     "group by windowIndex " +
-                    "having count(*) = " + numCameras + " " +
-                    "output first every 59 seconds"; // Output once per windowIndex when ready
+                    "having count(*) = " + numCameras; // Removed: output first every 59 seconds
             System.out.println(">>> EPL String: " + aggregationEPL);
 
             EventEPLUtil.compileDeployAddListener(aggregationEPL, (newEvents, oldEvents, statement, runtime) -> {

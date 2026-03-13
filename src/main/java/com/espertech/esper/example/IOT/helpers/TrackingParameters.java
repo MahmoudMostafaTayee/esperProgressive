@@ -35,6 +35,7 @@ public class TrackingParameters {
     public static boolean overlap_suppression = true;
     public static boolean isDebug = false;
     public static int max_number_of_windows_to_process = 1; // This won't work unless in isDebug is ture.
+    public static boolean turboMode = false;
 
     // SNMS Parameters
     public static boolean sequential_nms = true;
@@ -65,7 +66,7 @@ public class TrackingParameters {
     // "all" OR "1,2;2,3,4"
     public static String CAMERA_GROUPS;
 
-    public static int scene;
+    public static int scene = 2;
 
     private TrackingParameters() {
         /* Prevent instantiation */
@@ -79,12 +80,14 @@ public class TrackingParameters {
         }
 
         // ---------- Scene ----------
-        scene = Integer.parseInt(
-                cmd.getOptionValue("scene"));
+        if (cmd.hasOption("scene")) {
+            scene = Integer.parseInt(cmd.getOptionValue("scene"));
+        }
 
         // ---------- Feature directory ----------
-        FEATURES_BASE_DIR = cmd.getOptionValue(
-                "features_dir");
+        if (cmd.hasOption("features_dir")) {
+            FEATURES_BASE_DIR = cmd.getOptionValue("features_dir");
+        }
 
         // ---------- Output directory ----------
         OUTPUT_DIR = cmd.getOptionValue(
@@ -115,6 +118,9 @@ public class TrackingParameters {
         // ---------- Log everything ----------
         printArgs();
 
+        // ---------- Turbo Mode ----------
+        turboMode = cmd.hasOption("turbo");
+
         return ErrorCode.SUCCESS;
     }
 
@@ -133,8 +139,6 @@ public class TrackingParameters {
         options.addOption(Option.builder()
                 .longOpt("scene")
                 .hasArg()
-                .required()
-                .desc("Scene number (e.g., 1, 2, 3)")
                 .build());
 
         options.addOption(Option.builder()
@@ -142,7 +146,6 @@ public class TrackingParameters {
                 .hasArg()
                 .desc("Base directory for embedding features")
                 .build());
-
         options.addOption(Option.builder()
                 .longOpt("camera")
                 .hasArg()
@@ -161,9 +164,12 @@ public class TrackingParameters {
                 .desc("Directory to save logs and outputs")
                 .build());
 
-        options.addOption("exec_all", false, "Execute all stages");
-        options.addOption("exec_scpt", false, "Execute SCPT stage");
-        options.addOption("exec_mcpt", false, "Execute MCPT stage");
+        options.addOption(Option.builder().longOpt("debug").desc("Debug mode").build());
+        options.addOption(Option.builder().longOpt("turbo").desc("Turbo mode").build());
+
+        options.addOption(Option.builder().longOpt("exec_all").desc("Execute all stages").build());
+        options.addOption(Option.builder().longOpt("exec_scpt").desc("Execute SCPT stage").build());
+        options.addOption(Option.builder().longOpt("exec_mcpt").desc("Execute MCPT stage").build());
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
