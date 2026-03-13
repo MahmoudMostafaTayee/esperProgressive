@@ -22,21 +22,21 @@
 \maketitle
 
 \begin{abstract}
-% [DONE] TODO: Replace with final abstract.
-Multi-camera object tracking (MCOT) is typically implemented as a tightly-coupled computer vision pipeline, which complicates cross-camera association scalability and hinders runtime reconfigurability. This paper presents \textbf{STREAMTRACK}, a systems-oriented formulation of MCOT as a \emph{streams-and-tables} program. By expressing detections as streams and identity or configuration state as relational tables, we realize cross-camera association via topology-aware stream joins. This architecture enables zero-downtime reconfiguration of the camera network and provides a 25.6$\times$ speedup in similarity generation, achieving an overall 4.3$\times$ performance improvement over conventional offline baselines while maintaining functional parity.
+% TODO: Replace with final abstract.
+Multi-camera object tracking (MCOT) is typically implemented as a tightly coupled computer-vision pipeline, making it difficult to scale cross-camera association, to inspect intermediate decisions, and to adapt to changes in the camera network. This paper presents an alternative systems-oriented formulation: MCOT as a streaming program in which detections and tracklet updates are streams, identity hypotheses are maintained as relational state tables, and cross-camera association is expressed as continuous SQL/EPL queries. Inter-camera tracking is realised via topology-aware stream joins parameterised by a dynamically updateable camera neighbourhood table, reducing candidate explosion and enabling runtime reconfiguration without restarting the pipeline. 
 \end{abstract}
 
 \section{Introduction}
 \subsection{Motivation}
-% [DONE] TODO: Add motivating use cases (smart buildings, retail, airports, traffic), and why multi-camera tracking is hard operationally.
-Multi-camera object tracking must simultaneously satisfy (i) computer-vision accuracy requirements and (ii) operational requirements such as scalability and reconfigurability. Conventional implementations often embed cross-camera association logic into bespoke code, which complicates maintenance and makes runtime changes (e.g., adding a camera) disruptive. By transitioning to a streaming-relational model, we move cross-camera association logic into high-level SQL/EPL queries, making the system more modular and operational.
+% TODO: Add motivating use cases (smart buildings, retail, airports, traffic), and why multi-camera tracking is hard operationally.
+Multi-camera object tracking must simultaneously satisfy (i) computer-vision accuracy requirements and (ii) operational requirements such as scalability, debuggability, and reconfigurability. Conventional implementations often embed cross-camera association logic into bespoke code, which complicates maintenance and makes runtime changes (e.g., adding a camera, changing neighbourhoods) disruptive.
 
 \subsection{Key Insight}
-% [DONE] TODO: Make this crisp and aligned with your BEST streams+tables story.
+% TODO: Make this crisp and aligned with your BEST streams+tables story.
 We recast MCOT as a \emph{streams-and-tables} program: (a) \emph{streams} represent observations and incremental hypotheses; (b) \emph{tables} represent state (tracklets, global identities, topology/configuration); and (c) continuous queries implement the operator graph that transforms observations into persistent identity assignments.
 
 \subsection{Contributions}
-% TODO: Finalize claims once results are in.
+% TODO [REVIEW] : Finalize claims once results are in.
 \begin{itemize}[leftmargin=*]
     \item An operator-graph formulation of MCOT using streams and relational state tables.
     \item An end-to-end SQL/EPL realization over a CEP/streaming engine (Esper), including streaming counterparts of key clustering/association components.
@@ -46,20 +46,20 @@ We recast MCOT as a \emph{streams-and-tables} program: (a) \emph{streams} repres
 \end{itemize}
 
 \subsection{Paper Organization}
-% [DONE] TODO: Update after finalizing sections.
+% TODO: Update after finalizing sections.
 Section~\ref{sec:background} defines the problem and background. Section~\ref{sec:overview} presents the system overview and data model. Sections~\ref{sec:operators}--\ref{sec:joins} detail the operator graph and topology-aware joins. Section~\ref{sec:implementation} outlines the SQL/EPL implementation. Section~\ref{sec:evaluation} describes the evaluation plan. Sections~\ref{sec:discussion}--\ref{sec:conclusion} conclude with discussion, related work, and future directions.
 
 \section{Background and Problem Definition}\label{sec:background}
 \subsection{Multi-Camera Object Tracking (MCOT)}
-% [DONE] TODO: Formalize the inputs and outputs.
+% TODO: Formalize the inputs and outputs.
 We consider a set of cameras $\mathcal{C} = \{c_1,\dots,c_m\}$. Each camera produces a stream of detections with associated appearance embeddings and optional metadata. The goal is to assign a \emph{global identity} to observations across cameras and time, producing consistent identity tracks.
 
 \subsection{Baseline Pipeline (Starting Point)}
-% [DONE] TODO: Summarize the starting paper at high-level, mapping stages to your operators (no need for deep detail here).
-We begin from the baseline multi-camera tracking pipeline described by Wang et al.~\cite{wang2024overlap}, which (i) constructs tracklets per camera, (ii) selects representative images/observations, (iii) performs cross-camera re-identification (Re-ID) via clustering, and (iv) assigns lower-confidence tracklets in a subsequent stage. Our work keeps the functional intent but re-architects the pipeline as a streaming operator graph with explicit state tables and join-based cross-camera association.
+% TODO: Summarize the starting paper at high-level, mapping stages to your operators (no need for deep detail here).
+We begin from a representative multi-camera tracking pipeline that (i) constructs tracklets per camera, (ii) selects representative images/observations, (iii) performs cross-camera re-identification (Re-ID) via clustering, and (iv) assigns lower-confidence tracklets in a subsequent stage. Our work keeps the functional intent but re-architects the pipeline as a streaming operator graph with explicit state tables and join-based cross-camera association.
 
 \subsection{Streams-and-Tables Execution Model}
-% [DONE] TODO: Define only what is needed (streams, tables, windows, continuous queries).
+% TODO: Define only what is needed (streams, tables, windows, continuous queries).
 A \emph{stream} is an unbounded sequence of tuples. A \emph{table} (relation) is a mutable stateful dataset updated incrementally by the stream. A \emph{continuous query} consumes streams, reads/updates tables, and emits derived streams or table updates.
 
 % \subsection{Time Semantics: Ingestion Time}
@@ -67,10 +67,10 @@ A \emph{stream} is an unbounded sequence of tuples. A \emph{table} (relation) is
 % \textbf{We adopt ingestion time (processing-time) semantics.}
 % All operators interpret time using the timestamp at which events are \emph{ingested by the engine}, not the original event-generation time. Windowing, ordering, and join constraints are defined on ingestion time. This simplifies runtime behavior under real-time video analytics deployments and avoids the need for watermarking and late-event handling.
 
-% % [DONE] TODO: If needed, later justify tradeoffs (e.g., late arrivals, jitter, vs operational simplicity).
+% % TODO: If needed, later justify tradeoffs (e.g., late arrivals, jitter, vs operational simplicity).
 
 \subsection{System Requirements}
-% [DONE] TODO: Convert into explicit requirements; later connect them to experiments.
+% TODO: Convert into explicit requirements; later connect them to experiments.
 \begin{itemize}[leftmargin=*]
     \item \textbf{Accuracy:} maintain competitive tracking and Re-ID quality.
     \item \textbf{Scalability:} handle increasing numbers of cameras and detections.
@@ -80,8 +80,8 @@ A \emph{stream} is an unbounded sequence of tuples. A \emph{table} (relation) is
 
 \section{System Overview}\label{sec:overview}
 \subsection{Architecture at a Glance}
-% [DONE] TODO: Add a table of the operator DAG.
-Table~\ref{tab:dag} detailing the operator graph from detection ingestion to global identity updates.
+%  [REVIEW] TODO: Add a table of the operator DAG.
+The architecture of \textbf{STREAMTRACK} is organized as a pipeline of continuous operators processing detection streams and state tables. Table~\ref{tab:dag} summarizes the functional operator graph from detection ingestion to global identity updates.
 
 \begin{table}[t]
     \centering
@@ -99,7 +99,7 @@ Table~\ref{tab:dag} detailing the operator graph from detection ingestion to glo
 \end{table}
 
 \subsection{Data Model: Streams and Tables}
-% [DONE] TODO: Replace with final schemas; keep names consistent with EPL/SQL later.
+% [REVIEW] TODO: Replace with final schemas; keep names consistent with EPL/SQL later.
 \paragraph{Streams.}
 \begin{itemize}[leftmargin=*]
     \item $\texttt{embeddingFeature}(\textit{cameraId}, \textit{curFrame}, \textit{timestamp}, \textit{detectedUsers}[])$ 
@@ -116,42 +116,49 @@ Table~\ref{tab:dag} detailing the operator graph from detection ingestion to glo
 \end{itemize}
 
 \subsection{Execution Semantics}
-% [DONE] TODO: Specify operator update triggers, state eviction policy, and window definitions in ingestion time.
+% [REVIEW] TODO: Specify operator update triggers, state eviction policy, and window definitions in ingestion time.
 Operators are evaluated continuously as new tuples arrive. Windows and joins use ingestion timestamps $\textit{ts\_ingest}$. State tables maintain current hypotheses and apply eviction rules based on ingestion-time staleness (e.g., tracklet inactivity).
 
 \section{Stream Operator Graph for MCOT}\label{sec:operators}
 \subsection{Ingestion and Feature Enrichment Operators}
-% [DONE] TODO: Detail how detections are ingested and enriched with embeddings/pose/world coordinates.
+% [REVIEW] TODO: Detail how detections are ingested and enriched with embeddings/pose/world coordinates.
 This stage ingests per-camera detections and attaches feature vectors (appearance embeddings). For cameras with calibration data available in the \texttt{CalibrationTable}, we apply a \texttt{MeasureWorldCoordinates} operator that projects detections from image planes to a unified world coordinate system, facilitating cross-camera spatial gating.
 
 \subsection{Single-Camera Tracking as Stateful Stream Processing}
-% [DONE] TODO: Formalize tracklet creation/update/end; specify association rules and state updates.
-Single-camera tracking is implemented as a stateful windowed operator. It maintains detection history within a sliding window to perform frame-to-frame association. The operator emits \texttt{SingleCameraResult} events which contain consolidated tracklet features and detection-level timestamps, providing the foundation for inter-window and cross-camera matching.
+% [REVIEW] TODO: Formalize tracklet creation/update/end; specify association rules and state updates.
+Single-camera tracking is implemented as a stateful windowed operator (\texttt{Tracker.java}). It maintains detection history within a sliding window (e.g., 120 frames) to perform frame-to-frame association. The operator aggregates appearance features and keypoint stability metrics for each tracklet, finally emitting a \texttt{SingleCameraResult} event. This event contains consolidated tracklet features and detection-level timestamps, providing the foundation for inter-window and cross-camera matching while preserving local identity consistency.
 
-\subsection{Streaming Conflict Resolution / Overlap Suppression (Optional)}
+\subsection{Streaming Overlap Suppression}
 % TODO: Provide streaming equivalent of overlap suppression and how it is implemented with windowed constraints.
-When detections/tracklets violate spatial overlap constraints within short ingestion-time windows, a conflict-resolution operator suppresses inconsistent hypotheses and triggers re-association.
+To ensure hypothesis consistency, the system implements a streaming conflict-resolution operator using EPL-based Intersection-over-Union (IoUction Operator}
+\subsection{Representative Selection Operator}
+% TODO: Define quality scoring and windowed ranking to pick representatives.
+A continuous query selects representative observations for each tracklet based on quality criteria (e.g., embedding stability, pose confidence). The output is the $\texttt{Representatives}$ stream.
+
+\subsection{Online Clustering / Global Identity Maintenance}
+% TODO: Describe streaming clustering or incremental linkage approach.
+Global identities are maintained in $\texttt{GlobalIdentities}$ via incremental updates (e.g., centroid maintenance, micro-clusters, merge rules). Identity updates are emitted as $\texttt{IdentityUpdates}$.
 
 \section{Cross-Camera Tracking via Topology-Aware Stream Joins}\label{sec:joins}
 \subsection{Naive Cross-Camera Matching Cost}
-% [DONE] TODO: Define baseline candidate generation and its complexity.
+% [REVIEW] TODO: Define baseline candidate generation and its complexity.
 Naive cross-camera association compares tracklets across all camera pairs in the network. For $m$ cameras, this results in $O(m^2)$ pairwise comparisons, which becomes a scalability bottleneck as the network grows. In high-density scenes, this lead to a quadratic explosion of candidate matches.
 
 \subsection{Topology-Aware Candidate Generation (Association)}
-% [DONE] TODO: Provide join formulation and gating predicates (time, similarity, optional space).
-We formulation cross-camera association as a stream join constrained by a dynamically updateable neighborhood graph. The join only evaluates pairs $(c_i, c_j)$ for which an edge exists in the \texttt{CameraTopology} (or via predefined aggregation groups in Esper). By applying this spatial gating, we reduce the candidate space to local neighborhoods, drastically lowering the computational overhead of similarity matrix generation.
+% [REVIEW] TODO: Provide join formulation and gating predicates (time, similarity, optional space).
+We formulate cross-camera association as a stream join synchronized by a \texttt{windowIndex}. The join identifies tracklets from different cameras that fall within the same processing window and are constrained by a neighbor relationship. In our implementation, this is realized via aggregation groups where \texttt{SingleCameraResult} events are buffered until a complete set of observations from a neighborhood (defined in the \texttt{CameraTopologyTable} or static configuration) is available. By applying this spatial gating, we restrict the similarity search space to local camera clusters, drastically lowering the computational overhead of similarity matrix generation.
 
 \subsection{Camera Topology as a Reconfigurable State Table}
-% [DONE] TODO: Explain update mechanism and runtime effect.
-A key system feature is the treatment of camera neighborhoods as a manageable relational configuration. We implement a \texttt{CameraTopologyTable} in Esper which stores the active neighbor graph. Administrators can update this table at runtime (e.g., adding a new camera, disabling a malfunctioning link) by streaming \texttt{CameraTopology} events or executing DML operations. These changes take effect immediately for the next window of tracklets, enabling zero-downtime reconfiguration of the tracking pipeline without redeploying complex aggregation queries.
+% [REVIEW] TODO: Explain update mechanism and runtime effect.
+A key system feature is the treatment of camera neighborhoods as a manageable relational configuration rather than hardcoded logic. We implement a \texttt{CameraTopologyTable} in Esper which stores the active neighbor graph. Administrators can update this table at runtime by streaming \texttt{CameraTopology} events. These changes take effect immediately for the next window of tracklets, enabling zero-downtime reconfiguration of the tracking pipeline (e.g., adding a new camera or disabling a link) without redeploying the core association queries.
 
 \subsection{Representative Selection Operator}
-% [DONE] TODO: Define quality scoring and windowed ranking to pick representatives.
-Once cameras are successfully joined and aggregated, the MCPT module natively selects the top-$k$ representative observations for each associated tracklet. Selection is based on criteria such as the presence of keypoints (e.g., face, torso) and embedding stability within the window.
+% [REVIEW] TODO: Define quality scoring and windowed ranking to pick representatives.
+Once cameras are successfully joined and aggregated, the MCPT module natively selects the top-$k$ representative observations for each associated tracklet. Selection is driven by two keypoint-based criteria (\texttt{keypointTh} and \texttt{keypointConditionTh}): (i) the presence of high-confidence anatomical landmarks (e.g., facial features, limb joints) and (ii) the temporal stability of appearance embeddings within the window. This ensures that the subsequent Re-ID clustering step operates on the most discriminative visual data available.
 
 \subsection{Online Clustering / Global Identity Maintenance}
-% [DONE] TODO: Describe streaming clustering or incremental linkage approach.
-Global identities are maintained in the \texttt{GlobalIDTable}. We implement a person-centric summary logic where the system aggregates all detections of a specific identity across all cameras within a processing window. Instead of streaming every individual detection point, the system emits a single \texttt{GlobalPersonEvent} per identity per window, capturing their latest sighting (timestamp and coordinates) and the full set of cameras on which they were visible (e.g., \texttt{Cameras: [1, 2, 4]}). When the CEP engine detects a track expiration (e.g., unseen for 2 minutes), it emits a \texttt{TrackExpiredEvent} stream which signals the external tracking logic to evict heavy state bindings, keeping the relational CEP engine performance optimized.
+% [REVIEW] TODO: Describe streaming clustering or incremental linkage approach.
+Global identities are maintained in the \texttt{GlobalIDTable}. We implement a \textit{person-centric summary} logic that drastically reduces event volume: instead of streaming individual coordinates per frame, the system aggregates all sightings of a person across the synchronized camera cluster. It then emits a single \texttt{GlobalPersonEvent} per identity per window, capturing the latest sighting (\texttt{Timestamp}, \texttt{Coordinate}) and the full set of cameras where the person was visible (e.g., \texttt{Cameras: [1, 2, 4]}). When the CEP engine detects that a person has been unseen across all cameras for a configured period (e.g., 2 minutes), it triggers a \texttt{TrackExpiredEvent}, signaling the system to evict heavy feature bindings from memory.
 
 \subsection{Join Planning and Optimization}
 % TODO: Discuss selectivity, indexes/partitioning, and how topology sparsity helps.
@@ -159,14 +166,14 @@ Topology sparsity reduces the join search space and improves throughput. We late
 
 \section{Implementation in SQL/EPL on Esper}\label{sec:implementation}
 \subsection{Why SQL-first on a CEP Engine}
-% [DONE] TODO: Argue for inspectability, modularity, and operational benefits.
+% [REVIEW] TODO: Argue for inspectability, modularity, and operational benefits.
 Implementing MCOT via SQL/EPL on a Complex Event Processing (CEP) engine like Esper provides several operational advantages: (i) \textbf{Inspectability:} Developers can query intermediate state tables (e.g., \texttt{GlobalIDTable}) at runtime to debug association failures. (ii) \textbf{Modularity:} New operators can be added by simply deploying new EPL statements. (iii) \textbf{Memory Safe:} The engine gracefully handles complex event lifecycle rules like \texttt{TrackExpiredEvent}, ensuring deterministic garbage collection of heavy vision tensors. (iv) \textbf{Performance:} The system optimizes windowing and join planning using JIT compilation, as reflected in the 25$\times$ speedup observed in similarity generation.
 
 \subsection{Handling Ordering and Jitter under Ingestion Time}
 Using ingestion-time semantics simplifies real-time deployment by avoiding the complexities of event-time watermarking. While minor jitter may occur, the system remains stable by using small slack windows in the joins and state eviction based on engine-time staleness.
 
 \subsection{EPL Operator Templates}
-% [DONE] TODO: Add actual EPL snippets later. Keep structure stable.
+% [REVIEW] TODO: Add actual EPL snippets later. Keep structure stable.
 Representative EPL templates from the Esper implementation mapping to the pipeline stages in Table~\ref{tab:dag} are shown below:
 
 \paragraph{1. Ingestion \& Feature Enrichment.}
@@ -276,47 +283,48 @@ The results highlight a significant breakthrough in \emph{Similarity Matrix Gene
 
 \subsection{Research Questions}
 \begin{itemize}[leftmargin=*]
-    \item \textbf{RQ1: (Tracking Quality)} Our evaluation confirms that the streams-and-tables re-architecture preserves tracking quality. As illustrated in Fig.~\ref{fig:visual_comparison}, the system maintains strict functional parity with the offline baseline in terms of detection coverage and identity assignment.
-    \item \textbf{RQ2: (Join Efficiency)} Topology-aware joins significantly reduce candidate comparisons. By restricting comparisons to neighboring cameras in the \texttt{CameraTopology} table, we eliminate redundant all-pairs matching, leading to the speedups reported in Table~\ref{tab:performance}.
-    \item \textbf{RQ3: (Reconfigurability)} The system demonstrates robustness to runtime changes. Updates to the neighborhood topology take effect immediately for subsequent ingestion windows without requiring a pipeline restart or state reset.
-    \item \textbf{RQ4: (Throughput)} The implementation achieves a total MCPT processing time of 516ms for a 4-camera window (192 tracklets), indicating high throughput capable of supporting real-time multi-camera deployments.
+    \item \textbf{RQ1:} Does the streams-and-tables re-architecture preserve tracking quality compared to the baseline pipeline?
+    \item \textbf{RQ2:} How much does topology-aware joining reduce candidate comparisons and runtime cost compared to naive all-pairs matching?
+    \item \textbf{RQ3:} How robust is the system under runtime topology changes (without restart/reset) in terms of stability and accuracy?
+    \item \textbf{RQ4:} How do throughput and latency scale with the number of cameras and detection rates?
 \end{itemize}
 \subsection{Datasets and Scenarios}
-% [DONE] TODO: Fill with selected datasets and synthetic topology-change scenarios.
+% [REVIEW] TODO: Fill with selected datasets and synthetic topology-change scenarios.
 We evaluate on Scene 1 of the AIC24 Track 1 dataset, focusing on scenarios with varying camera graph sparsity and topology updates during execution.
 
 \subsection{Metrics}
-% [DONE] TODO: Choose final set (IDF1, HOTA, ID switches; systems metrics).
+% TODO: Choose final set (IDF1, HOTA, ID switches; systems metrics).
 We report standard tracking metrics (e.g., IDF1/HOTA, identity switches) and systems metrics (throughput, end-to-end ingestion-time latency, memory footprint, join candidate counts).
 
 \subsection{Baselines}
-% [DONE] TODO: Add baseline implementations.
+% TODO: Add baseline implementations.
 Baselines include the starting pipeline, a naive cross-camera matcher without topology pruning, and ablations disabling key operators (representative selection, clustering variants).
 
-\subsection{Ablation Study: Topology Gating}
-% [DONE] TODO: Specify planned ablations and expected outcomes.
-We isolate the effect of the \texttt{CameraTopology} table gating. Evaluations show that enabling topology-aware joins reduces the candidate tracklet comparisons by approximately 60\% in our 4-camera setup, directly contributing to the throughput gains while preserving identity consistency across neighboring views.
+
+\subsection{Ablation Studies}
+% TODO: Specify planned ablations and expected outcomes.
+We conduct ablations to isolate the effects of topology pruning, representative selection, and streaming clustering choices.
 
 \section{Discussion}\label{sec:discussion}
 \subsection{Benefits of a SQL/Streams-and-Tables Formulation}
-% [DONE] TODO: Discuss inspectability, modularity, runtime reconfiguration, observability.
+% TODO: Discuss inspectability, modularity, runtime reconfiguration, observability.
 We discuss how expressing MCOT as continuous queries improves modularity, debuggability, and operational control, particularly under changing camera networks.
 
 \subsection{Limitations and Failure Modes}
-% [DONE] TODO: e.g., ambiguous Re-ID, topology misconfiguration, embedding drift.
+% TODO: e.g., ambiguous Re-ID, topology misconfiguration, embedding drift.
 We document limitations including challenging Re-ID conditions, sensitivity to topology configuration, and appearance drift, and discuss mitigation strategies.
 
 \subsection{Deployment Considerations}
-% [DONE] TODO: Edge/cloud partitioning, monitoring, alerts, etc.
-We outline deployment patterns and monitoring hooks, such as join selectivity dashboards, identity churn indicators, and topology update audit logs, which are significantly easier to implement using the relational model.
+% TODO: Edge/cloud partitioning, monitoring, alerts, etc.
+We outline deployment patterns and monitoring hooks, such as join selectivity dashboards, identity churn indicators, and topology update audit logs.
 
 \section{Related Work}\label{sec:related}
-% [DONE] TODO: Add citations and organize by buckets.
+% TODO: Add citations and organize by buckets.
 We build upon recent advances in (i) multi-camera tracking and Re-ID pipelines~\cite{wang2024overlap}, (ii) stream processing for video analytics, (iii) online/incremental clustering, and (iv) Complex Event Processing (CEP) engine designs. Our unique contribution lies in the relational reformulation of the MCOT association problem as a topology-aware stream join.
 
-\section{Conclusion}\label{sec:conclusion}
-% [DONE] TODO: Replace with final conclusion once results are available.
-We presented \textbf{STREAMTRACK}, a streams-and-tables re-architecture of multi-camera object tracking. By leveraging SQL/EPL on a CEP engine, we achieved a modular design that supports runtime network reconfiguration via a dynamic topology table. Performance evaluation shows a 4.3$\times$ speedup over conventional baselines while maintaining strict tracking parity. This work demonstrates that transitioning from monolithic computer-vision pipelines to streaming operator graphs significantly improves the scalability and operational flexibility of multi-camera analytics systems.
+\section{Conclusion and Future Work}\label{sec:conclusion}
+% TODO: Replace with final conclusion once results are available.
+We presented a draft of a streams-and-tables re-architecture of multi-camera object tracking implemented in SQL/EPL on a CEP engine, featuring topology-aware stream joins and runtime reconfigurable camera neighborhoods under ingestion-time semantics.
 
 \paragraph{Future work.}
 % TODO: Expand as desired.
