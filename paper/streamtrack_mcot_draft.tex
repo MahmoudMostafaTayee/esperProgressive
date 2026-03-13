@@ -249,14 +249,14 @@ Ingestion-time semantics avoids late-event complexity; minor jitter can be handl
 We expose configurable parameters for window sizes, similarity thresholds, topology gating, and eviction policies, enabling controlled trade-offs between accuracy and performance.
 
 \section{Experimental Evaluation}\label{sec:evaluation}
-\subsection{Performance Benchmarking}
-We benchmark the performance of the proposed streams-and-tables architecture (\textbf{Ours}) against the conventional baseline (\textbf{Theirs}). The evaluation is conducted on Scene 1 of the AIC24 Track 1 dataset using a window of 4 cameras and 192 candidate tracklets.
+\subsection{System Benchmark: Woven WTS Dataset}
+We benchmark the performance of the proposed streams-and-tables architecture (\textbf{Ours}) against the conventional baseline (\textbf{Theirs}). The evaluation is conducted on the Woven VisionAI WTS dataset~\cite{woven2024wts} using a window of 4 cameras and 192 candidate tracklets.
 
 Table~\ref{tab:performance} summarizes the processing time for each stage of the Multi-Camera People Tracking (MCPT) pipeline. Our implementation significantly outperforms the baseline in similarity matrix generation, which is a major bottleneck in the original version.
 
 \begin{table}[h]
     \centering
-    \caption{Stage 1: Architectural Speedup (\textbf{Theirs} vs. \textbf{Ours-Base}) for Scene 1.}
+    \caption{Stage 1: Architectural Speedup (\textbf{Theirs} vs. \textbf{Ours-Base}) for the Woven WTS Dataset~\cite{woven2024wts}.}
     \label{tab:performance_scene1}
     \begin{tabular}{@{}lrrr@{}}
         \toprule
@@ -271,14 +271,14 @@ Table~\ref{tab:performance} summarizes the processing time for each stage of the
     \end{tabular}
 \end{table}
 
-\subsection{Stage 2: Topological Optimization Enhancement (Scene 2)}
+\subsection{Topological Optimization: NVIDIA SmartSpaces Dataset}
 While the streaming architecture provides a significant baseline improvement, the computational complexity still scales with the number of tracklets in the aggregation window. By introducing \emph{Topology-Aware Stream Joins}, we further optimize the association search space by pruning the join predicates using camera proximity.
 
-Table~\ref{tab:topology_perf} shows the benchmarking results for Scene 2. Transitioning to the relational streaming model (\textbf{Ours-Base}) yields a 2.2$\times$ speedup over the batch baseline ($\sim$210ms vs. 95ms). The subsequent introduction of topological pruning (\textbf{Ours-Opt}) yields an additional \textbf{21.1$\times$} optimization, resulting in a cumulative \textbf{46.7$\times$ speedup} relative to the original tracking pipeline.
+Table~\ref{tab:topology_perf} shows the benchmarking results for the AI City Challenge 2025 Track 1 dataset~\cite{aicity2025track1}. Transitioning to the relational streaming model (\textbf{Ours-Base}) yields a 2.2$\times$ speedup over the batch baseline ($\sim$210.4ms vs. 95.2ms). The subsequent introduction of topological pruning (\textbf{Ours-Opt}) yields an additional \textbf{21.1$\times$} optimization, resulting in a cumulative \textbf{46.6$\times$ speedup} relative to the original tracking pipeline.
 
 \begin{table}[h]
     \centering
-    \caption{Stage 2: Impact of Topological Optimization on MCPT Stage (Scene 2).}
+    \caption{Stage 2: Impact of Topological Optimization on MCPT Stage (AI City Challenge 2025 Track 1 Dataset~\cite{aicity2025track1}).}
     \label{tab:topology_perf}
     \begin{tabular}{@{}lrrrr@{}}
         \toprule
@@ -308,9 +308,7 @@ The breakthrough in \emph{Similarity Matrix Generation} (25.57$\times$ speedup) 
     \item \textbf{RQ3:} How robust is the system under runtime topology changes (without restart/reset) in terms of stability and accuracy?
     \item \textbf{RQ4:} How do throughput and latency scale with the number of cameras and detection rates?
 \end{itemize}
-\subsection{Datasets and Scenarios}
-% [REVIEW] TODO: Fill with selected datasets and synthetic topology-change scenarios.
-We evaluate on Scene 1 of the AIC24 Track 1 dataset, focusing on scenarios with varying camera graph sparsity and topology updates during execution.
+We evaluate on both the Woven VisionAI WTS dataset~\cite{woven2024wts} and the NVIDIA AIC 2025 dataset~\cite{aicity2025track1}, focusing on scenarios with varying camera graph sparsity and topology updates during execution.
 
 \subsection{Metrics}
 % TODO: Choose final set (IDF1, HOTA, ID switches; systems metrics).
