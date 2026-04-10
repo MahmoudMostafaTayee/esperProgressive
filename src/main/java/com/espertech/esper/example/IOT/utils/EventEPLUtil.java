@@ -112,12 +112,31 @@ public class EventEPLUtil {
     }
 
     public static void compileDeployAddListener(String eplQuery, UpdateListener listener) {
-        EPStatement statement;
-        statement = EventEPLUtil.compileDeploy(eplQuery);
-        EventEPLUtil.add_listener(statement, listener);
+        EventEPLUtil.compileDeployAddListenerReturnsId(eplQuery, listener);
+    }
+
+    public static String compileDeployAddListenerReturnsId(String eplQuery, UpdateListener listener) {
+        EPDeployment deployment = EventEPLUtil.compileDeployReturnDeployment(eplQuery);
+        EventEPLUtil.add_listener(deployment.getStatements()[0], listener);
+        return deployment.getDeploymentId();
+    }
+
+    public static void undeploy(String deploymentId) {
+        if (runtime != null && deploymentId != null) {
+            try {
+                runtime.getDeploymentService().undeploy(deploymentId);
+                logger.info("Undeployed statement with ID: " + deploymentId);
+            } catch (Exception e) {
+                logger.error("Failed to undeploy ID: " + deploymentId, e);
+            }
+        }
     }
 
     public static EPStatement compileDeploy(String epl) {
+        return compileDeployReturnDeployment(epl).getStatements()[0];
+    }
+
+    public static EPDeployment compileDeployReturnDeployment(String epl) {
         try {
             CompilerArguments args = new CompilerArguments();
 
@@ -130,8 +149,7 @@ public class EventEPLUtil {
             args.getOptions().setAccessModifierEventType(env -> NameAccessModifier.PUBLIC);
 
             EPCompiled compiled = EPCompilerProvider.getCompiler().compile(epl, args);
-            EPDeployment deployment = runtime.getDeploymentService().deploy(compiled);
-            return deployment.getStatements()[0];
+            return runtime.getDeploymentService().deploy(compiled);
         } catch (Exception ex) {
             logger.error("Failed to deploy EPL:\n{}", epl, ex); // Log the exact EPL causing failure
             throw new RuntimeException(ex);

@@ -61,6 +61,10 @@ public class IotMain implements Runnable {
     public static final AtomicInteger nextGlobalId = new AtomicInteger(1);
     private static final java.util.List<com.espertech.esper.example.IOT.streams.CameraTopology> initialTopology = new java.util.ArrayList<>();
 
+    // Dynamic Topology State
+    private final java.util.Map<String, java.util.Set<String>> topologyGraph = new ConcurrentHashMap<>();
+    private final java.util.Map<java.util.Set<String>, String> activeDeployments = new ConcurrentHashMap<>();
+
     private void initiateRunTime() {
         EventEPLUtil.setConfiguration();
         EventEPLUtil.addEventType("personView", PersonView.class);
@@ -162,6 +166,8 @@ public class IotMain implements Runnable {
 
         prepareCalibrationQueries();
         prepareTopologyQueries();
+        EventEPLUtil.deployAll(); // Commit tables before listeners are compiled
+
         embeddingFeatureQueries();
         multiCameraAggregationQueries();
         afterClusteringQueries();
@@ -272,208 +278,192 @@ public class IotMain implements Runnable {
     }
 
     private void multiCameraAggregationQueries() {
-        // Aggregate SingleCameraResult events from specific camera groups
-
-        String groupsConfig = TrackingParameters.CAMERA_GROUPS;
-        java.util.List<java.util.List<String>> groups = new java.util.ArrayList<>();
-
-        if (groupsConfig.equalsIgnoreCase("all")) {
-            groups.add(cameraList);
-            logger.info("Aggregation Group: All " + cameraList.size() + " cameras: " + cameraList);
-        } else {
-            String[] groupStrings = groupsConfig.split(";");
-            for (String groupStr : groupStrings) {
-                java.util.List<String> group = new java.util.ArrayList<>();
-                String[] parts = groupStr.split(",");
-                for (String part : parts) {
-                    String token = part.trim();
-                    if (token.isEmpty())
-                        continue;
-
-                    String camName;
-                    if (token.matches("\\d+")) {
-                        int id = Integer.parseInt(token);
-                        camName = String.format("camera_%04d", id);
-                    } else if (!token.startsWith("camera_")) {
-                        camName = "camera_" + token;
-                    } else {
-                        camName = token;
-                    }
-
-                    // Only add if it's in the active camera list (streamed)
-                    if (cameraList.contains(camName)) {
-                        group.add(camName);
-                    } else {
-                        logger.warn("Camera " + camName + " in group [" + groupStr
-                                + "] is not in active camera list. Skipping.");
-                    }
-                }
-                if (!group.isEmpty()) {
-                    groups.add(group);
-                    logger.info("Aggregation Group: " + group);
-                }
-            }
-        }
-
-        if (groups.isEmpty()) {
-            logger.warn("No valid aggregation groups found!");
-            return;
-        }
-
-        int groupIndex = 0;
-        for (java.util.List<String> group : groups) {
-            final int currentGroupIndex = groupIndex++;
-            int numCameras = group.size();
-
-            // Build camera ID list for IN clause: 'camera_0001', 'camera_0002'
-            StringJoiner joiner = new StringJoiner("', '", "'", "'");
-            for (String cam : group) {
-                joiner.add(cam);
-            }
-            String cameraInClause = joiner.toString();
-
-            System.out.println(">>> DEPLOYING AGGREGATION QUERY FOR GROUP " + currentGroupIndex + ": " + group);
-
-            // Unique aggregation name for each group to avoid collisions if needed (though
-            // EPL prevents duplicats usually context/name)
-            // We use the filter in the FROM clause
-            String aggregationEPL = "select window( * ) as results " +
-                    "from SingleCameraResult(cameraId in (" + cameraInClause + ")).win:time(2 min) " +
-                    "group by windowIndex " +
-                    "having count(*) = " + numCameras; // Removed: output first every 59 seconds
-            System.out.println(">>> EPL String: " + aggregationEPL);
-
-            EventEPLUtil.compileDeployAddListener(aggregationEPL, (newEvents, oldEvents, statement, runtime) -> {
-                if (newEvents != null) {
+        // Listen to the CameraTopology event stream (not the table) to reactively recalculate clusters
+        String topologyListenerEPL = "select * from CameraTopology";
+        
+        EventEPLUtil.compileDeployAddListener(topologyListenerEPL, (newEvents, oldEvents, statement, runtime) -> {
+            if (newEvents != null) {
+                synchronized (topologyGraph) {
                     for (EventBean event : newEvents) {
-                        com.espertech.esper.example.IOT.streams.SingleCameraResult[] results = (com.espertech.esper.example.IOT.streams.SingleCameraResult[]) event
-                                .get("results");
-                        if (results != null && results.length > 0) {
-                            int winIdx = results[0].getWindowIndex();
-                            System.out.println(">>> AGGREGATED RESULT (Group " + currentGroupIndex + "): Window "
-                                    + winIdx + " is ready with "
-                                    + results.length + " cameras.");
+                        String camA = (String) event.get("cameraId");
+                        String camB = (String) event.get("neighborId");
+                        boolean enabled = (boolean) event.get("enabled");
 
-                            // Prepare data for MCPT
-                            java.util.Map<Integer, java.util.Map<String, java.util.Map<String, Object>>> trackingResults = new java.util.HashMap<>();
+                        if (enabled) {
+                            topologyGraph.computeIfAbsent(camA, k -> java.util.Collections.synchronizedSet(new java.util.HashSet<>())).add(camB);
+                            topologyGraph.computeIfAbsent(camB, k -> java.util.Collections.synchronizedSet(new java.util.HashSet<>())).add(camA);
+                        } else {
+                            if (topologyGraph.containsKey(camA)) topologyGraph.get(camA).remove(camB);
+                            if (topologyGraph.containsKey(camB)) topologyGraph.get(camB).remove(camA);
+                        }
+                    }
+                    reconcileDeployments();
+                }
+            }
+        });
 
-                            for (com.espertech.esper.example.IOT.streams.SingleCameraResult scr : results) {
-                                int cameraId = Integer.parseInt(scr.getCameraId().replace("camera_", ""));
+        logger.info("Reactive topology engine initialized. Waiting for CameraTopology events to deploy aggregators...");
+    }
 
-                                java.util.Map<String, java.util.Map<String, Object>> trackingDict = new java.util.HashMap<>();
-                                java.util.List<Integer> clusterLabels = scr.getClusterLabels();
-                                java.util.List<Integer> idList = scr.getIdList();
-                                java.util.List<Integer[]> boundingBoxList = scr.getBoundingBoxList();
-                                java.util.List<double[]> featureList = scr.getFeatureList();
-                                java.util.List<java.util.List<java.util.List<Float>>> keypointsList = scr
-                                        .getKeypointsList();
-                                java.util.List<Integer> frameNumbers = scr.getFrameNumbers();
-                                java.util.List<Long> timestampsList = scr.getTimestamps();
+    private void reconcileDeployments() {
+        java.util.List<java.util.Set<String>> currentClusters = computeClusters();
+        java.util.Set<java.util.Set<String>> clusterNames = new java.util.HashSet<>(currentClusters);
 
-                                for (int i = 0; i < clusterLabels.size(); i++) {
-                                    String serial = String.valueOf(idList.get(i));
+        // 1. Remove deployments for clusters that no longer exist
+        for (java.util.Set<String> deployedCluster : new java.util.HashSet<>(activeDeployments.keySet())) {
+            if (!clusterNames.contains(deployedCluster)) {
+                String depId = activeDeployments.remove(deployedCluster);
+                EventEPLUtil.undeploy(depId);
+                logger.info("Undeployed aggregation query for obsolete group: " + deployedCluster);
+            }
+        }
 
-                                    java.util.Map<String, Object> data = new java.util.HashMap<>();
-                                    data.put("OfflineID", clusterLabels.get(i));
-                                    data.put("Frame", frameNumbers.get(i));
-                                    data.put("Timestamp", timestampsList.get(i));
+        // 2. Add deployments for new clusters
+        for (java.util.Set<String> cluster : currentClusters) {
+            if (!activeDeployments.containsKey(cluster)) {
+                String depId = deployAggregationQuery(cluster);
+                activeDeployments.put(cluster, depId);
+                logger.info("Deployed NEW dynamic aggregation query for group: " + cluster);
+            }
+        }
+    }
 
-                                    Integer[] bbox = boundingBoxList.get(i);
-                                    java.util.Map<String, Integer> coord = new java.util.HashMap<>();
-                                    coord.put("x1", bbox[0]);
-                                    coord.put("x2", bbox[1]);
-                                    coord.put("y1", bbox[2]);
-                                    coord.put("y2", bbox[3]);
-                                    data.put("Coordinate", coord);
-
-                                    data.put("Feature", featureList.get(i));
-                                    data.put("Keypoints", keypointsList.get(i));
-
-                                    trackingDict.put(serial, data);
-                                }
-                                trackingResults.put(cameraId, trackingDict);
-                            }
-
-                            // Run MCPT
-                            com.espertech.esper.example.IOT.clusterers.MCPT.multiCameraPeopleTracking(
-                                    calibrationMap, // Pass the calibration map
-                                    trackingResults,
-                                    globalTrackRegistry,
-                                    nextGlobalId,
-                                    TrackingParameters.representativeSelectionMethod, // Using keypoint selection
-                                    TrackingParameters.epsilonMcpt,
-                                    TrackingParameters.shortTrackTh,
-                                    TrackingParameters.keypointTh,
-                                    TrackingParameters.keypointConditionTh,
-                                    TrackingParameters.replaceSimilarityByWCoordinate,
-                                    TrackingParameters.distanceType,
-                                    TrackingParameters.distanceTh,
-                                    TrackingParameters.replaceValue,
-                                    new int[] { 1920, 1080 }, // imageSize
-                                    TrackingParameters.aspectTh, // aspectTh
-                                    2000, // stackMaxSize
-                                    winIdx);
-
-                            // Aggregate cameras and find the latest detection per GlobalID
-                            java.util.Map<Integer, java.util.Set<Integer>> globalIdToCameras = new java.util.HashMap<>();
-                            java.util.Map<Integer, com.espertech.esper.example.IOT.streams.GlobalPersonEvent> latestEvents = new java.util.HashMap<>();
-                            long timestamp = EventEPLUtil.getCurrentTime();
-
-                            for (Integer camId : trackingResults.keySet()) {
-                                java.util.Map<String, java.util.Map<String, Object>> camRes = trackingResults
-                                        .get(camId);
-                                for (String serial : camRes.keySet()) {
-                                    java.util.Map<String, Object> attrs = camRes.get(serial);
-                                    if (attrs.containsKey("GlobalOfflineID")) {
-                                        int gid = (int) attrs.get("GlobalOfflineID");
-                                        long detTimestamp = (long) attrs.get("Timestamp");
-
-                                        // Update cameras set
-                                        globalIdToCameras.computeIfAbsent(gid, k -> new java.util.TreeSet<>())
-                                                .add(camId);
-
-                                        // Keep track of the latest appearance for this person
-                                        if (!latestEvents.containsKey(gid)
-                                                || (long) latestEvents.get(gid).getAttributes()
-                                                        .get("Timestamp") <= detTimestamp) {
-                                            @SuppressWarnings("unchecked")
-                                            java.util.Map<String, Integer> coord = (java.util.Map<String, Integer>) attrs
-                                                    .get("Coordinate");
-                                            int x = (coord.get("x1") + coord.get("x2")) / 2;
-                                            int y = coord.get("y2");
-
-                                            // Cleanup attributes for table
-                                            java.util.Map<String, Object> eventAttrs = new java.util.HashMap<>(attrs);
-                                            eventAttrs.remove("Feature");
-                                            eventAttrs.remove("Keypoints");
-                                            eventAttrs.remove("OfflineID");
-                                            eventAttrs.remove("GlobalOfflineID");
-                                            eventAttrs.remove("Frame"); // User requested Timestamp instead of Frame
-
-                                            latestEvents.put(gid,
-                                                    new com.espertech.esper.example.IOT.streams.GlobalPersonEvent(
-                                                            gid, camId, serial, (int) attrs.get("OfflineID"), x, y,
-                                                            timestamp, eventAttrs));
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Stream the summarized events to the GlobalIDTable
-                            for (com.espertech.esper.example.IOT.streams.GlobalPersonEvent gpe : latestEvents
-                                    .values()) {
-                                // Inject the final camera list into the summarized attributes
-                                gpe.getAttributes().put("Cameras", globalIdToCameras.get(gpe.getGlobalId()));
-                                EventEPLUtil.streamEvent(gpe, "GlobalPersonEvent");
-                            }
-                            // Trigger table print
-                            EventEPLUtil.streamEvent(new com.espertech.esper.example.IOT.streams.TriggerEvent(),
-                                    "TriggerEvent");
+    private java.util.List<java.util.Set<String>> computeClusters() {
+        java.util.List<java.util.Set<String>> clusters = new java.util.ArrayList<>();
+        java.util.Set<String> visited = new java.util.HashSet<>();
+        
+        // Ensure all active cameras are at least a cluster of size 1 if they have no neighbors
+        for (String cam : cameraList) {
+            if (visited.contains(cam)) continue;
+            
+            java.util.Set<String> cluster = new java.util.HashSet<>();
+            java.util.Stack<String> stack = new java.util.Stack<>();
+            stack.push(cam);
+            
+            while (!stack.isEmpty()) {
+                String node = stack.pop();
+                if (visited.add(node)) {
+                    cluster.add(node);
+                    java.util.Set<String> neighbors = topologyGraph.get(node);
+                    if (neighbors != null) {
+                        for (String n : neighbors) {
+                            if (!visited.contains(n)) stack.push(n);
                         }
                     }
                 }
-            });
+            }
+            if (!cluster.isEmpty()) clusters.add(cluster);
         }
+        return clusters;
+    }
+
+    private String deployAggregationQuery(java.util.Set<String> group) {
+        int numCameras = group.size();
+        StringJoiner joiner = new StringJoiner("', '", "'", "'");
+        for (String cam : group) joiner.add(cam);
+        String cameraInClause = joiner.toString();
+
+        String aggregationEPL = "select window( * ) as results " +
+                "from SingleCameraResult(cameraId in (" + cameraInClause + ")).win:time(2 min) " +
+                "group by windowIndex " +
+                "having count(*) = " + numCameras;
+
+        return EventEPLUtil.compileDeployAddListenerReturnsId(aggregationEPL, (newEvents, oldEvents, statement, runtime) -> {
+            if (newEvents != null) {
+                for (EventBean event : newEvents) {
+                    com.espertech.esper.example.IOT.streams.SingleCameraResult[] results = (com.espertech.esper.example.IOT.streams.SingleCameraResult[]) event.get("results");
+                    processAggregatedResults(results);
+                }
+            }
+        });
+    }
+
+    private void processAggregatedResults(com.espertech.esper.example.IOT.streams.SingleCameraResult[] results) {
+        if (results == null || results.length == 0) return;
+        
+        int winIdx = results[0].getWindowIndex();
+        // Prepare data for MCPT
+        java.util.Map<Integer, java.util.Map<String, java.util.Map<String, Object>>> trackingResults = new java.util.HashMap<>();
+
+        for (com.espertech.esper.example.IOT.streams.SingleCameraResult scr : results) {
+            int cameraId = Integer.parseInt(scr.getCameraId().replace("camera_", ""));
+            java.util.Map<String, java.util.Map<String, Object>> trackingDict = new java.util.HashMap<>();
+            
+            java.util.List<Integer> clusterLabels = scr.getClusterLabels();
+            java.util.List<Integer> idList = scr.getIdList();
+            java.util.List<Integer[]> boundingBoxList = scr.getBoundingBoxList();
+            java.util.List<double[]> featureList = scr.getFeatureList();
+            java.util.List<java.util.List<java.util.List<Float>>> keypointsList = scr.getKeypointsList();
+            java.util.List<Integer> frameNumbers = scr.getFrameNumbers();
+            java.util.List<Long> timestampsList = scr.getTimestamps();
+
+            for (int i = 0; i < clusterLabels.size(); i++) {
+                String serial = String.valueOf(idList.get(i));
+                java.util.Map<String, Object> data = new java.util.HashMap<>();
+                data.put("OfflineID", clusterLabels.get(i));
+                data.put("Frame", frameNumbers.get(i));
+                data.put("Timestamp", timestampsList.get(i));
+
+                Integer[] bbox = boundingBoxList.get(i);
+                java.util.Map<String, Integer> coord = new java.util.HashMap<>();
+                coord.put("x1", bbox[0]); coord.put("x2", bbox[1]);
+                coord.put("y1", bbox[2]); coord.put("y2", bbox[3]);
+                data.put("Coordinate", coord);
+                data.put("Feature", featureList.get(i));
+                data.put("Keypoints", keypointsList.get(i));
+                trackingDict.put(serial, data);
+            }
+            trackingResults.put(cameraId, trackingDict);
+        }
+
+        // Run MCPT
+        com.espertech.esper.example.IOT.clusterers.MCPT.multiCameraPeopleTracking(
+                calibrationMap, trackingResults, globalTrackRegistry, nextGlobalId,
+                TrackingParameters.representativeSelectionMethod, TrackingParameters.epsilonMcpt,
+                TrackingParameters.shortTrackTh, TrackingParameters.keypointTh, TrackingParameters.keypointConditionTh,
+                TrackingParameters.replaceSimilarityByWCoordinate, TrackingParameters.distanceType, TrackingParameters.distanceTh,
+                TrackingParameters.replaceValue, new int[] { 1920, 1080 }, TrackingParameters.aspectTh, 2000, winIdx);
+
+        // Publish to GlobalIDTable (as summarized previously)
+        broadcastGlobalResults(trackingResults, winIdx);
+    }
+
+    private void broadcastGlobalResults(java.util.Map<Integer, java.util.Map<String, java.util.Map<String, Object>>> trackingResults, int winIdx) {
+        java.util.Map<Integer, java.util.Set<Integer>> globalIdToCameras = new java.util.HashMap<>();
+        java.util.Map<Integer, com.espertech.esper.example.IOT.streams.GlobalPersonEvent> latestEvents = new java.util.HashMap<>();
+        long timestamp = EventEPLUtil.getCurrentTime();
+
+        for (Integer camId : trackingResults.keySet()) {
+            java.util.Map<String, java.util.Map<String, Object>> camRes = trackingResults.get(camId);
+            for (String serial : camRes.keySet()) {
+                java.util.Map<String, Object> attrs = camRes.get(serial);
+                if (attrs.containsKey("GlobalOfflineID")) {
+                    int gid = (int) attrs.get("GlobalOfflineID");
+                    long detTimestamp = (long) attrs.get("Timestamp");
+                    globalIdToCameras.computeIfAbsent(gid, k -> new java.util.TreeSet<>()).add(camId);
+
+                    if (!latestEvents.containsKey(gid) || (long) latestEvents.get(gid).getAttributes().get("Timestamp") <= detTimestamp) {
+                        @SuppressWarnings("unchecked")
+                        java.util.Map<String, Integer> coord = (java.util.Map<String, Integer>) attrs.get("Coordinate");
+                        int x = (coord.get("x1") + coord.get("x2")) / 2;
+                        int y = coord.get("y2");
+
+                        java.util.Map<String, Object> eventAttrs = new java.util.HashMap<>(attrs);
+                        eventAttrs.remove("Feature"); eventAttrs.remove("Keypoints");
+                        eventAttrs.remove("OfflineID"); eventAttrs.remove("GlobalOfflineID"); eventAttrs.remove("Frame");
+
+                        latestEvents.put(gid, new com.espertech.esper.example.IOT.streams.GlobalPersonEvent(
+                                gid, camId, serial, (int) attrs.get("OfflineID"), x, y, timestamp, eventAttrs));
+                    }
+                }
+            }
+        }
+
+        for (com.espertech.esper.example.IOT.streams.GlobalPersonEvent gpe : latestEvents.values()) {
+            gpe.getAttributes().put("Cameras", globalIdToCameras.get(gpe.getGlobalId()));
+            EventEPLUtil.streamEvent(gpe, "GlobalPersonEvent");
+        }
+        EventEPLUtil.streamEvent(new com.espertech.esper.example.IOT.streams.TriggerEvent(), "TriggerEvent");
     }
 
     private void afterClusteringQueries() {
@@ -540,6 +530,8 @@ public class IotMain implements Runnable {
         EventEPLUtil.addEpl("on pattern [every timer:interval(1000)]\n" +
                 "delete from PersonTable\n" +
                 "where current_timestamp() - lastSeen > 5000;");
+
+        EventEPLUtil.deployAll(); // Commit tables and patterns before listeners
 
         String eplSelect = """
                     on TriggerEvent

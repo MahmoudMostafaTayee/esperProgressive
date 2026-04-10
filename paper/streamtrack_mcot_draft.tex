@@ -287,6 +287,8 @@ insert into CameraTopologyTable
 select cameraId, neighborId, enabled from CameraTopology;
 \end{verbatim}
 
+\noindent Critically, the \texttt{CameraTopologyTable} is not merely a static configuration store. Our system implements a \emph{reactive reconfiguration loop}: each incoming \texttt{CameraTopology} event triggers a Connected Components computation over the in-memory neighborhood graph. When the resulting cluster partition differs from the currently active set of aggregation queries, the system automatically compiles and deploys new EPL statements targeting the updated camera groups, while undeploying the obsolete ones. This enables zero-downtime reconfiguration of the camera network---an operator can add, remove, or reassign camera neighborhoods at runtime without restarting the pipeline or manually editing query definitions.
+
 
 \subsection{Streaming Counterparts of Clustering}
 % TODO [REVIEW] : Windowed HAC implementation logic detailed.
@@ -409,7 +411,7 @@ We presented \textbf{STREAMTRACK}, a relational streams-and-tables architecture 
 
 \paragraph{Future work.}
 % TODO : Complete and expand future work directions.
-Future directions include: (i) multi-hop topology reasoning, where cameras beyond immediate neighbors contribute to association via transitive similarity; (ii) learning topology weights from historical data to dynamically adjust join selectivity; and (iii) a full runtime-reconfigurable topology where aggregation queries are dynamically rewritten in response to \texttt{CameraTopologyTable} updates.
+Future directions include: (i) multi-hop topology reasoning, where cameras beyond immediate neighbors contribute to association via transitive similarity; and (ii) learning topology weights from historical data to dynamically adjust join selectivity.
 
 \bibliographystyle{plain}
 \bibliography{references}
