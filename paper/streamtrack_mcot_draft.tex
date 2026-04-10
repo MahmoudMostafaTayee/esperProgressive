@@ -23,7 +23,7 @@
 
 \begin{abstract}
 % TODO [REVIEW] : Abstract finalized with performance results.
-Multi-camera object tracking (MCOT) is typically implemented as a tightly coupled computer-vision pipeline, making it difficult to scale cross-camera association, to inspect intermediate decisions, and to adapt to changes in the camera network. This paper presents an alternative systems-oriented formulation: MCOT as a streaming program in which detections and tracklet updates are streams, identity hypotheses are maintained as relational state tables, and cross-camera association is expressed as continuous SQL/EPL queries. Inter-camera tracking is realised via topology-aware stream joins parameterised by a dynamically updateable camera neighbourhood table. Our results demonstrate that this relational approach achieves a \textbf{56.4$\times$ speedup} relative to conventional batch-oriented baselines while enabling zero-downtime reconfiguration of the camera neighborhood topology.
+Multi-camera object tracking (MCOT) is typically implemented as a tightly coupled computer-vision pipeline, making it difficult to scale cross-camera association, to inspect intermediate decisions, and to adapt to changes in the camera network. This paper presents an alternative systems-oriented formulation: MCOT as a streaming program in which detections and tracklet updates are streams, identity hypotheses are maintained as relational state tables, and cross-camera association is expressed as continuous SQL/EPL queries. Inter-camera tracking is realised via topology-aware stream joins parameterised by a dynamically updateable camera neighbourhood table. Our results demonstrate that this relational approach achieves a \textbf{56.4$\times$ speedup} relative to conventional batch-oriented baselines while providing an architecture that supports zero-downtime reconfiguration of the camera neighborhood topology.
 \end{abstract}
 
 \section{Introduction}
@@ -41,7 +41,7 @@ We recast MCOT as a \emph{streams-and-tables} program: (a) \emph{streams} repres
     \item An operator-graph formulation of MCOT using streams and relational state tables.
     \item An end-to-end SQL/EPL realization over a CEP/streaming engine (Esper), including streaming counterparts of key clustering/association components.
     \item Topology-aware cross-camera association expressed as stream joins, reducing candidate comparisons relative to naive all-pairs matching.
-    \item A dynamically updateable camera neighborhood topology table enabling runtime reconfiguration without code changes or pipeline resets.
+    \item A dynamically updateable camera neighborhood topology table that provides an architecture for runtime reconfiguration without code changes or pipeline resets.
     \item A performance-optimized implementation (\textbf{Ours}) that achieves a \textbf{56.4$\times$ cumulative speedup} in the MCPT clustering stage relative to the batch baseline (\textbf{Theirs}). This is realized through a two-stage enhancement: (1) a migration to a \textbf{relational streams-and-tables architecture} that yields a 45.5$\times$ architectural speedup, and (2) \textbf{Topology-Aware Stream Join} optimization that provides a further 1.2$\times$ gain on sparse networks.
 \end{itemize}
 
@@ -151,7 +151,7 @@ We formulate cross-camera association as a stream join synchronized by a \texttt
 
 \subsection{Camera Topology as a Reconfigurable State Table}
 % TODO [REVIEW] : Update mechanism and runtime effects detailed.
-A key system feature is the treatment of camera neighborhoods as a manageable relational configuration rather than hardcoded logic. We implement a \texttt{CameraTopologyTable} in Esper which stores the active neighbor graph. Administrators can update this table at runtime by streaming \texttt{CameraTopology} events. These changes take effect immediately for the next window of tracklets, enabling zero-downtime reconfiguration of the tracking pipeline (e.g., adding a new camera or disabling a link) without redeploying the core association queries.
+A key system feature is the treatment of camera neighborhoods as a manageable relational configuration rather than hardcoded logic. We implement a \texttt{CameraTopologyTable} in Esper which stores the active neighbor graph. Administrators can update this table at runtime by streaming \texttt{CameraTopology} events. This tables-based design supports having these changes take effect immediately for the next window of tracklets, providing an architecture for zero-downtime reconfiguration of the tracking pipeline (e.g., adding a new camera or disabling a link) without redeploying the core association queries.
 
 \subsection{Representative Selection Operator}
 % TODO [REVIEW] : Keypoint-based quality scoring defined.
@@ -347,7 +347,7 @@ We build upon recent advances in multi-camera tracking and Re-ID pipelines, part
 
 \section{Conclusion and Future Work}\label{sec:conclusion}
 % TODO [REVIEW] : Conclusion drafted with final results.
-We presented \textbf{STREAMTRACK}, a relational streams-and-tables architecture for multi-camera object tracking. By recasting MCOT as a continuous query problem and utilizing topology-aware stream joins, we achieved a \textbf{56.4$\times$ speedup} over batch-oriented baselines. Our system ensures real-time performance even as the camera network grows, while providing unique operational benefits like runtime reconfigurability and SQL-based inspectability.
+We presented \textbf{STREAMTRACK}, a relational streams-and-tables architecture for multi-camera object tracking. By recasting MCOT as a continuous query problem and utilizing topology-aware stream joins, we achieved a \textbf{56.4$\times$ speedup} over batch-oriented baselines. Our system ensures real-time performance even as the camera network grows, while providing an architecture that supports unique operational benefits like runtime reconfigurability and SQL-based inspectability.
 
 \paragraph{Future work.}
 % TODO : Complete and expand future work directions.
