@@ -122,19 +122,19 @@ Operators are evaluated continuously as new tuples arrive. Windows and joins use
 \section{Stream Operator Graph for MCOT}\label{sec:operators}
 \subsection{Ingestion and Feature Enrichment Operators}
 % TODO [REVIEW] : Feature enrichment and calibration logic detailed.
-This stage ingests per-camera detections and attaches appearance embedding vectors extracted via a pre-trained Re-ID model. For cameras with calibration data available in the \texttt{CalibrationTable}, we apply a \texttt{MeasureWorldCoordinates} operator that projects detections from the 2D image plane to a unified 3D world coordinate system (ground plane), enabling spatial gating and distance-based heuristics in later stages.
+This stage ingests per-camera detections and attaches appearance embedding vectors extracted via a pre-trained Re-ID model. For cameras where world locations are required, the system captures homography matrices from a \texttt{CalibrationTable} via a continuous listener. This state is then passed to the native clustering logic, which projects detections from the 2D image plane to a unified 3D world coordinate system (ground plane), enabling spatial gating and distance-based heuristics in later stages without dedicating a separate streaming operator.
 
 \subsection{Single-Camera Tracking as Stateful Stream Processing}
 % TODO [REVIEW] : Single-camera tracking implementation detailed.
 Single-camera tracking is implemented as a stateful windowed operator. It maintains detection history within a sliding window (e.g., 90--120 frames) to perform frame-to-frame association. The operator aggregates appearance features and keypoint stability metrics for each tracklet, finally emitting a \texttt{SingleCameraResult} event once the tracklet's window is processed.
 
-\subsection{Streaming Overlap Suppression}
-% TODO [REVIEW] : EPL-based conflict-resolution operator described.
-To ensure hypothesis consistency across overlapping fields of view, the system implements a streaming conflict-resolution operator. Using an EPL-based Intersection-over-Union (IoU) predicate, the operator identifies duplicate tracklets from different cameras that represent the same physical person in the same space. Conflict resolution is performed within the synchronized processing window, where the tracklet with the highest confidence or most stable embedding is retained, while redundant hypotheses are suppressed.
+\subsection{Overlap Suppression via Core Logic}
+% TODO [REVIEW] : Native conflict-resolution logic described.
+To ensure hypothesis consistency across overlapping fields of view, the system implements an overlap suppression mechanism within the core clustering module. Rather than relying purely on tracking heuristics, the algorithm identifies and merges duplicate tracklets emanating from different cameras that represent the same physical person moving in the same space. Using temporal bounds and distance comparisons, the most representative tracking hypotheses are leveraged to bind overlapping tracks, while redundant identity assignments are suppressed prior to global tracking updates.
 
-\subsection{Representative Selection Operator}
+\subsection{Representative Selection}
 % TODO [REVIEW] : Quality-based selection logic detailed.
-A continuous query selects representative observations for each tracklet based on quality criteria: (i) the presence of high-confidence anatomical keypoints (facial features, limb joints) and (ii) the stability of the appearance embedding vector relative to the tracklet centroid. The operator ranks detections within a window and emits a \texttt{Representatives} stream containing only the most discriminative visual data for the subsequent Re-ID clustering.
+Once per-camera synchronized events trigger the association phase, the native MCPT module performs representative selection based on quality criteria: (i) the presence of high-confidence anatomical keypoints (facial features, limb joints) and (ii) the stability of the appearance embedding vector relative to the tracklet centroid. This logic ranks detections within a window and retains only the most discriminative visual data, forwarding it to the subsequent Re-ID clustering block.
 
 \subsection{Online Clustering / Global Identity Maintenance}
 % TODO [REVIEW] : Incremental clustering and table maintenance detailed.
@@ -146,8 +146,8 @@ Global identities are maintained in the \texttt{GlobalIdentities} table via an i
 Naive cross-camera association compares tracklets across all camera pairs in the network. For $m$ cameras, this results in $O(m^2)$ pairwise comparisons. In high-density scenes with $N$ tracklets, this global $(O(N^2))$ approach leads to a quadratic explosion of candidate matches, which becomes the primary scalability bottleneck as the network grows.
 
 \subsection{Topology-Aware Candidate Generation (Association)}
-% TODO [REVIEW] : Topology-aware join formulation detailed.
-We formulate cross-camera association as a stream join synchronized by a \texttt{windowIndex}. The join identifies tracklets from different cameras that fall within the same processing window and are explicitly linked in the \texttt{CameraTopologyTable}. By restricting comparisons to local camera neighborhoods, we move from global $O(N^2)$ complexity to local $O(n^2)$ complexity (where $n \ll N$), drastically reducing the search space for similarity matrix generation.
+% TODO [REVIEW] : Topology-aware candidate grouping formulation detailed.
+We formulate cross-camera association as an aggregated stream query synchronized by a \texttt{windowIndex}. The pipeline dynamically builds an \texttt{IN (\dots)} clause query corresponding to explicitly linked cameras in a specific topological cluster. By restricting comparisons and event aggregations strictly to localized camera groups, we move from global $O(N^2)$ complexity to local $O(n^2)$ complexity (where $n \ll N$), drastically reducing the search space for similarity matrix generation.
 
 \subsection{Camera Topology as a Reconfigurable State Table}
 % TODO [REVIEW] : Update mechanism and runtime effects detailed.
@@ -159,7 +159,9 @@ Once cameras are successfully joined and aggregated, the MCPT module natively se
 
 \subsection{Online Clustering / Global Identity Maintenance}
 % TODO [REVIEW] : HAC clustering strategy described.
-Global identities are maintained in the \texttt{GlobalIDTable}. We implement a \textit{person-centric summary} logic that drastically reduces event volume: instead of streaming individual coordinates per frame, the system aggregates all sightings of a person across the synchronized camera cluster. It then emits a single \texttt{GlobalPersonEvent} per identity per window, capturing the latest sighting (\texttt{Timestamp}, \texttt{Coordinate}) and the full set of cameras where the person was visible (e.g., \texttt{Cameras: [1, 2, 4]}). When the CEP engine detects that a person has been unseen across all cameras for a configured period (e.g., 2 minutes), it triggers a \texttt{TrackExpiredEvent}, signaling the system to evict heavy feature bindings from memory.
+Global identities are maintained in the \texttt{GlobalIDTable}. We implement a \textit{person-centric summary} logic that drastically reduces event volume: instead of streaming individual coordinates per frame, the system aggregates all sightings of a person across the synchronized camera cluster. It then emits a single \texttt{GlobalPersonEvent} per identity per window, capturing the latest sighting (\texttt{Timestamp}, \texttt{Coordinate}) and the full set of cameras where the person was visible (e.g., \texttt{Cameras: [1, 2, 4]}). 
+
+A critical operational advantage of this streaming setup is its deterministic memory management. Batch tracking systems often suffer from unconstrained memory usage due to accumulating appearance signatures. In contrast, when the CEP engine detects that a person has been unseen across all cameras for a configured period (e.g., 2 minutes), an EPL timer triggers a \texttt{TrackExpiredEvent} with strict \texttt{@Priority(10)} handling. This signals the system to systematically purge stale \texttt{GlobalIDTable} rows and decisively garbage-collect the associated heavy feature trace tensors from the JVM memory.
 
 \subsection{Join Planning and Optimization}
 % TODO : Discuss join selectivity and optimization logic.
@@ -170,9 +172,9 @@ Topology sparsity reduces the join search space and improves throughput. We late
 % TODO [REVIEW] : Operational and performance benefits of SQL/EPL summarized.
 Implementing MCOT via SQL/EPL on a Complex Event Processing (CEP) engine like Esper provides several operational advantages: (i) \textbf{Inspectability:} Developers can query intermediate state tables (e.g., \texttt{GlobalIDTable}) at runtime to debug association failures. (ii) \textbf{Modularity:} New operators can be added by simply deploying new EPL statements. (iii) \textbf{Memory Safe:} The engine gracefully handles complex event lifecycle rules like \texttt{TrackExpiredEvent}, ensuring deterministic garbage collection of heavy vision tensors. (iv) \textbf{Performance:} The system optimizes windowing and join planning using JIT compilation, as reflected in the 25$\times$ speedup observed in similarity generation.
 
-\subsection{Handling Ordering and Jitter under Ingestion Time}
-% TODO [REVIEW] : Stability and slack window logic detailed.
-Using ingestion-time semantics simplifies real-time deployment by avoiding the complexities of event-time watermarking. While minor jitter may occur, the system remains stable by using small slack windows in the joins and state eviction based on engine-time staleness.
+\subsection{Robust Synchronization and Jitter Handling}
+% TODO [REVIEW] : Synchronization and count-based bounding logic detailed.
+Using ingestion-time semantics simplifies real-time deployments by eliminating the need for complex event-time watermarking logic. To handle out-of-order deliveries and jitter, the system relies on a timeout-bounded aggregation window (e.g., \texttt{win:time(2 min) group by windowIndex having count(*) = numCameras}). This guarantees that the aggregation block moves forward seamlessly either when all participating cameras have gracefully reported for a \texttt{windowIndex}, or when the maximum latency explicitly expires, ensuring a predictable progress rate.
 
 \subsection{EPL Operator Templates}
 % TODO [REVIEW] : EPL templates for primary pipeline stages provided.
@@ -287,9 +289,7 @@ Furthermore, the NVIDIA SmartSpaces benchmark demonstrates the critical importan
     \begin{tabular}{@{}lrrrr@{}}
         \toprule
         \textbf{Metric} & \textbf{Theirs (ms)} & \textbf{Ours-Base (ms)} & \textbf{Ours-Opt (ms)} & \textbf{Cum. Speedup} \\ \midrule
-        Avg. MCPT Stage Time & 239.87 & 5.27 & \textbf{4.25} & \textbf{56.4$\times$} \\
-        Max MCPT Stage Time & -- & 6.26 & \textbf{5.10} & -- \\
-        Total Window Latency & Offline & 100.00 & \textbf{60.00} & -- \\ \bottomrule
+        Avg. MCPT Stage Time & 239.87 & 5.27 & \textbf{4.25} & \textbf{56.4$\times$} \\ \bottomrule
     \end{tabular}
 \end{table}
 
