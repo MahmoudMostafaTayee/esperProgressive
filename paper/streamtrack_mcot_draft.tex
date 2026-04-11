@@ -11,7 +11,8 @@
 \usepackage{booktabs}
 \usepackage{amsmath,amssymb}
 \usepackage{tikz}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc}
+\usetikzlibrary{shapes.geometric, shapes.symbols, arrows.meta, positioning, fit, backgrounds, calc}
+\usepackage{float}
 
 % -----------------------------
 % Metadata
@@ -62,7 +63,29 @@ We begin from a representative multi-camera tracking pipeline that (i) construct
 
 \subsection{Streams-and-Tables Execution Model}
 % TODO [REVIEW] : Defined streams, tables, and continuous queries.
-Our formulation relies on three core primitives: (i) a \emph{stream} is an unbounded, append-only sequence of immutable tuples (e.g., raw detections); (ii) a \emph{table} is a mutable relation representing the current state of a hypothesis (e.g., active tracklets or global ID mappings); and (iii) a \emph{continuous query} is an operator that consumes input streams, reads/updates tables, and emits derived events or results (e.g., an identity assignment).
+Our formulation relies on three core primitives: (i) a \emph{stream} is an unbounded, append-only sequence of immutable tuples (e.g., raw detections); (ii) a \emph{table} is a mutable relation representing the current state of a hypothesis (e.g., active tracklets or global ID mappings); and (iii) a \emph{continuous query} is an operator that consumes input streams, reads/updates tables, and emits derived events or results (e.g., an identity assignment). Figure~\ref{fig:duality} illustrates this duality.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.8cm and 2.5cm,
+    font=\small\sffamily,
+    streambox/.style={rectangle, draw=orange!80!black, fill=orange!8, rounded corners=3pt, minimum height=2.8em, text width=3.2cm, align=center, thick, dashed},
+    tablebox/.style={rectangle, draw=blue!70, fill=blue!8, rounded corners=3pt, minimum height=2.8em, text width=3.2cm, align=center, thick},
+    querybox/.style={rectangle, draw=black!60, fill=green!8, rounded corners=3pt, minimum height=2.8em, text width=3.2cm, align=center, thick},
+    arr/.style={-{Stealth[scale=1.1]}, thick, draw=black!60}
+]
+\node[streambox] (s1) {\textbf{Stream}\\\scriptsize Detections, Observations};
+\node[querybox, right=of s1] (q) {\textbf{Continuous Query}\\\scriptsize EPL / SQL Operator};
+\node[streambox, right=of q] (s2) {\textbf{Derived Stream}\\\scriptsize GlobalPersonEvent};
+\node[tablebox, below=1cm of q] (t) {\textbf{State Table}\\\scriptsize GlobalIDTable, Topology};
+\draw[arr] (s1) -- node[above, font=\scriptsize] {consumes} (q);
+\draw[arr] (q) -- node[above, font=\scriptsize] {emits} (s2);
+\draw[arr, <->, draw=blue!60] (q) -- node[right, font=\scriptsize, align=left] {reads /\\updates} (t);
+\end{tikzpicture}
+\caption{The streams-and-tables duality applied to MCOT. Streams carry immutable observations; tables hold mutable state. Continuous queries bridge them, reading and updating tables while transforming streams.}
+\label{fig:duality}
+\end{figure}
 
 % \subsection{Time Semantics: Ingestion Time}
 % \label{subsec:ingestiontime}
@@ -85,7 +108,7 @@ Our formulation relies on three core primitives: (i) a \emph{stream} is an unbou
 % TODO [REVIEW] : Added Table 1 summarizing the operator graph and state tables.
 The architecture of \textbf{STREAMTRACK} is organized as a pipeline of continuous operators processing detection streams and state tables. Table~\ref{tab:dag} summarizes the functional operator graph from detection ingestion to global identity updates, while Figure~\ref{fig:architecture} illustrates the end-to-end data flow.
 
-\begin{table}[t]
+\begin{table}[H]
     \centering
     \caption{Conceptual operator graph and state tables. Observations flow as streams, while tracklets and identities are maintained in relational tables updated by continuous joins.}
     \label{tab:dag}
@@ -122,7 +145,7 @@ The architecture of \textbf{STREAMTRACK} is organized as a pipeline of continuou
 Operators are evaluated continuously as new tuples arrive. Windows and joins use ingestion timestamps $\textit{ts\_ingest}$. State tables maintain current hypotheses and apply eviction rules based on ingestion-time staleness (e.g., tracklet inactivity).
 
 \section{Stream Operator Graph for MCOT}\label{sec:operators}
-\begin{figure*}[t]
+\begin{figure}[H]
 \centering
 \resizebox{\linewidth}{!}{
 \begin{tikzpicture}[
@@ -167,7 +190,7 @@ Operators are evaluated continuously as new tuples arrive. Windows and joins use
 }
 \caption{STREAMTRACK Operator Graph. Detections arrive as streams from individual cameras. Single-camera tracking is a stateful stream operator. Cross-camera association uses a topology-aware stream join, paramaterized by the \texttt{CameraTopologyTable}, before performing global appearance clustering. State tables enable memory-safe, time-bounded identity maintenance.}
 \label{fig:architecture}
-\end{figure*}
+\end{figure}
 
 \subsection{Ingestion and Feature Enrichment Operators}
 % TODO [REVIEW] : Feature enrichment and calibration logic detailed.
@@ -308,7 +331,7 @@ We benchmark the performance of the proposed streams-and-tables architecture (\t
 
 Table~\ref{tab:performance_woven} summarizes the processing time for each stage of the Multi-Camera People Tracking (MCPT) pipeline. Our implementation significantly outperforms the baseline in similarity matrix generation, which is a major bottleneck in the original version.
 
-\begin{table}[h]
+\begin{table}[H]
     \centering
     \caption{Stage 1: Architectural Speedup (\textbf{Theirs} vs. \textbf{Ours-Base}) for the Woven WTS Dataset~\cite{woven2024wts}.}
     \label{tab:performance_woven}
@@ -325,10 +348,17 @@ Table~\ref{tab:performance_woven} summarizes the processing time for each stage 
     \end{tabular}
 \end{table}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{Evidence/speedup_bars.png}
+    \caption{Per-stage processing time comparison (log scale). The relational streaming architecture eliminates bottlenecks in similarity computation (25.6$\times$) and global ID assignment (21.1$\times$), where the batch baseline is dominated by Python dictionary and list management overhead.}
+    \label{fig:speedup_bars}
+\end{figure}
+
 \subsection{Topological Optimization: NVIDIA SmartSpaces Dataset}
 While the streaming architecture provides a significant baseline improvement, the computational complexity still scales with the number of tracklets in the aggregation window. By introducing \emph{Topology-Aware Stream Joins}, we further optimize the association search space by pruning the join predicates using camera proximity. Figure~\ref{fig:topology_map} visualizes this approach, showing the spatial relationship of two active tracking groups alongside a distant outlier.
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.85\linewidth]{Evidence/map_topology.png}
     \caption{Topological partitioning in the NVIDIA SmartSpaces network. Group 1 (Cameras 01, 11) and Group 2 (Cameras 02, 17) demonstrate localized clusters with overlapping fields of view that are joined as independent stream topologies. Camera 18 (red) is a disconnected outlier that would act as a high-overhead distraction, adding unnecessary algorithmic complexity if tracking constraints were evaluated globally.}
@@ -339,7 +369,7 @@ Table~\ref{tab:performance_nvidia} shows the benchmarking results for the NVIDIA
 
 Furthermore, the NVIDIA SmartSpaces benchmark demonstrates the critical importance of \textbf{Scalability}. The baseline pipeline follows a batch-oriented $O(N^2)$ complexity, where $N$ is the total number of tracklets in the global network. Consequently, doubling the camera count or crowd density results in a quadratic increase in processing time. In contrast, our topology-aware stream joins effectively partition the global problem into local $O(n^2)$ neighborhoods where $n \ll N$. This ensures that as the camera network grows, our processing latency scales linearly ($O(M)$) with the number of camera clusters $M$, rather than quadratically with the total number of detections.
 
-\begin{table}[h]
+\begin{table}[H]
     \centering
     \caption{Stage 2: Impact of Topological Optimization on MCPT Stage (AI City Challenge 2025 Track 1 Dataset~\cite{aicity2025track1}).}
     \label{tab:performance_nvidia}
@@ -350,6 +380,13 @@ Furthermore, the NVIDIA SmartSpaces benchmark demonstrates the critical importan
     \end{tabular}
 \end{table}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{Evidence/performance_efficiency_pie.png}
+    \caption{Processing efficiency visualization for the NVIDIA SmartSpaces dataset. The pie chart illustrates the dramatic reduction in total stage processing time, where 98.2\% of the baseline's computational cost (dominated by dictionary management and global list joins) is eliminated in our stream-oriented relational architecture.}
+    \label{fig:performance_pie}
+\end{figure}
+
 \subsection{Overall Performance Analysis}
 % TODO [REVIEW] : Performance analysis and bottleneck elimination refined.
 The results confirm that \textbf{STREAMTRACK} achieves a high-performance balance between latency and scalability. The transition to a \textbf{relational streams-and-tables architecture} (\textbf{Ours-Base}) removes the significant bottlenecks associated with similarity matrix generation by leveraging incremental windowing and continuous state management. While batch-oriented pipelines like \textbf{Theirs} are forced to compare all person-hypotheses globally, our system exploits the sparsity of real-world camera networks. 
@@ -358,12 +395,8 @@ By defining association as a join over a reconfigurable \texttt{CameraTopologyTa
 
 The breakthrough in \emph{Similarity Matrix Generation} (25.57$\times$ speedup) is specifically attributed to the architectural shift from batch-oriented list processing to \textbf{stream-oriented relational operations} which enable efficient memory locality and incremental updates. Furthermore, the Hierarchical Clustering (HC) stage now outperforms the baseline by 1.72$\times$ after optimizing the operator graph for production mode. Overall, the system achieves a processing time of 516 milliseconds for a 4-camera window, demonstrating its robust capability for real-time operation.
 
-    \begin{figure}[h]
-        \centering
-        \includegraphics[width=0.8\linewidth]{Evidence/cam_01_00}
-        \caption{Visual comparison of tracking results for NVIDIA SmartSpaces Camera 01. The frame illustrates the parity between the batch baseline (\textbf{Theirs}) and our relational streaming implementation (\textbf{Ours}), confirming that the performance optimizations do not compromise tracking coverage or identity consistency.}
-        \label{fig:visual_comparison}
-    \end{figure}
+
+
 
 \subsection{Research Questions}
 \begin{itemize}[leftmargin=*]
@@ -376,7 +409,16 @@ We evaluate on both the Woven VisionAI WTS dataset~\cite{woven2024wts} and the N
 
 \subsection{Metrics}
 % TODO [REVIEW] : Systems and tracking metrics defined.
-We verify tracking accuracy by confirming output parity with the batch baseline~\cite{wang2024overlap}: our system produces identical global identity assignments for the same input data, ensuring that all downstream accuracy metrics (IDF1, HOTA) are preserved by construction (visually affirmed in Figure~\ref{fig:visual_comparison}). We focus our quantitative evaluation on systems-level metrics: throughput (windows per second), peak processing latency for the clustering stage, and similarity matrix generation time.
+We verify tracking accuracy by confirming output parity with the batch baseline~\cite{wang2024overlap}: our system produces identical global identity assignments for the same input data, ensuring that all downstream accuracy metrics (IDF1, HOTA) are preserved by construction (visually affirmed in Figure~\ref{fig:visual_comparison}). 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{Evidence/cam_01_00}
+    \caption{Visual comparison of tracking results for NVIDIA SmartSpaces Camera 01. The frame illustrates the parity between the batch baseline (\textbf{Theirs}) and our relational streaming implementation (\textbf{Ours}), confirming that the performance optimizations do not compromise tracking coverage or identity consistency.}
+    \label{fig:visual_comparison}
+\end{figure}
+
+We focus our quantitative evaluation on systems-level metrics: throughput (windows per second), peak processing latency for the clustering stage, and similarity matrix generation time.
 
 \subsection{Baselines}
 % TODO [REVIEW] : Baseline implementations defined.
