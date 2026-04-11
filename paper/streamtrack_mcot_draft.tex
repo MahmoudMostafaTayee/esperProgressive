@@ -326,7 +326,44 @@ Ingestion-time semantics avoids the complexity of late-event watermarking. To ha
 The system exposes several runtime-configurable parameters via the \texttt{ConfigurationTable}, including: (i) synchronization window size (frames), (ii) similarity thresholds for clustering, (iii) neighborhood links in the topology, and (iv) state eviction TTLs. This allows administrators to tune the accuracy-latency tradeoff dynamically.
 
 \section{Experimental Evaluation}\label{sec:evaluation}
+\subsection{Implementation Parity and Functional Accuracy}
+Before evaluating performance gains, we first verify that the proposed streaming architecture preserves tracking quality. We evaluate the \emph{Implementation Parity} between \textbf{Ours} (StreamTrack) and the reference baseline (\textbf{Theirs}) using a serialized cross-implementation mapping method. Functional equivalence is quantified across three pipeline stages using the following metrics:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Numerical Parity (Similarity Matrix):} We measure the numerical drift in the Re-ID feature similarity matrices using the \textbf{Mean Absolute Difference (MAD)} and \textbf{Maximum Absolute Difference (MaxAD)} across all window slices.
+    \item \textbf{Structural Parity (HAC Clustering):} We compare the grouping logic using two standard clustering metrics: the \textbf{Adjusted Rand Index (ARI)} and \textbf{Normalized Mutual Information (NMI)}. Additionally, we report a \textbf{Clustering Group Match} percentage, calculated as the set-agreement of tracklet serials; a match is recorded if a cluster in \textbf{Ours} contains the exact same set of physical tracklets as a cluster in \textbf{Theirs}.
+    \item \textbf{Identity Parity (Global ID):} We confirm the final identity assigned to every physical object across the entire scene to verify absolute output consistency.
+\end{itemize}
+
+Table~\ref{tab:parity_metrics} summarizes these results for the Woven WTS Dataset.
+
+\begin{table}[H]
+    \centering
+    \caption{Implementation Parity: StreamTrack vs. AIC24 Baseline (Woven WTS Dataset).}
+    \label{tab:parity_metrics}
+    \begin{tabular}{@{}llc@{}}
+        \toprule
+        \textbf{Pipeline Stage} & \textbf{Metric (Abbreviation)} & \textbf{Parity Result} \\ \midrule
+        Re-ID Similarity Matrix & Mean Absolute Difference (MAD) & $< 1 \times 10^{-6}$ \\
+        & Maximum Absolute Difference (MaxAD) & $< 1 \times 10^{-6}$ \\ \hline
+        HAC Clustering & Clustering Group Match (Set Match) & 92.86\% \\
+        & Adjusted Rand Index (ARI) & 0.9886 \\
+        & Normalized Mutual Information (NMI) & 0.9852 \\ \hline
+        Global Tracking & Global ID Assignment Match & \textbf{100.00\%} \\ \bottomrule
+    \end{tabular}
+\end{table}
+
+The metrics characterize different aspects of the system: MAD and MaxAD quantify numerical error (where $0$ is perfect), while ARI, NMI, and Match \% quantify structural agreement (where $1$ or $100\%$ is perfect). The results confirm that while minor structural differences exist in the per-window HAC clusters (92.86\%)---primarily due to floating-point tie-breaking in similarity matrices---the stateful \texttt{GlobalIDTable} maintenance effectively reconciles these discrepancies. By mapping incoming clusters against a persistent historical consensus of identity state, the streaming engine ensures absolute functional parity (100.00\% Global ID Match) with the original batch pipeline. Consequently, all downstream tracking accuracy metrics (IDF1, HOTA) are preserved by construction as visually affirmed in Figure~\ref{fig:visual_comparison}. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{Evidence/cam_01_00}
+    \caption{Visual comparison of tracking results for NVIDIA SmartSpaces Camera 01. The frame illustrates the parity between the batch baseline (\textbf{Theirs}) and our relational streaming implementation (\textbf{Ours}), confirming that the performance optimizations do not compromise tracking coverage or identity consistency.}
+    \label{fig:visual_comparison}
+\end{figure}
+
 \subsection{System Benchmark: Woven WTS Dataset}
+
 We benchmark the performance of the proposed streams-and-tables architecture (\textbf{Ours}) against the conventional baseline (\textbf{Theirs}). The evaluation is conducted on the Woven VisionAI WTS dataset~\cite{woven2024wts} using a window of 4 cameras and 192 candidate tracklets.
 
 Table~\ref{tab:performance_woven} summarizes the processing time for each stage of the Multi-Camera People Tracking (MCPT) pipeline. Our implementation significantly outperforms the baseline in similarity matrix generation, which is a major bottleneck in the original version.
@@ -356,6 +393,7 @@ Table~\ref{tab:performance_woven} summarizes the processing time for each stage 
 \end{figure}
 
 \subsection{Topological Optimization: NVIDIA SmartSpaces Dataset}
+
 While the streaming architecture provides a significant baseline improvement, the computational complexity still scales with the number of tracklets in the aggregation window. By introducing \emph{Topology-Aware Stream Joins}, we further optimize the association search space by pruning the join predicates using camera proximity. Figure~\ref{fig:topology_map} visualizes this approach, showing the spatial relationship of two active tracking groups alongside a distant outlier.
 
 \begin{figure}[H]
@@ -388,6 +426,7 @@ Furthermore, the NVIDIA SmartSpaces benchmark demonstrates the critical importan
 \end{figure}
 
 \subsection{Overall Performance Analysis}
+
 % TODO [REVIEW] : Performance analysis and bottleneck elimination refined.
 The results confirm that \textbf{STREAMTRACK} achieves a high-performance balance between latency and scalability. The transition to a \textbf{relational streams-and-tables architecture} (\textbf{Ours-Base}) removes the significant bottlenecks associated with similarity matrix generation by leveraging incremental windowing and continuous state management. While batch-oriented pipelines like \textbf{Theirs} are forced to compare all person-hypotheses globally, our system exploits the sparsity of real-world camera networks. 
 
@@ -399,6 +438,7 @@ The breakthrough in \emph{Similarity Matrix Generation} (25.57$\times$ speedup) 
 
 
 \subsection{Research Questions}
+
 \begin{itemize}[leftmargin=*]
     \item \textbf{RQ1:} Does the streams-and-tables re-architecture preserve tracking quality compared to the baseline pipeline?
     \item \textbf{RQ2:} How much does topology-aware joining reduce candidate comparisons and runtime cost compared to naive all-pairs matching?
@@ -407,9 +447,6 @@ The breakthrough in \emph{Similarity Matrix Generation} (25.57$\times$ speedup) 
 \end{itemize}
 We evaluate on both the Woven VisionAI WTS dataset~\cite{woven2024wts} and the NVIDIA AIC 2025 dataset~\cite{aicity2025track1}, focusing on scenarios with varying camera graph sparsity and topology updates during execution.
 
-\subsection{Metrics}
-% TODO [REVIEW] : Systems and tracking metrics defined.
-We verify tracking accuracy by confirming output parity with the batch baseline~\cite{wang2024overlap}: our system produces identical global identity assignments for the same input data, ensuring that all downstream accuracy metrics (IDF1, HOTA) are preserved by construction (visually affirmed in Figure~\ref{fig:visual_comparison}). 
 
 \begin{figure}[H]
     \centering
@@ -420,7 +457,9 @@ We verify tracking accuracy by confirming output parity with the batch baseline~
 
 We focus our quantitative evaluation on systems-level metrics: throughput (windows per second), peak processing latency for the clustering stage, and similarity matrix generation time.
 
+
 \subsection{Baselines}
+
 % TODO [REVIEW] : Baseline implementations defined.
 Baselines include: (i) the original batch-oriented Python pipeline (\textbf{Theirs}), (ii) a relational streaming implementation without topology pruning (\textbf{Ours-Base}), and (iii) the full optimized pipeline with topology-aware joins (\textbf{Ours-Opt}).
 
