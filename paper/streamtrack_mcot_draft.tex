@@ -240,8 +240,12 @@ Topology sparsity reduces the join search space and improves throughput. We late
 % TODO [REVIEW] : Operational and performance benefits of SQL/EPL summarized.
 Implementing MCOT via SQL/EPL on a Complex Event Processing (CEP) engine like Esper~\cite{espertech2024} provides several operational advantages: (i) \textbf{Inspectability:} Developers can query intermediate state tables (e.g., \texttt{GlobalIDTable}) at runtime to debug association failures. (ii) \textbf{Modularity:} New operators can be added by simply deploying new EPL statements. (iii) \textbf{Memory Safe:} The engine gracefully handles complex event lifecycle rules like \texttt{TrackExpiredEvent}, ensuring deterministic garbage collection of heavy vision tensors. (iv) \textbf{Performance:} The engine's efficient in-memory event processing combined with JVM runtime optimizations yield a 25$\times$ speedup in similarity generation.
 
+\subsection{Modular Operator Design}
+A key operational advantage of the proposed architecture is its \emph{functional modularity}, akin to interchangeable ``Lego-like'' blocks. By decoupling the temporal stream routing logic (EPL) from the heavy computational tracking kernels (Java), the system allows for seamless algorithm substitution. 
+
+As shown in Fig.~\ref{fig:streaming_system}, the Esper engine handles high-level stream synchronization, windowing, and topological joining. When a window is filled, it triggers a listener that dispatches the collected data to a native Java operator. This boundary allows developers to swap the underlying clustering algorithm (e.g., replacing the current HAC implementation with a density-based or deep-learning classifier) by simply updating the listener registration in the \texttt{IotMain} class. This modularity ensures the system can evolve with new computer vision techniques without requiring a redesign of the ingestion or synchronization layers.
+
 \subsection{Robust Synchronization and Jitter Handling}
-% TODO [REVIEW] : Synchronization and count-based bounding logic detailed.
 Using ingestion-time semantics simplifies real-time deployments by eliminating the need for complex event-time watermarking logic. To handle out-of-order deliveries and jitter, the system relies on a timeout-bounded aggregation window (e.g., \texttt{win:time(2 min) group by windowIndex having count(*) = numCameras}). This guarantees that the aggregation block moves forward seamlessly either when all participating cameras have gracefully reported for a \texttt{windowIndex}, or when the maximum latency explicitly expires, ensuring a predictable progress rate.
 
 \subsection{EPL Operator Templates}
@@ -361,6 +365,11 @@ The metrics characterize different aspects of the system: MAD and MaxAD quantify
     \caption{Visual comparison of tracking results for NVIDIA SmartSpaces Camera 01. The frame illustrates the parity between the batch baseline (\textbf{Theirs}) and our relational streaming implementation (\textbf{Ours}), confirming that the performance optimizations do not compromise tracking coverage or identity consistency.}
     \label{fig:visual_comparison}
 \end{figure}
+
+\subsubsection{Algorithm Selection and Evaluated Alternatives}
+During the development of \textbf{STREAMTRACK}, several data stream clustering algorithms implemented in the MOA framework~\cite{bifet2010moa} were evaluated as alternatives to the current Hierarchical Agglomerative Clustering (HAC) approach, including \textbf{CluStream}~\cite{aggarwal2003framework} and \textbf{ClusTree}~\cite{kranen2011clustree}. These algorithms are optimized for high-velocity data streams where clusters are maintained as micro-clusters with statistical summaries (e.g., centroids and standard deviations).
+
+While CluStream and ClusTree provide excellent scalability for general data streams, they were found to be suboptimal for the specific requirements of Multi-Camera People Tracking (MCPT). MCOT requires precise \emph{set-matching} of person identities across discrete camera views to maintain continuous global trajectories. Centroid-based micro-clusters tend to merge distinct but spatially proximal identities, and the loss of individual tracklet features during micro-cluster aggregation results in a significant drop in cross-camera Re-ID accuracy. Consequently, we selected \textbf{HAC} as the primary operator because it preserves the full feature granularity of the representative nodes within each aggregation window, ensuring the 100\% Global ID Assignment parity reported in Table~\ref{tab:parity_metrics}.
 
 \subsection{System Benchmark: Woven WTS Dataset}
 
