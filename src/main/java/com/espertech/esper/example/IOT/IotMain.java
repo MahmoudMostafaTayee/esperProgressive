@@ -235,7 +235,15 @@ public class IotMain implements Runnable {
 
         // Initial population from static groups to bootstrap the "Graph"
         String groupsConfig = TrackingParameters.CAMERA_GROUPS;
-        if (!groupsConfig.equalsIgnoreCase("all")) {
+        if (groupsConfig.equalsIgnoreCase("all")) {
+            for (int i = 0; i < cameraList.size(); i++) {
+                for (int j = i + 1; j < cameraList.size(); j++) {
+                    String camI = cameraList.get(i);
+                    String camJ = cameraList.get(j);
+                    initialTopology.add(new com.espertech.esper.example.IOT.streams.CameraTopology(camI, camJ, true));
+                }
+            }
+        } else {
             String[] groupStrings = groupsConfig.split(";");
             for (String groupStr : groupStrings) {
                 String[] parts = groupStr.split(",");
@@ -254,6 +262,7 @@ public class IotMain implements Runnable {
         }
 
         logger.info("Initialized CameraTopologyTable with reconfigurable neighborhood data.");
+
     }
 
     private String normalizeCameraName(String token) {
