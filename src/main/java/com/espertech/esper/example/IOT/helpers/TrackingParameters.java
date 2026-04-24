@@ -34,7 +34,17 @@ public class TrackingParameters {
     public static double iouTh = 0.9;
     public static boolean overlap_suppression = true;
     public static boolean isDebug = false;
-    public static int max_number_of_windows_to_process = 1; // This won't work unless in isDebug is ture.
+    public static int max_number_of_windows_to_process = 5; // Limit to 5 windows for benchmarking
+    static {
+        String mw = System.getenv("MAX_WINDOWS");
+        if (mw != null && !mw.trim().isEmpty()) {
+            try {
+                max_number_of_windows_to_process = Integer.parseInt(mw.trim());
+            } catch (NumberFormatException e) {
+                // Ignore
+            }
+        }
+    }
     public static boolean turboMode = false;
 
     // SNMS Parameters

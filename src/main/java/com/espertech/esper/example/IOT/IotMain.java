@@ -176,7 +176,9 @@ public class IotMain implements Runnable {
             EventEPLUtil.streamEvent(t, "CameraTopology");
         }
 
-        socketServer.waitForFirstClient();
+        if (!TrackingParameters.turboMode) {
+            socketServer.waitForFirstClient();
+        }
         launchStreams();
 
         EmbeddingFeatureStreamer.waitForCompletion();
