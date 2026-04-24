@@ -56,8 +56,8 @@ public class EmbeddingFeatureStreamer {
         if (TrackingParameters.turboMode) {
             logger.info("Turbo Mode ENABLED. Streaming at maximum speed.");
             while (true) {
-                if (TrackingParameters.isDebug && framesStreamed >= maxFrames) {
-                    logger.info("Reached maximum number of windows to process in debug mode ("
+                if (framesStreamed >= maxFrames) {
+                    logger.info("Reached maximum number of windows to process ("
                             + TrackingParameters.max_number_of_windows_to_process
                             + " windows). Global maxFrames limit: "
                             + maxFrames);
