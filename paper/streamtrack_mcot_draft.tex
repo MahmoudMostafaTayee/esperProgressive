@@ -390,6 +390,10 @@ Table~\ref{tab:performance_combined} summarizes the architectural speedup achiev
     }
 \end{table}
 
+Table~\ref{tab:performance_combined} summarizes these benchmarking results. The marked disparity in speedup values---4.28$\times$ for Woven WTS vs. 32.38$\times$ for NVIDIA SmartSpaces---is directly attributable to the varying \textbf{tracklet density} ($N$) of the two scenes. In the Woven WTS Dataset, the scene is relatively sparse, with an average of \textbf{192 tracklets} distributed across \textbf{4 cameras}. Here, the Python baseline's $O(N^2)$ bottleneck is less pronounced, resulting in a moderate latency of 2.2 seconds. 
+
+In contrast, the NVIDIA SmartSpaces dataset represents a high-density "stress test" environment, peaking at over \textbf{556 tracklets} in the global network across \textbf{4 cameras}. As $N$ increases from 192 to 556 (a 2.9$\times$ increase in density), the baseline's quadratic workload increases by roughly \textbf{8.4$\times$}, causing execution time to explode from 2.2s to over \textbf{13.1 seconds}. Meanwhile, our relational streaming engine remains stable at sub-500ms latencies. This demonstrates that \textbf{STREAMTRACK} effectively neutralizes the "state explosion" that occurs in dense crowds, maintaining a stable, real-time pace where batch-oriented approaches fail.
+
 \subsection{Topological Optimization: NVIDIA SmartSpaces Dataset}
 
 While the streaming architecture provides a significant baseline improvement, the computational complexity still scales with the number of tracklets in the aggregation window. By introducing \emph{Topology-Aware Stream Joins}, we further optimize the association search space by pruning the join predicates using camera proximity. Figure~\ref{fig:topology_map} visualizes this approach, showing the spatial relationship of two active tracking groups alongside a distant outlier.
@@ -401,9 +405,6 @@ While the streaming architecture provides a significant baseline improvement, th
     \label{fig:topology_map}
 \end{figure}
 
-Table~\ref{tab:performance_combined} summarizes these benchmarking results. The marked disparity in speedup values---4.28$\times$ for Woven WTS vs. 32.38$\times$ for NVIDIA SmartSpaces---is directly attributable to the varying \textbf{tracklet density} ($N$) of the two scenes. In the Woven WTS Dataset, the scene is relatively sparse, with an average of \textbf{192 tracklets} distributed across \textbf{4 cameras}. Here, the Python baseline's $O(N^2)$ bottleneck is less pronounced, resulting in a moderate latency of 2.2 seconds. 
-
-In contrast, the NVIDIA SmartSpaces dataset represents a high-density "stress test" environment, peaking at over \textbf{556 tracklets} in the global network across \textbf{4 cameras}. As $N$ increases from 192 to 556 (a 2.9$\times$ increase in density), the baseline's quadratic workload increases by roughly \textbf{8.4$\times$}, causing execution time to explode from 2.2s to over \textbf{13.1 seconds}. Meanwhile, our relational streaming engine remains stable at sub-500ms latencies. This demonstrates that \textbf{STREAMTRACK} effectively neutralizes the "state explosion" that occurs in dense crowds, maintaining a stable, real-time pace where batch-oriented approaches fail.
 
 \begin{table}[H]
     \centering
