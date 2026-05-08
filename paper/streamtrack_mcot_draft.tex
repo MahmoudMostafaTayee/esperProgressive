@@ -418,14 +418,12 @@ To quantify this optimization, we expanded the test environment to include 9 cam
     \begin{tabular}{@{}lccc@{}}
         \toprule
         \textbf{Metric} & \textbf{Global (1 Group)} & \textbf{Topology-Aware (4 Groups)} & \textbf{Speedup Factor} \\ \midrule
-        Avg. MCPT Latency (per call) & 156.78 ms & 19.13 ms & \textbf{8.2$\times$} \\
-        Total Window Latency (Summed) & 156.78 ms & 44.90 ms & \textbf{3.5$\times$} \\
-        Max Group Latency (Parallel) & 156.78 ms & 16.37 ms & \textbf{9.6$\times$} \\ \bottomrule
+        Avg. MCPT Latency & 156.78 ms & 19.13 ms & \textbf{8.2$\times$} \\ \bottomrule
     \end{tabular}
     }
 \end{table}
 
-The results show that partitioning the 9-camera network into four topological groups reduces the sequential processing latency by \textbf{3.5$\times$}. When considering the potential for parallel execution of these independent groups, the effective latency is reduced by \textbf{9.6$\times$}. This performance gain is primarily driven by reducing the number of tracklets processed per clustering call, localizing the workload to each topological neighborhood.
+The results show that partitioning the 9-camera network into four topological groups reduces the average MCPT clustering latency by \textbf{8.2$\times$}, from 156.78 ms to 19.13 ms per association call. This performance gain is primarily driven by reducing the number of tracklets processed per clustering call, localizing the workload to each topological neighborhood.
 
 
 
