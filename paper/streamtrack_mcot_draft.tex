@@ -25,44 +25,36 @@
 \maketitle
 
 \begin{abstract}
-% TODO [REVIEW] : Abstract finalized with performance results.
-Multi-camera object tracking (MCOT) is typically implemented as a tightly coupled computer-vision pipeline, making it difficult to scale cross-camera association, to inspect intermediate decisions, and to adapt to changes in the camera network. This paper presents an alternative systems-oriented formulation: MCOT as a streaming program in which detections and tracklet updates are streams, identity hypotheses are maintained as relational state tables, and cross-camera association is expressed as continuous SQL/EPL queries. Inter-camera tracking is realised via topology-aware stream joins parameterised by a dynamically updateable camera neighbourhood table. Our results demonstrate that this relational approach achieves a \textbf{35.9$\times$ speedup} in the core similarity generation stage relative to conventional batch-oriented baselines while providing an architecture that supports zero-downtime reconfiguration of the camera neighborhood topology.
+Multi-camera object tracking (MCOT) is typically implemented as a tightly coupled computer-vision pipeline, making it difficult to scale cross-camera association, to inspect intermediate decisions, and to adapt to changes in the camera network. This paper presents an alternative systems-oriented formulation: MCOT as a streaming program in which detections and tracklet updates are streams, identity hypotheses are maintained as relational state tables, and cross-camera association is expressed as continuous SQL/EPL queries. Inter-camera tracking is realised via topology-aware stream joins parameterised by a dynamically updateable camera neighbourhood table. Our results demonstrate that this relational approach achieves up to a \textbf{210$\times$ speedup} in the core similarity generation stage and a \textbf{32$\times$ overall speedup} relative to conventional batch-oriented baselines. Furthermore, scaling the system to 9 cameras with topology-aware partitioning yields an additional \textbf{8.2$\times$} latency reduction per association call, while providing an architecture that supports zero-downtime reconfiguration of the camera neighborhood topology.
 \end{abstract}
 
 \section{Introduction}
 \subsection{Motivation}
-% TODO [REVIEW] : Added motivating use cases (retail, traffic, airport).
 Multi-camera object tracking is essential for modern AI applications such as smart retail monitoring, urban traffic management, and airport security. However, these systems must simultaneously satisfy (i) computer-vision accuracy requirements and (ii) operational requirements such as scalability, debuggability, and reconfigurability. Conventional implementations often embed cross-camera association logic into bespoke code, which complicates maintenance and makes runtime changes (e.g., adding a camera or redefining neighborhood links) disruptive and resource-intensive.
 
 \subsection{Key Insight}
-% TODO [REVIEW] : Key insight narrative refined.
 We recast MCOT as a \emph{streams-and-tables} program: (a) \emph{streams} represent observations and incremental tracklet hypotheses; (b) \emph{tables} represent persistent state (tracklets, global identities, and the camera network topology); and (c) continuous SQL/EPL queries implement the operator graph that transforms per-camera observations into a unified, globally consistent identity track.
 
 \subsection{Contributions}
-% TODO [REVIEW] : Finalized claims with speedup metrics.
 \begin{itemize}[leftmargin=*]
     \item An operator-graph formulation of MCOT using streams and relational state tables.
     \item An end-to-end SQL/EPL realization over a CEP/streaming engine (Esper), including streaming counterparts of key clustering/association components.
     \item Topology-aware cross-camera association expressed as stream joins, reducing candidate comparisons relative to naive all-pairs matching.
     \item A dynamically updateable camera neighborhood topology table that provides an architecture for runtime reconfiguration without code changes or pipeline resets.
-    \item A performance-optimized implementation (\textbf{Ours}) that achieves a \textbf{35.9$\times$ speedup} in the primary Matrix Generation stage relative to the batch baseline (\textbf{Theirs}). This is realized through a two-stage enhancement: (1) a migration to a \textbf{relational streams-and-tables architecture} that yields an architectural speedup in coordinate projection and state maintenance, and (2) \textbf{Topology-Aware Stream Join} optimization that provides a further 1.2$\times$ gain on sparse networks.
+    \item A performance-optimized implementation (\textbf{Ours}) that achieves up to a \textbf{210$\times$ speedup} in the primary similarity generation stage and a \textbf{32$\times$ overall speedup} relative to the batch baseline (\textbf{Theirs}). This is realized through a two-stage enhancement: (1) a migration to a \textbf{relational streams-and-tables architecture} that yields an architectural speedup in coordinate projection and state maintenance, and (2) \textbf{Topology-Aware Stream Join} optimization that delivers an \textbf{8.2$\times$} latency reduction per association call when scaling to 9 cameras.
 \end{itemize}
 
 \subsection{Paper Organization}
-% TODO : Update paper organization summary after final section review.
 Section~\ref{sec:background} defines the problem and background. Section~\ref{sec:overview} presents the system overview and data model. Sections~\ref{sec:operators}--\ref{sec:joins} detail the operator graph and topology-aware joins. Section~\ref{sec:implementation} outlines the SQL/EPL implementation. Section~\ref{sec:evaluation} describes the evaluation plan. Sections~\ref{sec:discussion}--\ref{sec:conclusion} conclude with discussion, related work, and future directions.
 
 \section{Background and Problem Definition}\label{sec:background}
 \subsection{Multi-Camera Object Tracking (MCOT)}
-% TODO [REVIEW] : Formalized inputs and outputs for MCOT stream.
 We consider a set of cameras $\mathcal{C} = \{c_1,\dots,c_m\}$. Each camera produces a stream of detections $\mathcal{D}_c$, where each detection $d \in \mathcal{D}_c$ consists of a bounding box, an appearance embedding vector $f \in \mathbb{R}^d$, and a timestamp $t$. The goal of MCOT is to assign a \emph{global identity} $ID_G$ to each observation such that all detections of the same physical object across the camera network $\mathcal{C}$ share the same identity over time, producing consistent and continuous identity tracks.
 
 \subsection{Baseline Pipeline (Starting Point)}
-% TODO [REVIEW] : Summarized baseline Python pipeline and its mapping to operators.
 We begin from a representative multi-camera tracking pipeline that (i) constructs tracklets per camera (Single-Camera Tracking), (ii) selects representative visual features for each track (Representative Selection), (iii) performs cross-camera re-identification (Re-ID) via similarity-based clustering, and (iv) assigns lower-confidence detections in a post-processing stage. Our work re-architects this functional intent as a streaming operator graph where tracklet state and identity mappings are maintained in relational tables.
 
 \subsection{Streams-and-Tables Execution Model}
-% TODO [REVIEW] : Defined streams, tables, and continuous queries.
 Our formulation relies on three core primitives: (i) a \emph{stream} is an unbounded, append-only sequence of immutable tuples (e.g., raw detections); (ii) a \emph{table} is a mutable relation representing the current state of a hypothesis (e.g., active tracklets or global ID mappings); and (iii) a \emph{continuous query} is an operator that consumes input streams, reads/updates tables, and emits derived events or results (e.g., an identity assignment). Figure~\ref{fig:duality} illustrates this duality.
 
 \begin{figure}[H]
@@ -95,7 +87,6 @@ Our formulation relies on three core primitives: (i) a \emph{stream} is an unbou
 % % TODO: If needed, later justify tradeoffs (e.g., late arrivals, jitter, vs operational simplicity).
 
 \subsection{System Requirements}
-% TODO [REVIEW] : Explicit systems and operational requirements conversion.
 \begin{itemize}[leftmargin=*]
     \item \textbf{Accuracy:} maintain competitive tracking and Re-ID quality.
     \item \textbf{Scalability:} handle increasing numbers of cameras and detections.
@@ -105,7 +96,6 @@ Our formulation relies on three core primitives: (i) a \emph{stream} is an unbou
 
 \section{System Overview}\label{sec:overview}
 \subsection{Architecture at a Glance}
-% TODO [REVIEW] : Added Table 1 summarizing the operator graph and state tables.
 The architecture of \textbf{STREAMTRACK} is organized as a pipeline of continuous operators processing detection streams and state tables. Table~\ref{tab:dag} summarizes the functional operator graph from detection ingestion to global identity updates, while Figure~\ref{fig:architecture} illustrates the end-to-end data flow.
 
 \begin{table}[H]
@@ -126,7 +116,6 @@ The architecture of \textbf{STREAMTRACK} is organized as a pipeline of continuou
 \end{table}
 
 \subsection{Data Model: Streams and Tables}
-% TODO [REVIEW] : Data model for streams and tables finalized.
 \paragraph{Streams.}
 \begin{itemize}[leftmargin=*]
     \item $\texttt{embeddingFeature}(\textit{cameraId}, \textit{curFrame}, \textit{timestamp}, \textit{detectedUsers}[])$ 
@@ -143,7 +132,6 @@ The architecture of \textbf{STREAMTRACK} is organized as a pipeline of continuou
 \end{itemize}
 
 \subsection{Execution Semantics}
-% TODO [REVIEW] : Ingestion-time semantics and eviction policies detailed.
 Operators are evaluated continuously as new tuples arrive. Windows and joins use ingestion timestamps $\textit{ts\_ingest}$. State tables maintain current hypotheses and apply eviction rules based on ingestion-time staleness (e.g., tracklet inactivity).
 
 \section{Stream Operator Graph for MCOT}\label{sec:operators}
@@ -190,68 +178,56 @@ Operators are evaluated continuously as new tuples arrive. Windows and joins use
 
 \end{tikzpicture}
 }
-\caption{STREAMTRACK Operator Graph. Detections arrive as streams from individual cameras. Single-camera tracking is a stateful stream operator. Cross-camera association uses a topology-aware stream join, paramaterized by the \texttt{CameraTopologyTable}, before performing global appearance clustering. State tables enable memory-safe, time-bounded identity maintenance.}
+\caption{STREAMTRACK Operator Graph. Detections arrive as streams from individual cameras. Single-camera tracking is a stateful stream operator. Cross-camera association uses a topology-aware stream join, parameterized by the \texttt{CameraTopologyTable}, before performing global appearance clustering. State tables enable memory-safe, time-bounded identity maintenance.}
 \label{fig:architecture}
 \end{figure}
 
 \subsection{Ingestion and Feature Enrichment Operators}
-% TODO [REVIEW] : Feature enrichment and calibration logic detailed.
 This stage ingests per-camera detections and attaches appearance embedding vectors extracted via a pre-trained Re-ID model. For cameras where world locations are required, the system captures homography matrices from a \texttt{CalibrationTable} via a continuous listener. This state is then passed to the native clustering logic, which projects detections from the 2D image plane to a unified 3D world coordinate system (ground plane), enabling spatial gating and distance-based heuristics in later stages without dedicating a separate streaming operator.
 
 \subsection{Single-Camera Tracking as Stateful Stream Processing}
-% TODO [REVIEW] : Single-camera tracking implementation detailed.
 Single-camera tracking is implemented as a stateful windowed operator. It maintains detection history within a sliding window (e.g., 90--120 frames) to perform frame-to-frame association. The operator aggregates appearance features and keypoint stability metrics for each tracklet, finally emitting a \texttt{SingleCameraResult} event once the tracklet's window is processed.
 
 \subsection{Overlap Suppression via Core Logic}
-% TODO [REVIEW] : Native conflict-resolution logic described.
 To ensure hypothesis consistency across overlapping fields of view, the system implements an overlap suppression mechanism within the core clustering module. Rather than relying purely on tracking heuristics, the algorithm identifies and merges duplicate tracklets emanating from different cameras that represent the same physical person moving in the same space. Using temporal bounds and distance comparisons, the most representative tracking hypotheses are leveraged to bind overlapping tracks, while redundant identity assignments are suppressed prior to global tracking updates.
 
 \subsection{Representative Selection and Global Identity Maintenance}
-% TODO [REVIEW] : Brief conceptual overview; implementation details in Section 5.
 Following single-camera tracking, two key stages complete the pipeline: (i) \emph{representative selection}, which identifies the most visually discriminative observation per tracklet using keypoint quality and embedding centrality criteria, and (ii) \emph{global identity maintenance}, which clusters representative features across cameras via Hierarchical Agglomerative Clustering (HAC) and maintains a persistent \texttt{GlobalIDTable}. Both stages are detailed in Section~\ref{sec:joins}.
 
 \section{Cross-Camera Tracking via Topology-Aware Stream Joins}\label{sec:joins}
 \subsection{Naive Cross-Camera Matching Cost}
-% TODO [REVIEW] : Complexity analysis for the baseline batch approach added.
-Naive cross-camera association compares tracklets across all camera pairs in the network. For $m$ cameras, this results in $O(m^2)$ pairwise comparisons. In high-density scenes with $N$ tracklets, this global $(O(N^2))$ approach leads to a quadratic explosion of candidate matches, which becomes the primary scalability bottleneck as the network grows.
+Naive cross-camera association compares tracklets across all camera pairs in the network. For $m$ cameras, each with multiple tracklets, this exhaustive matching leads to a combinatorial explosion of candidate comparisons, which becomes the primary scalability bottleneck as the network grows.
 
 \subsection{Topology-Aware Candidate Generation (Association)}
-% TODO [REVIEW] : Topology-aware candidate grouping formulation detailed.
-We formulate cross-camera association as an aggregated stream query synchronized by a \texttt{windowIndex}. The pipeline dynamically builds an \texttt{IN (\dots)} clause query corresponding to explicitly linked cameras in a specific topological cluster. By restricting comparisons and event aggregations strictly to localized camera groups, we move from global $O(N^2)$ complexity to local $O(n^2)$ complexity (where $n \ll N$), drastically reducing the search space for similarity matrix generation.
+We formulate cross-camera association as an aggregated stream query synchronized by a \texttt{windowIndex}. The pipeline dynamically builds an \texttt{IN (\dots)} clause query corresponding to explicitly linked cameras in a specific topological cluster. By restricting comparisons and event aggregations strictly to localized camera groups, the number of candidate matches is drastically reduced---as confirmed by our 9-camera benchmark, where topology-aware partitioning yields an \textbf{8.2$\times$} reduction in per-call latency relative to global matching.
 
 \subsection{Camera Topology as a Reconfigurable State Table}
-% TODO [REVIEW] : Update mechanism and runtime effects detailed.
 A key system feature is the treatment of camera neighborhoods as a manageable relational configuration rather than hardcoded logic. We implement a \texttt{CameraTopologyTable} in Esper which stores the active neighbor graph. Administrators can update this table at runtime by streaming \texttt{CameraTopology} events. This tables-based design supports having these changes take effect immediately for the next window of tracklets, providing an architecture for zero-downtime reconfiguration of the tracking pipeline (e.g., adding a new camera or disabling a link) without redeploying the core association queries.
 
 \subsection{Representative Selection Operator}
-% TODO [REVIEW] : Keypoint-based quality scoring defined.
 Once cameras are successfully joined and aggregated, the MCPT module natively selects the top-$k$ representative observations for each associated tracklet. Selection is driven by two keypoint-based criteria (\texttt{keypointTh} and \texttt{keypointConditionTh}): (i) the presence of high-confidence anatomical landmarks (e.g., facial features, limb joints) and (ii) the temporal stability of appearance embeddings within the window. This ensures that the subsequent Re-ID clustering step operates on the most discriminative visual data available.
 
 \subsection{Online Clustering / Global Identity Maintenance}
-% TODO [REVIEW] : HAC clustering strategy described.
 Global identities are maintained in the \texttt{GlobalIDTable}. We implement a \textit{person-centric summary} logic that drastically reduces event volume: instead of streaming individual coordinates per frame, the system aggregates all sightings of a person across the synchronized camera cluster. It then emits a single \texttt{GlobalPersonEvent} per identity per window, capturing the latest sighting (\texttt{Timestamp}, \texttt{Coordinate}) and the full set of cameras where the person was visible (e.g., \texttt{Cameras: [1, 2, 4]}). 
 
 A critical operational advantage of this streaming setup is its deterministic memory management. Batch tracking systems often suffer from unconstrained memory usage due to accumulating appearance signatures. In contrast, when the CEP engine detects that a person has been unseen across all cameras for a configured period (e.g., 2 minutes), an EPL timer triggers a \texttt{TrackExpiredEvent} with strict \texttt{@Priority(10)} handling. This signals the system to systematically purge stale \texttt{GlobalIDTable} rows and decisively garbage-collect the associated heavy feature trace tensors from the JVM memory.
 
 \subsection{Join Planning and Optimization}
-% TODO : Discuss join selectivity and optimization logic.
 Topology sparsity reduces the join search space and improves throughput. We later quantify candidate reduction and runtime cost savings relative to naive matching.
 
 \section{Implementation in SQL/EPL on Esper}\label{sec:implementation}
 \subsection{Why SQL-first on a CEP Engine}
-% TODO [REVIEW] : Operational and performance benefits of SQL/EPL summarized.
-Implementing MCOT via SQL/EPL on a Complex Event Processing (CEP) engine like Esper~\cite{espertech2024} provides several operational advantages: (i) \textbf{Inspectability:} Developers can query intermediate state tables (e.g., \texttt{GlobalIDTable}) at runtime to debug association failures. (ii) \textbf{Modularity:} New operators can be added by simply deploying new EPL statements. (iii) \textbf{Memory Safe:} The engine gracefully handles complex event lifecycle rules like \texttt{TrackExpiredEvent}, ensuring deterministic garbage collection of heavy vision tensors. (iv) \textbf{Performance:} The engine's efficient in-memory event processing combined with JVM runtime optimizations yield a 25$\times$ speedup in similarity generation.
+Implementing MCOT via SQL/EPL on a Complex Event Processing (CEP) engine like Esper~\cite{espertech2024} provides several operational advantages: (i) \textbf{Inspectability:} Developers can query intermediate state tables (e.g., \texttt{GlobalIDTable}) at runtime to debug association failures. (ii) \textbf{Modularity:} New operators can be added by simply deploying new EPL statements. (iii) \textbf{Memory Safe:} The engine gracefully handles complex event lifecycle rules like \texttt{TrackExpiredEvent}, ensuring deterministic garbage collection of heavy vision tensors. (iv) \textbf{Performance:} The engine's efficient in-memory event processing yields up to a \textbf{210$\times$} speedup in similarity generation on the NVIDIA SmartSpaces dataset.
 
 \subsection{Modular Operator Design}
-A key operational advantage of the proposed architecture is its \emph{functional modularity}, akin to interchangeable ``Lego-like'' blocks. By decoupling the temporal stream routing logic (EPL) from the heavy computational tracking kernels (Java), the system allows for seamless algorithm substitution. 
+A key operational advantage of the proposed architecture is its \emph{functional modularity}, akin to interchangeable ``Lego-like'' blocks. By decoupling the temporal stream routing logic (EPL) from the heavy computational tracking kernels, the system allows for seamless algorithm substitution. 
 
-As shown in Fig.~\ref{fig:architecture}, the Esper engine handles high-level stream synchronization, windowing, and topological joining. When a window is filled, it triggers a listener that dispatches the collected data to a native Java operator. This boundary allows developers to swap the underlying clustering algorithm (e.g., replacing the current HAC implementation with a density-based or deep-learning classifier) by simply updating the listener registration in the \texttt{IotMain} class. This modularity ensures the system can evolve with new computer vision techniques without requiring a redesign of the ingestion or synchronization layers.
+As shown in Fig.~\ref{fig:architecture}, the Esper engine handles high-level stream synchronization, windowing, and topological joining. When a window is filled, it triggers a listener that dispatches the collected data to a native tracking operator. This boundary allows developers to swap the underlying clustering algorithm (e.g., replacing the current HAC implementation with a density-based or deep-learning classifier) by simply updating the listener registration in the \texttt{IotMain} class. This modularity ensures the system can evolve with new computer vision techniques without requiring a redesign of the ingestion or synchronization layers.
 
 \subsection{Robust Synchronization and Jitter Handling}
 Using ingestion-time semantics simplifies real-time deployments by eliminating the need for complex event-time watermarking logic. To handle out-of-order deliveries and jitter, the system relies on a timeout-bounded aggregation window (e.g., \texttt{win:time(2 min) group by windowIndex having count(*) = numCameras}). This guarantees that the aggregation block moves forward seamlessly either when all participating cameras have gracefully reported for a \texttt{windowIndex}, or when the maximum latency explicitly expires, ensuring a predictable progress rate.
 
 \subsection{EPL Operator Templates}
-% TODO [REVIEW] : EPL templates for primary pipeline stages provided.
 Representative EPL templates from the Esper implementation mapping to the pipeline stages in Table~\ref{tab:dag} are shown below:
 
 \paragraph{1. Ingestion \& Feature Enrichment.}
@@ -279,7 +255,7 @@ group by windowIndex
 having count(*) = 2;
 \end{verbatim}
 
-\paragraph{5. Global ID Maintenance (Clustering).}
+\paragraph{4. Global ID Maintenance (Clustering).}
 \begin{verbatim}
 -- Maintains GlobalIDTable with latest state and person-centric summaries
 on GlobalPersonEvent as gpe
@@ -302,9 +278,9 @@ delete from GlobalIDTable
 where current_timestamp() - lastSeen > 120000;
 \end{verbatim}
 
-\paragraph{6. Runtime Topology Reconfiguration.}
+\paragraph{5. Runtime Topology Reconfiguration.}
 \begin{verbatim}
--- Define relational neighboorhood graph
+-- Define relational neighborhood graph
 -- (Esper 9 composite primary key syntax)
 create table CameraTopologyTable (
     cameraId string, neighborId string, enabled boolean, 
@@ -320,18 +296,30 @@ select cameraId, neighborId, enabled from CameraTopology;
 
 
 \subsection{Streaming Counterparts of Clustering}
-% TODO [REVIEW] : Windowed HAC implementation logic detailed.
-We implement streaming counterparts of clustering by maintaining tracklet summary statistics (e.g., appearance centroids, temporal bounds, and spatial histograms) in relational tables. The system uses a windowed Hierarchical Agglomerative Clustering (HAC) operator that executes at the end of each synchronization window. By partitioning the clustering problem into topological groups, we ensure that the $O(n^2)$ complexity of HAC remains manageable even in high-throughput streams.
+We implement streaming counterparts of clustering by maintaining tracklet summary statistics (e.g., appearance centroids, temporal bounds, and spatial histograms) in relational tables. The system uses a windowed Hierarchical Agglomerative Clustering (HAC) operator that executes at the end of each synchronization window. By partitioning the clustering problem into topological groups, we ensure that the clustering workload per group remains manageable even in high-throughput streams.
 
 \subsection{Handling Ordering and Jitter under Ingestion Time}
-% TODO [REVIEW] : Slack windowing for stream synchronization detailed.
 Ingestion-time semantics avoids the complexity of late-event watermarking. To handle stream jitter, the system uses timeout-bounded aggregation windows (\texttt{win:time(2 min)}), which ensure that observations from all cameras in a neighborhood are aggregated before the clustering operator triggers. If a camera fails to report within the timeout, the window expires and the pipeline moves forward with the available data, guaranteeing a predictable progress rate.
 
 \subsection{Configuration Parameters}
-% TODO [REVIEW] : Runtime configurable parameters summarized.
 The system exposes several runtime-configurable parameters via the \texttt{ConfigurationTable}, including: (i) synchronization window size (frames), (ii) similarity thresholds for clustering, (iii) neighborhood links in the topology, and (iv) state eviction TTLs. This allows administrators to tune the accuracy-latency tradeoff dynamically.
 
 \section{Experimental Evaluation}\label{sec:evaluation}
+
+\subsection{Research Questions}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{RQ1:} Does the streams-and-tables re-architecture preserve tracking quality compared to the baseline pipeline?
+    \item \textbf{RQ2:} How much does topology-aware joining reduce candidate comparisons and runtime cost compared to naive all-pairs matching?
+    \item \textbf{RQ3:} How robust is the system under runtime topology changes (without restart/reset) in terms of stability and accuracy?
+    \item \textbf{RQ4:} How do throughput and latency scale with the number of cameras and detection rates?
+\end{itemize}
+We evaluate on both the Woven VisionAI WTS dataset~\cite{woven2024wts} and the NVIDIA SmartSpaces dataset~\cite{aicity2025track1}, focusing on scenarios with varying camera graph sparsity and topology updates during execution. We focus our quantitative evaluation on systems-level metrics: throughput (windows per second), peak processing latency for the clustering stage, and similarity matrix generation time.
+
+\subsection{Baselines}
+
+Baselines include: (i) the original batch-oriented baseline pipeline (\textbf{Theirs}), (ii) a relational streaming implementation without topology pruning (\textbf{Ours-Base}), and (iii) the full optimized pipeline with topology-aware joins (\textbf{Ours-Opt}).
+
 \subsection{Implementation Parity and Functional Accuracy}
 Before evaluating performance gains, we first verify that the proposed streaming architecture preserves tracking quality. We evaluate the \emph{Implementation Parity} between \textbf{Ours} (StreamTrack) and the reference baseline (\textbf{Theirs}) using a serialized cross-implementation mapping method. Functional equivalence is quantified across three pipeline stages using the following metrics:
 
@@ -369,7 +357,7 @@ The metrics characterize different aspects of the system: MAD quantifies numeric
 \subsection{Comparative Analysis of Clustering Operators}
 While the streaming database literature often suggests specialized algorithms like CluStream or ClusTree for high-velocity data, our experiments demonstrate that for the specific window sizes encountered in MCOT (50--500 tracklets), Hierarchical Agglomerative Clustering (HAC) is superior in both latency and identity precision. Table~\ref{tab:clustering_comparison} summarizes a side-by-side benchmark conducted on the NVIDIA SmartSpaces dataset.
 
-\begin{table}[h]
+\begin{table}[H]
     \centering
     \caption{Clustering Operator Comparison (NVIDIA SmartSpaces, 50-Window Average)}
     \label{tab:clustering_comparison}
@@ -386,18 +374,18 @@ The significantly higher latency of CluStream is attributed to the framework ini
 
 \subsection{System Benchmark: Architectural Speedup}
 
-We benchmark the fundamental performance of the proposed streams-and-tables architecture (\textbf{Ours-Base}) against the conventional batch-oriented baseline (\textbf{Theirs}). The evaluation is conducted across two datasets: the Woven VisionAI WTS dataset~\cite{woven2024wts} and the NVIDIA PhysicalAI-SmartSpaces dataset~\cite{aicity2025track1}, allowing us to observe scaling effects under different data densities.
+We benchmark the fundamental performance of the proposed streams-and-tables architecture (\textbf{Ours-Base}) against the conventional batch-oriented baseline (\textbf{Theirs}). The evaluation is conducted across two datasets: the Woven VisionAI WTS dataset~\cite{woven2024wts} and the NVIDIA SmartSpaces dataset~\cite{aicity2025track1}, allowing us to observe scaling effects under different data densities.
 
 Table~\ref{tab:performance_combined} summarizes the architectural speedup achieved for the primary Multi-Camera People Tracking (MCPT) stages. Our implementation significantly outperforms the baseline, particularly in similarity matrix generation, which forms the primary computational bottleneck in the original version.
 
 \begin{table}[H]
     \centering
-    \caption{Architectural Speedup (\textbf{Theirs} vs. \textbf{Ours-Base}) for Woven WTS and Scene 2 Datasets (Total Latency over a 50-window stress test).}
+    \caption{Architectural Speedup (\textbf{Theirs} vs. \textbf{Ours-Base}) for Woven WTS and NVIDIA SmartSpaces Datasets (Total Latency over a 50-window stress test).}
     \label{tab:performance_combined}
     \resizebox{\linewidth}{!}{
     \begin{tabular}{@{}l|rrr|rrr@{}}
         \toprule
-        & \multicolumn{3}{c|}{\textbf{Woven WTS Dataset}} & \multicolumn{3}{c}{\textbf{Scene 2 (NVIDIA) Dataset}} \\
+        & \multicolumn{3}{c|}{\textbf{Woven WTS Dataset}} & \multicolumn{3}{c}{\textbf{NVIDIA SmartSpaces Dataset}} \\
         \textbf{Pipeline Stage} & \textbf{Theirs (ms)} & \textbf{Ours (ms)} & \textbf{Speedup} & \textbf{Theirs (ms)} & \textbf{Ours (ms)} & \textbf{Speedup} \\ \midrule
         Re-ID Similarity Matrix & 1260.00 & 49.27 & \textbf{25.57$\times$} & 2835.69 & 13.46 & \textbf{210.68$\times$} \\
         Total MCPT Latency & 2210.70 & 515.99 & \textbf{4.28$\times$} & 13184.40 & 407.12 & \textbf{32.38$\times$} \\ \bottomrule
@@ -405,9 +393,9 @@ Table~\ref{tab:performance_combined} summarizes the architectural speedup achiev
     }
 \end{table}
 
-Table~\ref{tab:performance_combined} summarizes these benchmarking results. The marked disparity in speedup values---4.28$\times$ for Woven WTS vs. 32.38$\times$ for NVIDIA SmartSpaces---is directly attributable to the varying \textbf{tracklet density} ($N$) of the two scenes. In the Woven WTS Dataset, the scene is relatively sparse, with an average of \textbf{192 tracklets} distributed across \textbf{4 cameras}. Here, the Python baseline's $O(N^2)$ bottleneck is less pronounced, resulting in a moderate latency of 2.2 seconds. 
+The marked disparity in speedup values---4.28$\times$ for Woven WTS vs. 32.38$\times$ for NVIDIA SmartSpaces---is directly attributable to the varying \textbf{tracklet density} of the two scenes. In the Woven WTS Dataset, the scene is relatively sparse, with an average of \textbf{192 tracklets} distributed across \textbf{4 cameras}. Here, the baseline's bottleneck is less pronounced, resulting in a moderate latency of 2.2 seconds. 
 
-In contrast, the NVIDIA SmartSpaces dataset represents a high-density "stress test" environment, peaking at over \textbf{556 tracklets} in the global network across \textbf{4 cameras}. As $N$ increases from 192 to 556 (a 2.9$\times$ increase in density), the baseline's quadratic workload increases by roughly \textbf{8.4$\times$}, causing execution time to explode from 2.2s to over \textbf{13.1 seconds}. Meanwhile, our relational streaming engine remains stable at sub-500ms latencies. This demonstrates that \textbf{STREAMTRACK} effectively neutralizes the "state explosion" that occurs in dense crowds, maintaining a stable, real-time pace where batch-oriented approaches fail.
+In contrast, the NVIDIA SmartSpaces dataset represents a high-density "stress test" environment, peaking at over \textbf{556 tracklets} in the global network across \textbf{4 cameras}. As the density increases from 192 to 556 tracklets (a 2.9$\times$ increase), the baseline's workload increases by roughly \textbf{8.4$\times$}, causing execution time to explode from 2.2s to over \textbf{13.1 seconds}. Meanwhile, our relational streaming engine remains stable at sub-500ms latencies. This demonstrates that \textbf{STREAMTRACK} effectively neutralizes the "state explosion" that occurs in dense crowds, maintaining a stable, real-time pace where batch-oriented approaches fail.
 
 \subsection{Topological Optimization: NVIDIA SmartSpaces Dataset}
 
@@ -416,7 +404,7 @@ While the streaming architecture provides a significant baseline improvement, th
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.85\linewidth]{Evidence/map_topology.png}
-    \caption{Topological partitioning in the NVIDIA SmartSpaces network. Group 1 (Cameras 01, 11) and Group 2 (Cameras 02, 17) demonstrate localized clusters with overlapping fields of view that are joined as independent stream topologies. Camera 18 (red) is a disconnected outlier that would act as a high-overhead distraction, adding unnecessary algorithmic complexity if tracking constraints were evaluated globally.}
+    \caption{Topological partitioning in the NVIDIA SmartSpaces network. The figure illustrates how cameras with overlapping fields of view form localized clusters that are joined as independent stream topologies, while spatially distant cameras are excluded from comparison. Grouping cameras that share no physical overlap eliminates unnecessary algorithmic complexity from the association stage.}
     \label{fig:topology_map}
 \end{figure}
 
@@ -452,7 +440,7 @@ To evaluate the system's performance under increased topological complexity, we 
     }
 \end{table}
 
-The results show that partitioning the 9-camera network into four topological groups reduces the sequential processing latency by \textbf{3.5$\times$}. When considering the potential for parallel execution of these independent groups, the effective latency is reduced by \textbf{9.6$\times$}. This performance gain is primarily driven by the reduction in clustering complexity from $O(N^3)$ to $O(n^3)$, where $n$ is the number of tracklets per local group.
+The results show that partitioning the 9-camera network into four topological groups reduces the sequential processing latency by \textbf{3.5$\times$}. When considering the potential for parallel execution of these independent groups, the effective latency is reduced by \textbf{9.6$\times$}. This performance gain is primarily driven by reducing the number of tracklets processed per clustering call, localizing the workload to each topological neighborhood.
 
 
 
@@ -467,29 +455,7 @@ The benchmarking results across 50 data windows demonstrate that \textbf{STREAMT
     \label{fig:total_latency}
 \end{figure}
 
-For the NVIDIA SmartSpaces dataset, our system achieved a \textbf{32.4$\times$} average speedup in total MCPT latency, with the core similarity matrix generation being over \textbf{210$\times$} faster than the Python baseline. Most significantly, while the baseline's execution time begins to deviate sharply as the tracklet density $N$ grows, our relational streaming architecture maintains a sub-second processing pace for the entire 50-window run. This confirms the system's ability to maintain high-velocity tracking in large-scale multi-camera environments where batch-oriented approaches fail to meet real-time constraints.
-
-Figure~\ref{fig:speedup_factor} visualizes this divergence. As the number of processed windows increases and the tracklet density $N$ grows toward its peak of 556, the performance advantage of the streaming architecture grows from roughly 20$\times$ to over 210$\times$ for the similarity matrix stage alone. This confirms that \textbf{STREAMTRACK} effectively neutralizes the $O(N^2)$ scaling bottleneck that plagues conventional batch-oriented MCPT implementations.
-
-The results confirm that \textbf{STREAMTRACK} achieves a high-performance balance between latency and scalability. The transition to a \textbf{relational streams-and-tables architecture} (\textbf{Ours-Base}) removes the significant bottlenecks associated with similarity matrix generation by leveraging incremental windowing and continuous state management. While batch-oriented pipelines like \textbf{Theirs} are forced to compare all person-hypotheses globally, our system exploits the sparsity of real-world camera networks. 
-
-By defining association as a join over a reconfigurable \texttt{CameraTopologyTable}, we eliminate the "search space explosion" that occurs in conventional MCOT implementations. This makes \textbf{STREAMTRACK} uniquely suited for large-scale urban deployments where the number of cameras can reach the thousands, yet each camera cluster remains small enough for sub-10ms processing. The bottleneck in our system is shifted from algorithmic complexity to local streaming I/O, providing a predictable and stable "Real-Time" guarantee that remains consistent even as the global camera network expands.
-
-The breakthrough in \emph{Similarity Matrix Generation} (25.57$\times$ speedup) is specifically attributed to the architectural shift from batch-oriented list processing to \textbf{stream-oriented relational operations} which enable efficient memory locality and incremental updates. Furthermore, the Hierarchical Clustering (HC) stage now outperforms the baseline by 1.72$\times$ after optimizing the operator graph for production mode. Overall, the system achieves a processing time of 516 milliseconds for a 4-camera window in the Woven WTS dataset, demonstrating its robust capability for real-time operation in diverse multi-camera environments.
-
-
-
-
-\subsection{Research Questions}
-
-\begin{itemize}[leftmargin=*]
-    \item \textbf{RQ1:} Does the streams-and-tables re-architecture preserve tracking quality compared to the baseline pipeline?
-    \item \textbf{RQ2:} How much does topology-aware joining reduce candidate comparisons and runtime cost compared to naive all-pairs matching?
-    \item \textbf{RQ3:} How robust is the system under runtime topology changes (without restart/reset) in terms of stability and accuracy?
-    \item \textbf{RQ4:} How do throughput and latency scale with the number of cameras and detection rates?
-\end{itemize}
-We evaluate on both the Woven VisionAI WTS dataset~\cite{woven2024wts} and the NVIDIA AIC 2025 dataset~\cite{aicity2025track1}, focusing on scenarios with varying camera graph sparsity and topology updates during execution.
-
+For the NVIDIA SmartSpaces dataset, our system achieved a \textbf{32.4$\times$} average speedup in total MCPT latency, with the core similarity matrix generation being over \textbf{210$\times$} faster than the baseline. Most significantly, while the baseline's execution time begins to deviate sharply as the tracklet density grows, our relational streaming architecture maintains a sub-second processing pace for the entire 50-window run. This confirms the system's ability to maintain high-velocity tracking in large-scale multi-camera environments where batch-oriented approaches fail to meet real-time constraints.
 
 \begin{figure}[H]
     \centering
@@ -498,30 +464,29 @@ We evaluate on both the Woven VisionAI WTS dataset~\cite{woven2024wts} and the N
     \label{fig:speedup_factor}
 \end{figure}
 
-We focus our quantitative evaluation on systems-level metrics: throughput (windows per second), peak processing latency for the clustering stage, and similarity matrix generation time.
+Figure~\ref{fig:speedup_factor} visualizes this divergence. As the number of processed windows increases and the tracklet density grows toward its peak of 556, the performance advantage of the streaming architecture grows from roughly 20$\times$ to over 210$\times$ for the similarity matrix stage alone. This confirms that \textbf{STREAMTRACK} effectively neutralizes the scalability bottleneck that plagues conventional batch-oriented MCPT implementations.
 
+The results confirm that \textbf{STREAMTRACK} achieves a high-performance balance between latency and scalability. The transition to a \textbf{relational streams-and-tables architecture} (\textbf{Ours-Base}) removes the significant bottlenecks associated with similarity matrix generation by leveraging incremental windowing and continuous state management. While batch-oriented pipelines like \textbf{Theirs} are forced to compare all person-hypotheses globally, our system exploits the sparsity of real-world camera networks. 
 
-\subsection{Baselines}
+By defining association as a join over a reconfigurable \texttt{CameraTopologyTable}, we eliminate the "search space explosion" that occurs in conventional MCOT implementations. This makes \textbf{STREAMTRACK} uniquely suited for large-scale urban deployments where the number of cameras can reach the thousands, yet each camera cluster remains small enough for sub-10ms processing. The bottleneck in our system is shifted from algorithmic complexity to local streaming I/O, providing a predictable and stable "Real-Time" guarantee that remains consistent even as the global camera network expands.
 
-% TODO [REVIEW] : Baseline implementations defined.
-Baselines include: (i) the original batch-oriented Python pipeline (\textbf{Theirs}), (ii) a relational streaming implementation without topology pruning (\textbf{Ours-Base}), and (iii) the full optimized pipeline with topology-aware joins (\textbf{Ours-Opt}).
+The breakthrough in \emph{Similarity Matrix Generation} (up to 210$\times$ speedup on the NVIDIA SmartSpaces dataset) is specifically attributed to the architectural shift from batch-oriented list processing to \textbf{stream-oriented relational operations} which enable efficient memory locality and incremental updates. Overall, the system achieves a processing time of 516 milliseconds for a 4-camera window in the Woven WTS dataset, demonstrating its robust capability for real-time operation in diverse multi-camera environments.
+
 
 
 
 
 \section{Discussion}\label{sec:discussion}
 \subsection{Benefits of a SQL/Streams-and-Tables Formulation}
-% TODO [REVIEW] : Operational advantages (inspectability, etc.) detailed.
 Expressing MCOT as continuous queries provides significant operational benefits. \textbf{Inspectability}: Developers can query the \texttt{GlobalIDTable} at runtime using standard SQL to audit association decisions and trace identity assignments. \textbf{Modularity}: New vision operators (e.g., pose estimation) can be integrated by adding new join predicates without modifying the core system architecture. \textbf{Reconfigurability}: Camera neighborhoods can be updated via streams without restarting the pipeline.
 
 \subsection{Limitations and Failure Modes}
 Despite the high performance, certain challenges remain. Extremely crowded scenes may still lead to similarity ambiguities that even topological gating cannot resolve. Furthermore, rapid lighting changes or occlusions can cause embedding drift, requiring more sophisticated online re-training of the appearance models—a direction for future work.
 
 \subsection{Deployment Considerations}
-The streaming architecture naturally supports edge-to-cloud partitioning. Since the single-camera tracking stage (SCPT) operates independently per camera and emits compact \texttt{SingleCameraResult} events, it can be deployed at the edge, while the topology-aware joins and global clustering are centralized in a CEP engine. Our benchmarks show that the MCPT clustering stage processes a 4-camera window in 516ms and a 2-camera topological group in 4.25ms, confirming that even edge devices with modest compute can handle the centralized association workload. This partitioning reduces backhaul bandwidth from raw video streams to lightweight feature events while maintaining a global view of person identities.
+The streaming architecture naturally supports edge-to-cloud partitioning. Since the single-camera tracking stage (SCPT) operates independently per camera and emits compact \texttt{SingleCameraResult} events, it can be deployed at the edge, while the topology-aware joins and global clustering are centralized in a CEP engine. Our benchmarks show that the MCPT clustering stage processes a 4-camera window in 516ms (Woven WTS) and a topology-aware group averaging 19.13ms per call (Table~\ref{tab:9camera_performance}), confirming that even edge devices with modest compute can handle the centralized association workload. This partitioning reduces backhaul bandwidth from raw video streams to lightweight feature events while maintaining a global view of person identities.
 
 \section{Related Work}\label{sec:related}
-% TODO [REVIEW] : Related work context refined.
 
 \paragraph{Multi-Camera People Tracking.}
 Recent MCPT systems have achieved strong accuracy through sophisticated clustering and re-identification strategies. Wang et al.~\cite{wang2024overlap} introduced overlap suppression clustering for offline multi-camera tracking, which our system builds upon as the baseline pipeline. Kim et al.~\cite{kim2024cluster} proposed cluster self-refinement for enhanced online tracking, achieving competitive HOTA scores through iterative identity correction. Xie et al.~\cite{xie2024robust} presented a robust online system with geometric consistency and state-aware Re-ID correction. While these approaches focus on improving tracking accuracy, they remain architecturally coupled to batch-window processing paradigms. Our work re-architects the same functional pipeline as a streaming program, preserving output parity while enabling systems-level benefits.
@@ -530,11 +495,9 @@ Recent MCPT systems have achieved strong accuracy through sophisticated clusteri
 The conceptual foundation of our approach draws from the streams-and-tables duality formalized by Sax et al.~\cite{sax2018streams}, which established that streams and tables are dual representations of the same underlying data. We apply this principle to the MCOT domain: detection observations are streams, while tracklet state and global identities are tables. Our implementation uses Esper~\cite{espertech2024}, a mature Complex Event Processing (CEP) engine that supports continuous SQL-like queries (EPL) over event streams with full relational table semantics. Unlike batch-oriented frameworks, Esper enables event-driven operator evaluation, where downstream operators fire immediately upon upstream state changes rather than waiting for batch boundaries.
 
 \section{Conclusion and Future Work}\label{sec:conclusion}
-% TODO [REVIEW] : Conclusion drafted with final results.
-We presented \textbf{STREAMTRACK}, a relational streams-and-tables architecture for multi-camera object tracking. By recasting MCOT as a continuous query problem and utilizing topology-aware stream joins, we achieved a \textbf{56.4$\times$ speedup} over batch-oriented baselines. Our system ensures real-time performance even as the camera network grows, while providing an architecture that supports unique operational benefits like runtime reconfigurability and SQL-based inspectability.
+We presented \textbf{STREAMTRACK}, a relational streams-and-tables architecture for multi-camera object tracking. By recasting MCOT as a continuous query problem and utilizing topology-aware stream joins, we achieved up to a \textbf{210$\times$ speedup} in similarity generation and a \textbf{32$\times$ overall speedup} over batch-oriented baselines on the NVIDIA SmartSpaces dataset. Scaling to a 9-camera network with topology-aware partitioning yields a further \textbf{8.2$\times$} latency reduction per association call. Our system ensures real-time performance even as the camera network grows, while providing an architecture that supports unique operational benefits like runtime reconfigurability and SQL-based inspectability.
 
 \paragraph{Future work.}
-% TODO : Complete and expand future work directions.
 Future directions include: (i) multi-hop topology reasoning, where cameras beyond immediate neighbors contribute to association via transitive similarity; and (ii) learning topology weights from historical data to dynamically adjust join selectivity.
 
 \bibliographystyle{plain}
