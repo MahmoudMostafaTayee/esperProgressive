@@ -25,7 +25,7 @@
 \maketitle
 
 \begin{abstract}
-Multi-camera object tracking (MCOT) is typically implemented as a tightly coupled computer-vision pipeline, making it difficult to scale cross-camera association, to inspect intermediate decisions, and to adapt to changes in the camera network. This paper presents an alternative systems-oriented formulation: MCOT as a streaming program in which detections and tracklet updates are streams, identity hypotheses are maintained as relational state tables, and cross-camera association is expressed as continuous SQL/EPL queries. Inter-camera tracking is realised via topology-aware stream joins parameterised by a dynamically updateable camera neighbourhood table. Our results demonstrate that this relational approach achieves up to a \textbf{210$\times$ speedup} in the core similarity generation stage and a \textbf{32$\times$ overall speedup} relative to conventional batch-oriented baselines. Furthermore, scaling the system to 9 cameras with topology-aware partitioning yields an additional \textbf{8.2$\times$} latency reduction per association call, while providing an architecture that supports zero-downtime reconfiguration of the camera neighborhood topology.
+Multi-camera object tracking (MCOT) is typically implemented as a tightly coupled computer-vision pipeline, making it difficult to scale cross-camera association, to inspect intermediate decisions, and to adapt to changes in the camera network. This paper presents an alternative systems-oriented formulation: MCOT as a streaming program in which detections and tracklet updates are streams, identity hypotheses are maintained as relational state tables, and cross-camera association is expressed as continuous SQL/EPL queries. Inter-camera tracking is realised via topology-aware stream joins parameterised by a dynamically updateable camera neighbourhood table. Our results demonstrate that this relational approach achieves a \textbf{156$\times$ average speedup} in the core similarity generation stage and a \textbf{34$\times$ overall speedup} relative to conventional batch-oriented baselines. Furthermore, scaling the system to 9 cameras with topology-aware partitioning yields an additional \textbf{8.2$\times$} latency reduction per association call, while providing an architecture that supports zero-downtime reconfiguration of the camera neighborhood topology.
 \end{abstract}
 
 \section{Introduction}
@@ -41,7 +41,7 @@ We recast MCOT as a \emph{streams-and-tables} program: (a) \emph{streams} repres
     \item An end-to-end SQL/EPL realization over a CEP/streaming engine (Esper), including streaming counterparts of key clustering/association components.
     \item Topology-aware cross-camera association expressed as stream joins, reducing candidate comparisons relative to naive all-pairs matching.
     \item A dynamically updateable camera neighborhood topology table that provides an architecture for runtime reconfiguration without code changes or pipeline resets.
-    \item A performance-optimized implementation (\textbf{Ours}) that achieves up to a \textbf{210$\times$ speedup} in the primary similarity generation stage and a \textbf{32$\times$ overall speedup} relative to the batch baseline (\textbf{Theirs}). This is realized through a two-stage enhancement: (1) a migration to a \textbf{relational streams-and-tables architecture} that yields an architectural speedup in coordinate projection and state maintenance, and (2) \textbf{Topology-Aware Stream Join} optimization that delivers an \textbf{8.2$\times$} latency reduction per association call when scaling to 9 cameras.
+    \item A performance-optimized implementation (\textbf{Ours}) that achieves a \textbf{156$\times$ average speedup} in the primary similarity generation stage and a \textbf{34$\times$ overall speedup} relative to the batch baseline (\textbf{Theirs}). This is realized through a two-stage enhancement: (1) a migration to a \textbf{relational streams-and-tables architecture} that yields an architectural speedup in coordinate projection and state maintenance, and (2) \textbf{Topology-Aware Stream Join} optimization that delivers an \textbf{8.2$\times$} latency reduction per association call when scaling to 9 cameras.
 \end{itemize}
 
 \subsection{Paper Organization}
@@ -217,7 +217,7 @@ Topology sparsity reduces the join search space and improves throughput. We late
 
 \section{Implementation in SQL/EPL on Esper}\label{sec:implementation}
 \subsection{Why SQL-first on a CEP Engine}
-Implementing MCOT via SQL/EPL on a Complex Event Processing (CEP) engine like Esper~\cite{espertech2024} provides several operational advantages: (i) \textbf{Inspectability:} Developers can query intermediate state tables (e.g., \texttt{GlobalIDTable}) at runtime to debug association failures. (ii) \textbf{Modularity:} New operators can be added by simply deploying new EPL statements. (iii) \textbf{Memory Safe:} The engine gracefully handles complex event lifecycle rules like \texttt{TrackExpiredEvent}, ensuring deterministic garbage collection of heavy vision tensors. (iv) \textbf{Performance:} The engine's efficient in-memory event processing yields up to a \textbf{210$\times$} speedup in similarity generation on the NVIDIA SmartSpaces dataset.
+Implementing MCOT via SQL/EPL on a Complex Event Processing (CEP) engine like Esper~\cite{espertech2024} provides several operational advantages: (i) \textbf{Inspectability:} Developers can query intermediate state tables (e.g., \texttt{GlobalIDTable}) at runtime to debug association failures. (ii) \textbf{Modularity:} New operators can be added by simply deploying new EPL statements. (iii) \textbf{Memory Safe:} The engine gracefully handles complex event lifecycle rules like \texttt{TrackExpiredEvent}, ensuring deterministic garbage collection of heavy vision tensors. (iv) \textbf{Performance:} The engine's efficient in-memory event processing yields a \textbf{156$\times$} average speedup in similarity generation on the NVIDIA SmartSpaces dataset.
 
 \subsection{Modular Operator Design}
 A key operational advantage of the proposed architecture is its \emph{functional modularity}, akin to interchangeable ``Lego-like'' blocks. By decoupling the temporal stream routing logic (EPL) from the heavy computational tracking kernels, the system allows for seamless algorithm substitution. 
@@ -380,26 +380,26 @@ Table~\ref{tab:performance_combined} summarizes the architectural speedup achiev
 
 \begin{table}[H]
     \centering
-    \caption{Architectural Speedup (\textbf{Theirs} vs. \textbf{Ours-Base}) for Woven WTS and NVIDIA SmartSpaces Datasets (Total Latency over a 50-window stress test).}
+    \caption{Architectural Speedup (\textbf{Theirs} vs. \textbf{Ours-Base}) for Woven WTS and NVIDIA SmartSpaces Datasets (Average Latency per Window over a 50-window stress test).}
     \label{tab:performance_combined}
     \resizebox{\linewidth}{!}{
     \begin{tabular}{@{}l|rrr|rrr@{}}
         \toprule
         & \multicolumn{3}{c|}{\textbf{Woven WTS Dataset}} & \multicolumn{3}{c}{\textbf{NVIDIA SmartSpaces Dataset}} \\
         \textbf{Pipeline Stage} & \textbf{Theirs (ms)} & \textbf{Ours (ms)} & \textbf{Speedup} & \textbf{Theirs (ms)} & \textbf{Ours (ms)} & \textbf{Speedup} \\ \midrule
-        Re-ID Similarity Matrix & 1260.00 & 49.27 & \textbf{25.57$\times$} & 2835.69 & 13.46 & \textbf{210.68$\times$} \\
-        Total MCPT Latency & 2210.70 & 515.99 & \textbf{4.28$\times$} & 13184.40 & 407.12 & \textbf{32.38$\times$} \\ \bottomrule
+        Re-ID Similarity Matrix & 1260.00 & 49.27 & \textbf{25.57$\times$} & 1671.60 & 10.67 & \textbf{156.6$\times$} \\
+        Total MCPT Latency & 2210.70 & 515.99 & \textbf{4.28$\times$} & 9581.12 & 280.65 & \textbf{34.1$\times$} \\ \bottomrule
     \end{tabular}
     }
 \end{table}
 
-The marked disparity in speedup values---4.28$\times$ for Woven WTS vs. 32.38$\times$ for NVIDIA SmartSpaces---is directly attributable to the varying \textbf{tracklet density} of the two scenes. In the Woven WTS Dataset, the scene is relatively sparse, with an average of \textbf{192 tracklets} distributed across \textbf{4 cameras}. Here, the baseline's bottleneck is less pronounced, resulting in a moderate latency of 2.2 seconds. 
+The marked disparity in speedup values---4.28$\times$ for Woven WTS vs. 34.1$\times$ for NVIDIA SmartSpaces---is directly attributable to the varying \textbf{tracklet density} of the two scenes. In the Woven WTS Dataset, the scene is relatively sparse, with an average of \textbf{192 tracklets} distributed across \textbf{4 cameras}. Here, the baseline's bottleneck is less pronounced, resulting in a moderate latency of 2.2 seconds. 
 
-In contrast, the NVIDIA SmartSpaces dataset represents a high-density "stress test" environment, peaking at over \textbf{556 tracklets} in the global network across \textbf{4 cameras}. As the density increases from 192 to 556 tracklets (a 2.9$\times$ increase), the baseline's workload increases by roughly \textbf{8.4$\times$}, causing execution time to explode from 2.2s to over \textbf{13.1 seconds}. Meanwhile, our relational streaming engine remains stable at sub-500ms latencies. This demonstrates that \textbf{STREAMTRACK} effectively neutralizes the "state explosion" that occurs in dense crowds, maintaining a stable, real-time pace where batch-oriented approaches fail.
+In contrast, the NVIDIA SmartSpaces dataset represents a high-density "stress test" environment, peaking at over \textbf{556 tracklets} in the global network across \textbf{4 cameras}. As the density increases from 192 to 556 tracklets (a 2.9$\times$ increase), the baseline's workload increases dramatically, with average per-window latency reaching \textbf{9.6 seconds}. Meanwhile, our relational streaming engine remains stable at sub-300ms average latencies. This demonstrates that \textbf{STREAMTRACK} effectively neutralizes the "state explosion" that occurs in dense crowds, maintaining a stable, real-time pace where batch-oriented approaches fail.
 
 \subsection{Topological Optimization: NVIDIA SmartSpaces Dataset}
 
-While the streaming architecture provides a significant baseline improvement, the computational complexity still scales with the number of tracklets in the aggregation window. By introducing \emph{Topology-Aware Stream Joins}, we further optimize the association search space by pruning the join predicates using camera proximity. Figure~\ref{fig:topology_map} visualizes this approach, showing the spatial relationship of two active tracking groups alongside a distant outlier.
+While the streaming architecture provides a significant baseline improvement, the computational complexity still scales with the number of tracklets in the aggregation window. By introducing \emph{Topology-Aware Stream Joins}, we further optimize the association search space by pruning the join predicates using camera proximity. Figure~\ref{fig:topology_map} visualizes this approach, showing the spatial relationship of localized tracking groups.
 
 \begin{figure}[H]
     \centering
@@ -408,26 +408,11 @@ While the streaming architecture provides a significant baseline improvement, th
     \label{fig:topology_map}
 \end{figure}
 
+To quantify this optimization, we expanded the test environment to include 9 cameras (01, 11, 13, 17, 19, 21, 25, 27, 30) from the NVIDIA SmartSpaces dataset and compare the \textbf{Global} (single-group) execution against the \textbf{Topology-Aware} (4-group) partitioning. Table~\ref{tab:9camera_performance} summarizes the results.
 
 \begin{table}[H]
     \centering
-    \caption{Stage 2: Impact of Topological Optimization on MCPT Stage (Average Latency per Window, NVIDIA SmartSpaces).}
-    \label{tab:performance_nvidia}
-    \resizebox{\linewidth}{!}{
-    \begin{tabular}{@{}lrrrr@{}}
-        \toprule
-        \textbf{Metric} & \textbf{Theirs (ms)} & \textbf{Ours-Base (ms)} & \textbf{Ours-Opt (ms)} & \textbf{Cum. Speedup} \\ \midrule
-        Avg. MCPT Stage Time & 263.69 & 8.14 & \textbf{7.92} & \textbf{33.3$\times$} \\ \bottomrule
-    \end{tabular}
-    }
-\end{table}
-
-\subsection{Scalability Analysis: 9-Camera Stress Test}
-To evaluate the system's performance under increased topological complexity, we expanded the test environment to include 9 cameras (01, 11, 13, 17, 19, 21, 25, 27, 30) from the NVIDIA SmartSpaces dataset. We compare the \textbf{Global} (single-group) execution against the \textbf{Topology-Aware} (4-group) partitioning. 
-
-\begin{table}[H]
-    \centering
-    \caption{9-Camera Performance Comparison: Global vs. Topology-Aware.}
+    \caption{Impact of Topological Optimization: Global vs. Topology-Aware (9-Camera, NVIDIA SmartSpaces).}
     \label{tab:9camera_performance}
     \resizebox{\linewidth}{!}{
     \begin{tabular}{@{}lccc@{}}
@@ -455,7 +440,7 @@ The benchmarking results across 50 data windows demonstrate that \textbf{STREAMT
     \label{fig:total_latency}
 \end{figure}
 
-For the NVIDIA SmartSpaces dataset, our system achieved a \textbf{32.4$\times$} average speedup in total MCPT latency, with the core similarity matrix generation being over \textbf{210$\times$} faster than the baseline. Most significantly, while the baseline's execution time begins to deviate sharply as the tracklet density grows, our relational streaming architecture maintains a sub-second processing pace for the entire 50-window run. This confirms the system's ability to maintain high-velocity tracking in large-scale multi-camera environments where batch-oriented approaches fail to meet real-time constraints.
+For the NVIDIA SmartSpaces dataset, our system achieved a \textbf{34$\times$} average speedup in total MCPT latency, with the core similarity matrix generation being over \textbf{156$\times$} faster on average than the baseline. At peak density (window 50), the speedup reaches over \textbf{210$\times$} for similarity generation alone. Most significantly, while the baseline's execution time begins to deviate sharply as the tracklet density grows, our relational streaming architecture maintains a sub-second processing pace for the entire 50-window run. This confirms the system's ability to maintain high-velocity tracking in large-scale multi-camera environments where batch-oriented approaches fail to meet real-time constraints.
 
 \begin{figure}[H]
     \centering
@@ -470,7 +455,7 @@ The results confirm that \textbf{STREAMTRACK} achieves a high-performance balanc
 
 By defining association as a join over a reconfigurable \texttt{CameraTopologyTable}, we eliminate the "search space explosion" that occurs in conventional MCOT implementations. This makes \textbf{STREAMTRACK} uniquely suited for large-scale urban deployments where the number of cameras can reach the thousands, yet each camera cluster remains small enough for sub-10ms processing. The bottleneck in our system is shifted from algorithmic complexity to local streaming I/O, providing a predictable and stable "Real-Time" guarantee that remains consistent even as the global camera network expands.
 
-The breakthrough in \emph{Similarity Matrix Generation} (up to 210$\times$ speedup on the NVIDIA SmartSpaces dataset) is specifically attributed to the architectural shift from batch-oriented list processing to \textbf{stream-oriented relational operations} which enable efficient memory locality and incremental updates. Overall, the system achieves a processing time of 516 milliseconds for a 4-camera window in the Woven WTS dataset, demonstrating its robust capability for real-time operation in diverse multi-camera environments.
+The breakthrough in \emph{Similarity Matrix Generation} (156$\times$ average speedup, peaking at 210$\times$ on the NVIDIA SmartSpaces dataset) is specifically attributed to the architectural shift from batch-oriented list processing to \textbf{stream-oriented relational operations} which enable efficient memory locality and incremental updates. Overall, the system achieves a processing time of 516 milliseconds for a 4-camera window in the Woven WTS dataset, demonstrating its robust capability for real-time operation in diverse multi-camera environments.
 
 
 
@@ -495,7 +480,7 @@ Recent MCPT systems have achieved strong accuracy through sophisticated clusteri
 The conceptual foundation of our approach draws from the streams-and-tables duality formalized by Sax et al.~\cite{sax2018streams}, which established that streams and tables are dual representations of the same underlying data. We apply this principle to the MCOT domain: detection observations are streams, while tracklet state and global identities are tables. Our implementation uses Esper~\cite{espertech2024}, a mature Complex Event Processing (CEP) engine that supports continuous SQL-like queries (EPL) over event streams with full relational table semantics. Unlike batch-oriented frameworks, Esper enables event-driven operator evaluation, where downstream operators fire immediately upon upstream state changes rather than waiting for batch boundaries.
 
 \section{Conclusion and Future Work}\label{sec:conclusion}
-We presented \textbf{STREAMTRACK}, a relational streams-and-tables architecture for multi-camera object tracking. By recasting MCOT as a continuous query problem and utilizing topology-aware stream joins, we achieved up to a \textbf{210$\times$ speedup} in similarity generation and a \textbf{32$\times$ overall speedup} over batch-oriented baselines on the NVIDIA SmartSpaces dataset. Scaling to a 9-camera network with topology-aware partitioning yields a further \textbf{8.2$\times$} latency reduction per association call. Our system ensures real-time performance even as the camera network grows, while providing an architecture that supports unique operational benefits like runtime reconfigurability and SQL-based inspectability.
+We presented \textbf{STREAMTRACK}, a relational streams-and-tables architecture for multi-camera object tracking. By recasting MCOT as a continuous query problem and utilizing topology-aware stream joins, we achieved a \textbf{156$\times$ average speedup} in similarity generation and a \textbf{34$\times$ overall speedup} over batch-oriented baselines on the NVIDIA SmartSpaces dataset. Scaling to a 9-camera network with topology-aware partitioning yields a further \textbf{8.2$\times$} latency reduction per association call. Our system ensures real-time performance even as the camera network grows, while providing an architecture that supports unique operational benefits like runtime reconfigurability and SQL-based inspectability.
 
 \paragraph{Future work.}
 Future directions include: (i) multi-hop topology reasoning, where cameras beyond immediate neighbors contribute to association via transitive similarity; and (ii) learning topology weights from historical data to dynamically adjust join selectivity.
