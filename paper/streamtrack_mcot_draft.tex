@@ -112,6 +112,7 @@ The architecture of \textbf{STREAMTRACK} is organized as a pipeline of continuou
     \centering
     \caption{Conceptual operator graph and state tables. Observations flow as streams, while tracklets and identities are maintained in relational tables updated by continuous joins.}
     \label{tab:dag}
+    \resizebox{\linewidth}{!}{
     \begin{tabular}{@{}lll@{}}
         \toprule
         \textbf{Pipeline Stage} & \textbf{Operator} & \textbf{Output Stream / State Table} \\ \midrule
@@ -121,6 +122,7 @@ The architecture of \textbf{STREAMTRACK} is organized as a pipeline of continuou
         Selection & Representative Selection & Native MCPT Logic \\
         Clustering & Global ID Maintenance & \texttt{GlobalIDTable} table \\ \bottomrule
     \end{tabular}
+    }
 \end{table}
 
 \subsection{Data Model: Streams and Tables}
@@ -423,19 +425,36 @@ While the streaming architecture provides a significant baseline improvement, th
     \centering
     \caption{Stage 2: Impact of Topological Optimization on MCPT Stage (Average Latency per Window, NVIDIA SmartSpaces).}
     \label{tab:performance_nvidia}
+    \resizebox{\linewidth}{!}{
     \begin{tabular}{@{}lrrrr@{}}
         \toprule
         \textbf{Metric} & \textbf{Theirs (ms)} & \textbf{Ours-Base (ms)} & \textbf{Ours-Opt (ms)} & \textbf{Cum. Speedup} \\ \midrule
         Avg. MCPT Stage Time & 263.69 & 8.14 & \textbf{7.92} & \textbf{33.3$\times$} \\ \bottomrule
     \end{tabular}
+    }
 \end{table}
 
-\begin{figure}[H]
+\subsection{Scalability Analysis: 9-Camera Stress Test}
+To evaluate the system's performance under increased topological complexity, we expanded the test environment to include 9 cameras (01, 11, 13, 17, 19, 21, 25, 27, 30) from the NVIDIA SmartSpaces dataset. We compare the \textbf{Global} (single-group) execution against the \textbf{Topology-Aware} (4-group) partitioning. 
+
+\begin{table}[H]
     \centering
-    \includegraphics[width=0.7\linewidth]{Evidence/performance_efficiency_pie.png}
-    \caption{Processing efficiency visualization for the NVIDIA SmartSpaces dataset. The pie chart illustrates the dramatic reduction in total stage processing time, where 98.2\% of the baseline's computational cost (dominated by dictionary management and global list joins) is eliminated in our stream-oriented relational architecture.}
-    \label{fig:performance_pie}
-\end{figure}
+    \caption{9-Camera Performance Comparison: Global vs. Topology-Aware.}
+    \label{tab:9camera_performance}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{@{}lccc@{}}
+        \toprule
+        \textbf{Metric} & \textbf{Global (1 Group)} & \textbf{Topology-Aware (4 Groups)} & \textbf{Speedup Factor} \\ \midrule
+        Avg. MCPT Latency (per call) & 156.78 ms & 19.13 ms & \textbf{8.2$\times$} \\
+        Total Window Latency (Summed) & 156.78 ms & 44.90 ms & \textbf{3.5$\times$} \\
+        Max Group Latency (Parallel) & 156.78 ms & 16.37 ms & \textbf{9.6$\times$} \\ \bottomrule
+    \end{tabular}
+    }
+\end{table}
+
+The results show that partitioning the 9-camera network into four topological groups reduces the sequential processing latency by \textbf{3.5$\times$}. When considering the potential for parallel execution of these independent groups, the effective latency is reduced by \textbf{9.6$\times$}. This performance gain is primarily driven by the reduction in clustering complexity from $O(N^3)$ to $O(n^3)$, where $n$ is the number of tracklets per local group.
+
+
 
 \subsection{Overall Performance Analysis}
 
