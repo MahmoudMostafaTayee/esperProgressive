@@ -243,7 +243,7 @@ Implementing MCOT via SQL/EPL on a Complex Event Processing (CEP) engine like Es
 \subsection{Modular Operator Design}
 A key operational advantage of the proposed architecture is its \emph{functional modularity}, akin to interchangeable ``Lego-like'' blocks. By decoupling the temporal stream routing logic (EPL) from the heavy computational tracking kernels (Java), the system allows for seamless algorithm substitution. 
 
-As shown in Fig.~\ref{fig:streaming_system}, the Esper engine handles high-level stream synchronization, windowing, and topological joining. When a window is filled, it triggers a listener that dispatches the collected data to a native Java operator. This boundary allows developers to swap the underlying clustering algorithm (e.g., replacing the current HAC implementation with a density-based or deep-learning classifier) by simply updating the listener registration in the \texttt{IotMain} class. This modularity ensures the system can evolve with new computer vision techniques without requiring a redesign of the ingestion or synchronization layers.
+As shown in Fig.~\ref{fig:architecture}, the Esper engine handles high-level stream synchronization, windowing, and topological joining. When a window is filled, it triggers a listener that dispatches the collected data to a native Java operator. This boundary allows developers to swap the underlying clustering algorithm (e.g., replacing the current HAC implementation with a density-based or deep-learning classifier) by simply updating the listener registration in the \texttt{IotMain} class. This modularity ensures the system can evolve with new computer vision techniques without requiring a redesign of the ingestion or synchronization layers.
 
 \subsection{Robust Synchronization and Jitter Handling}
 Using ingestion-time semantics simplifies real-time deployments by eliminating the need for complex event-time watermarking logic. To handle out-of-order deliveries and jitter, the system relies on a timeout-bounded aggregation window (e.g., \texttt{win:time(2 min) group by windowIndex having count(*) = numCameras}). This guarantees that the aggregation block moves forward seamlessly either when all participating cameras have gracefully reported for a \texttt{windowIndex}, or when the maximum latency explicitly expires, ensuring a predictable progress rate.
@@ -474,9 +474,9 @@ We evaluate on both the Woven VisionAI WTS dataset~\cite{woven2024wts} and the N
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.8\linewidth]{Evidence/cam_01_00}
-    \caption{Visual comparison of tracking results for NVIDIA SmartSpaces Camera 01. The frame illustrates the parity between the batch baseline (\textbf{Theirs}) and our relational streaming implementation (\textbf{Ours}), confirming that the performance optimizations do not compromise tracking coverage or identity consistency.}
-    \label{fig:visual_comparison}
+    \includegraphics[width=0.8\linewidth]{Evidence/chart_speedup_factor.png}
+    \caption{Speedup factor of the relational streaming architecture relative to the batch baseline. The performance gain increases significantly with tracklet density, demonstrating the scalability of the stream-oriented approach.}
+    \label{fig:speedup_factor}
 \end{figure}
 
 We focus our quantitative evaluation on systems-level metrics: throughput (windows per second), peak processing latency for the clustering stage, and similarity matrix generation time.
