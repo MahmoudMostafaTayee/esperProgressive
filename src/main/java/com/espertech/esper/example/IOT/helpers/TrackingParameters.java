@@ -131,6 +131,9 @@ public class TrackingParameters {
         // ---------- Turbo Mode ----------
         turboMode = cmd.hasOption("turbo");
 
+        // ---------- Clustering Method ----------
+        clustering_method = cmd.getOptionValue("clusterer", "agglomerative");
+
         return ErrorCode.SUCCESS;
     }
 
@@ -180,6 +183,12 @@ public class TrackingParameters {
         options.addOption(Option.builder().longOpt("exec_all").desc("Execute all stages").build());
         options.addOption(Option.builder().longOpt("exec_scpt").desc("Execute SCPT stage").build());
         options.addOption(Option.builder().longOpt("exec_mcpt").desc("Execute MCPT stage").build());
+
+        options.addOption(Option.builder()
+                .longOpt("clusterer")
+                .hasArg()
+                .desc("Clustering algorithm (agglomerative, clustream, clustree)")
+                .build());
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();

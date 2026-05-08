@@ -98,8 +98,16 @@ public class Tracker {
                 "[" + cameraId + "] Processing Window " + windowIndex + " | Frames: " + first_frame + "-" + last_frame);
 
         // 2. Intra-Window Clustering (Local Tracking)
-        List<Integer> newClusterLabels = SCPT.trackingByClustering(featureList, frameNumbers, serialNumbers,
-                boundingBoxList, windowIndex, cameraId);
+        List<Integer> newClusterLabels;
+        if (TrackingParameters.clustering_method.equalsIgnoreCase("clustream")) {
+            int numSerials = new HashSet<>(serialNumbers).size();
+            newClusterLabels = SCPT.trackingByCluStream(featureList, numSerials);
+        } else if (TrackingParameters.clustering_method.equalsIgnoreCase("clustree")) {
+            newClusterLabels = SCPT.trackingByClusTree(featureList);
+        } else {
+            newClusterLabels = SCPT.trackingByClustering(featureList, frameNumbers, serialNumbers,
+                    boundingBoxList, windowIndex, cameraId);
+        }
 
         if (TrackingParameters.isDebug) {
             try {

@@ -18,6 +18,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.espertech.esper.example.IOT.helpers.ClusteringUtils;
+import com.yahoo.labs.samoa.instances.Instance;
+import com.yahoo.labs.samoa.instances.InstancesHeader;
+import moa.cluster.Clustering;
 
 public class SCPT {
     private static final Logger logger = LoggerFactory.getLogger(SCPT.class);
@@ -106,6 +109,74 @@ public class SCPT {
         clusterLabelsList = relabelClusters(clusterLabelsList);
 
         return clusterLabelsList;
+    }
+
+    public static List<Integer> trackingByCluStream(List<double[]> featureList, int numClusters) {
+        if (featureList.isEmpty())
+            return new ArrayList<>();
+
+        moa.clusterers.clustream.Clustream cluStream = new moa.clusterers.clustream.Clustream();
+        cluStream.prepareForUse();
+        cluStream.resetLearningImpl();
+
+        InstancesHeader header = ClustersUtils.createHeader(featureList.get(0).length);
+        cluStream.setModelContext(header);
+
+        List<Instance> instances = new ArrayList<>();
+        for (double[] features : featureList) {
+            Instance instance = ClustersUtils.convertFeatureToInstance(features, header);
+            cluStream.trainOnInstance(instance);
+            instances.add(instance);
+        }
+
+        Clustering microClusters = cluStream.getMicroClusteringResult();
+        if (microClusters == null || microClusters.getClustering().isEmpty()) {
+            return new ArrayList<>(Collections.nCopies(featureList.size(), 0));
+        }
+
+        List<? extends moa.cluster.Cluster> microClusterList = microClusters.getClustering();
+        int k = Math.min(numClusters, microClusterList.size());
+        
+        Clustering macroClusters;
+        if (k > 0) {
+            macroClusters = moa.clusterers.clustream.Clustream.kMeans(k, microClusterList);
+        } else {
+            macroClusters = microClusters;
+        }
+
+        List<Integer> labels = new ArrayList<>();
+        for (Instance inst : instances) {
+            labels.add(ClustersUtils.getNearestCluster(macroClusters, inst));
+        }
+
+        return relabelClusters(labels);
+    }
+
+    public static List<Integer> trackingByClusTree(List<double[]> featureList) {
+        if (featureList.isEmpty())
+            return new ArrayList<>();
+
+        moa.clusterers.clustree.ClusTree clusTree = new moa.clusterers.clustree.ClusTree();
+        clusTree.prepareForUse();
+        clusTree.resetLearningImpl();
+
+        InstancesHeader header = ClustersUtils.createHeader(featureList.get(0).length);
+        clusTree.setModelContext(header);
+
+        List<Instance> instances = new ArrayList<>();
+        for (double[] features : featureList) {
+            Instance instance = ClustersUtils.convertFeatureToInstance(features, header);
+            clusTree.trainOnInstance(instance);
+            instances.add(instance);
+        }
+
+        Clustering clusters = clusTree.getClusteringResult();
+        List<Integer> labels = new ArrayList<>();
+        for (Instance inst : instances) {
+            labels.add(ClustersUtils.getNearestCluster(clusters, inst));
+        }
+
+        return relabelClusters(labels);
     }
 
     public static List<Integer> relabelClusters/* ✅ */(List<Integer> clusters) {
