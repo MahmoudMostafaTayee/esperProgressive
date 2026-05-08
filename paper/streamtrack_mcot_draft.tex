@@ -404,11 +404,11 @@ While the streaming architecture provides a significant baseline improvement, th
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.85\linewidth]{Evidence/map_topology.png}
-    \caption{Topological partitioning in the NVIDIA SmartSpaces network. The figure illustrates how cameras with overlapping fields of view form localized clusters that are joined as independent stream topologies, while spatially distant cameras are excluded from comparison. Grouping cameras that share no physical overlap eliminates unnecessary algorithmic complexity from the association stage.}
+    \caption{Topological partitioning of the 9-camera NVIDIA SmartSpaces network. Four topology-aware groups are shown: Group 1 (Cameras 02, 17---blue), Group 2 (Cameras 01, 11---green), Group 3 (Cameras 19, 27---orange), and Group 4 (Cameras 21, 25, 30---purple). Cameras within each group share overlapping fields of view and are joined as independent stream topologies.}
     \label{fig:topology_map}
 \end{figure}
 
-To quantify this optimization, we expanded the test environment to include 9 cameras (01, 11, 13, 17, 19, 21, 25, 27, 30) from the NVIDIA SmartSpaces dataset and compare the \textbf{Global} (single-group) execution against the \textbf{Topology-Aware} (4-group) partitioning. Table~\ref{tab:9camera_performance} summarizes the results.
+To quantify this optimization, we expanded the test environment to include 9 cameras (01, 02, 11, 17, 19, 21, 25, 27, 30) from the NVIDIA SmartSpaces dataset and compare the \textbf{Global} (single-group) execution against the \textbf{Topology-Aware} (4-group) partitioning. Table~\ref{tab:9camera_performance} summarizes the results.
 
 \begin{table}[H]
     \centering
