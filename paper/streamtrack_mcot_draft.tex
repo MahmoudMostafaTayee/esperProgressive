@@ -25,7 +25,7 @@
 \maketitle
 
 \begin{abstract}
-Multi-camera object tracking (MCOT) is typically implemented as a tightly coupled computer-vision pipeline, making it difficult to scale cross-camera association, to inspect intermediate decisions, and to adapt to changes in the camera network. This paper presents an alternative systems-oriented formulation: MCOT as a streaming program in which detections and tracklet updates are streams, identity hypotheses are maintained as relational state tables, and cross-camera association is expressed as continuous SQL/EPL queries. Inter-camera tracking is realised via topology-aware stream joins parameterised by a dynamically updateable camera neighbourhood table. Our results demonstrate that this relational approach achieves a \textbf{156$\times$ average speedup} in the core similarity generation stage and a \textbf{34$\times$ overall speedup} relative to conventional batch-oriented baselines. Furthermore, scaling the system to 9 cameras with topology-aware partitioning yields an additional \textbf{8.2$\times$} latency reduction per association call, while providing an architecture that supports zero-downtime reconfiguration of the camera neighborhood topology.
+Multi-camera object tracking (MCOT) is typically implemented as a tightly coupled computer-vision pipeline, making it difficult to scale cross-camera association, to inspect intermediate decisions, and to adapt to changes in the camera network. This paper presents an alternative systems-oriented formulation: MCOT as a streaming program in which detections and tracklet updates are streams, identity hypotheses are maintained as relational state tables, and cross-camera association is expressed as continuous SQL/EPL queries. Inter-camera tracking is realised via topology-aware stream joins parameterised by a dynamically updateable camera neighbourhood table. Our results demonstrate that this relational approach achieves a \textbf{156$\times$ average speedup} in the core similarity generation stage and a \textbf{34$\times$ overall speedup} relative to conventional batch-oriented baselines. Furthermore, scaling the system to 9 cameras with topology-aware partitioning yields an additional \textbf{4.16$\times$} latency reduction per association call, while providing an architecture that supports zero-downtime reconfiguration of the camera neighborhood topology.
 \end{abstract}
 
 \section{Introduction}
@@ -41,7 +41,7 @@ We recast MCOT as a \emph{streams-and-tables} program: (a) \emph{streams} repres
     \item An end-to-end SQL/EPL realization over a CEP/streaming engine (Esper), including streaming counterparts of key clustering/association components.
     \item Topology-aware cross-camera association expressed as stream joins, reducing candidate comparisons relative to naive all-pairs matching.
     \item A dynamically updateable camera neighborhood topology table that provides an architecture for runtime reconfiguration without code changes or pipeline resets.
-    \item A performance-optimized implementation (\textbf{Ours}) that achieves a \textbf{156$\times$ average speedup} in the primary similarity generation stage and a \textbf{34$\times$ overall speedup} relative to the batch baseline (\textbf{Theirs}). This is realized through a two-stage enhancement: (1) a migration to a \textbf{relational streams-and-tables architecture} that yields an architectural speedup in coordinate projection and state maintenance, and (2) \textbf{Topology-Aware Stream Join} optimization that delivers an \textbf{8.2$\times$} latency reduction per association call when scaling to 9 cameras.
+    \item A performance-optimized implementation (\textbf{Ours}) that achieves a \textbf{156$\times$ average speedup} in the primary similarity generation stage and a \textbf{34$\times$ overall speedup} relative to the batch baseline (\textbf{Theirs}). This is realized through a two-stage enhancement: (1) a migration to a \textbf{relational streams-and-tables architecture} that yields an architectural speedup in coordinate projection and state maintenance, and (2) \textbf{Topology-Aware Stream Join} optimization that delivers an \textbf{4.16$\times$} latency reduction when scaling to 9 cameras.
 \end{itemize}
 
 \subsection{Paper Organization}
@@ -199,7 +199,7 @@ Following single-camera tracking, two key stages complete the pipeline: (i) \emp
 Naive cross-camera association compares tracklets across all camera pairs in the network. For $m$ cameras, each with multiple tracklets, this exhaustive matching leads to a combinatorial explosion of candidate comparisons, which becomes the primary scalability bottleneck as the network grows.
 
 \subsection{Topology-Aware Candidate Generation (Association)}
-We formulate cross-camera association as an aggregated stream query synchronized by a \texttt{windowIndex}. The pipeline dynamically builds an \texttt{IN (\dots)} clause query corresponding to explicitly linked cameras in a specific topological cluster. By restricting comparisons and event aggregations strictly to localized camera groups, the number of candidate matches is drastically reduced---as confirmed by our 9-camera benchmark, where topology-aware partitioning yields an \textbf{8.2$\times$} reduction in per-call latency relative to global matching.
+We formulate cross-camera association as an aggregated stream query synchronized by a \texttt{windowIndex}. The pipeline dynamically builds an \texttt{IN (\dots)} clause query corresponding to explicitly linked cameras in a specific topological cluster. By restricting comparisons and event aggregations strictly to localized camera groups, the number of candidate matches is drastically reduced---as confirmed by our 9-camera benchmark, where topology-aware partitioning yields an \textbf{4.16$\times$} reduction in per-call latency relative to global matching.
 
 \subsection{Camera Topology as a Reconfigurable State Table}
 A key system feature is the treatment of camera neighborhoods as a manageable relational configuration rather than hardcoded logic. We implement a \texttt{CameraTopologyTable} in Esper which stores the active neighbor graph. Administrators can update this table at runtime by streaming \texttt{CameraTopology} events. This tables-based design supports having these changes take effect immediately for the next window of tracklets, providing an architecture for zero-downtime reconfiguration of the tracking pipeline (e.g., adding a new camera or disabling a link) without redeploying the core association queries.
@@ -242,7 +242,7 @@ Representative EPL templates from the Esper implementation mapping to the pipeli
 \begin{verbatim}
 -- Stateful windowed single-camera tracking
 select detectedUsers, curFrame, timestamp 
-from embeddingFeature_camera_0001.win:length_batch(120)
+from embeddingFeature_camera_0001.win:length_batch(90)
 \end{verbatim}
 
 \paragraph{3. Topology-Aware Join (Association).}
@@ -418,12 +418,12 @@ To quantify this optimization, we expanded the test environment to include 9 cam
     \begin{tabular}{@{}lccc@{}}
         \toprule
         \textbf{Metric} & \textbf{Global (1 Group)} & \textbf{Topology-Aware (4 Groups)} & \textbf{Speedup Factor} \\ \midrule
-        Avg. MCPT Latency & 156.78 ms & 19.13 ms & \textbf{8.2$\times$} \\ \bottomrule
+        Avg. MCPT Latency & 41.96 ms & 10.10 ms & \textbf{4.16$\times$} \\ \bottomrule
     \end{tabular}
     }
 \end{table}
 
-The results show that partitioning the 9-camera network into four topological groups reduces the average MCPT clustering latency by \textbf{8.2$\times$}, from 156.78 ms to 19.13 ms per association call. This performance gain is primarily driven by reducing the number of tracklets processed per clustering call, localizing the workload to each topological neighborhood.
+The results show that partitioning the 9-camera network into four topological groups reduces the average MCPT clustering latency by \textbf{4.16$\times$}, from 41.96 ms to 10.10 ms per association call. This performance gain is primarily driven by reducing the number of tracklets processed per clustering call, localizing the workload to each topological neighborhood.
 
 
 
@@ -478,7 +478,7 @@ Recent MCPT systems have achieved strong accuracy through sophisticated clusteri
 The conceptual foundation of our approach draws from the streams-and-tables duality formalized by Sax et al.~\cite{sax2018streams}, which established that streams and tables are dual representations of the same underlying data. We apply this principle to the MCOT domain: detection observations are streams, while tracklet state and global identities are tables. Our implementation uses Esper~\cite{espertech2024}, a mature Complex Event Processing (CEP) engine that supports continuous SQL-like queries (EPL) over event streams with full relational table semantics. Unlike batch-oriented frameworks, Esper enables event-driven operator evaluation, where downstream operators fire immediately upon upstream state changes rather than waiting for batch boundaries.
 
 \section{Conclusion and Future Work}\label{sec:conclusion}
-We presented \textbf{STREAMTRACK}, a relational streams-and-tables architecture for multi-camera object tracking. By recasting MCOT as a continuous query problem and utilizing topology-aware stream joins, we achieved a \textbf{156$\times$ average speedup} in similarity generation and a \textbf{34$\times$ overall speedup} over batch-oriented baselines on the NVIDIA SmartSpaces dataset. Scaling to a 9-camera network with topology-aware partitioning yields a further \textbf{8.2$\times$} latency reduction per association call. Our system ensures real-time performance even as the camera network grows, while providing an architecture that supports unique operational benefits like runtime reconfigurability and SQL-based inspectability.
+We presented \textbf{STREAMTRACK}, a relational streams-and-tables architecture for multi-camera object tracking. By recasting MCOT as a continuous query problem and utilizing topology-aware stream joins, we achieved a \textbf{156$\times$ average speedup} in similarity generation and a \textbf{34$\times$ overall speedup} over batch-oriented baselines on the NVIDIA SmartSpaces dataset. Scaling to a 9-camera network with topology-aware partitioning yields a further \textbf{4.16$\times$} latency reduction per association call. Our system ensures real-time performance even as the camera network grows, while providing an architecture that supports unique operational benefits like runtime reconfigurability and SQL-based inspectability.
 
 \paragraph{Future work.}
 Future directions include: (i) multi-hop topology reasoning, where cameras beyond immediate neighbors contribute to association via transitive similarity; and (ii) learning topology weights from historical data to dynamically adjust join selectivity.
