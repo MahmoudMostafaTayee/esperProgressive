@@ -287,9 +287,17 @@ create table CameraTopologyTable (
     primary key(cameraId, neighborId)
 );
 
--- Update topology at runtime via stream
-insert into CameraTopologyTable 
-select cameraId, neighborId, enabled from CameraTopology;
+-- Update topology at runtime via atomic upsert (on-merge)
+on CameraTopology as ct
+merge into CameraTopologyTable as target
+where target.cameraId = ct.cameraId
+  and target.neighborId = ct.neighborId
+when matched then
+  update set target.enabled = ct.enabled
+when not matched then
+  insert select ct.cameraId as cameraId,
+               ct.neighborId as neighborId,
+               ct.enabled as enabled;
 \end{verbatim}
 
 \noindent Critically, the \texttt{CameraTopologyTable} is not merely a static configuration store. Our system implements a \emph{reactive reconfiguration loop}: each incoming \texttt{CameraTopology} event triggers a Connected Components computation over the in-memory neighborhood graph. When the resulting cluster partition differs from the currently active set of aggregation queries, the system automatically compiles and deploys new EPL statements targeting the updated camera groups, while undeploying the obsolete ones. This enables zero-downtime reconfiguration of the camera network---an operator can add, remove, or reassign camera neighborhoods at runtime without restarting the pipeline or manually editing query definitions.
@@ -404,7 +412,7 @@ While the streaming architecture provides a significant baseline improvement, th
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.85\linewidth]{Evidence/map_topology.png}
-    \caption{Topological partitioning of the 9-camera NVIDIA SmartSpaces network. Four topology-aware groups are shown: Group 1 (Cameras 02, 17---blue), Group 2 (Cameras 01, 11---green), Group 3 (Cameras 19, 27---orange), and Group 4 (Cameras 21, 25, 30---purple). Cameras within each group share overlapping fields of view and are joined as independent stream topologies.}
+    \caption{Topological partitioning of the NVIDIA SmartSpaces network. Four topology-aware groups are shown: Group 1 (Cameras 02, 17---blue), Group 2 (Cameras 01, 11---green), Group 3 (Cameras 19, 27---orange), and Group 4 (Cameras 21, 25, 30---purple). Cameras within each group share overlapping fields of view and are joined as independent stream topologies.}
     \label{fig:topology_map}
 \end{figure}
 
@@ -412,7 +420,7 @@ To quantify this optimization, we expanded the test environment to include 9 cam
 
 \begin{table}[H]
     \centering
-    \caption{Impact of Topological Optimization: Global vs. Topology-Aware (9-Camera, NVIDIA SmartSpaces).}
+    \caption{Impact of Topological Optimization: Global vs. Topology-Aware (NVIDIA SmartSpaces).}
     \label{tab:9camera_performance}
     \resizebox{\linewidth}{!}{
     \begin{tabular}{@{}lccc@{}}
@@ -423,8 +431,32 @@ To quantify this optimization, we expanded the test environment to include 9 cam
     }
 \end{table}
 
-The results show that partitioning the 9-camera network into four topological groups reduces the average MCPT clustering latency by \textbf{4.16$\times$}, from 41.96 ms to 10.10 ms per association call. This performance gain is primarily driven by reducing the number of tracklets processed per clustering call, localizing the workload to each topological neighborhood.
+The results show that partitioning the NVIDIA SmartSpaces network into four topological groups reduces the average MCPT clustering latency by \textbf{4.16$\times$}, from 41.96 ms to 10.10 ms per association call. This performance gain is primarily driven by reducing the number of tracklets processed per clustering call, localizing the workload to each topological neighborhood.
 
+\subsection{Runtime Topology Reconfiguration (RQ3)}
+
+A distinctive operational advantage of \textbf{STREAMTRACK} is its ability to reconfigure the camera network topology at runtime---without any pipeline downtime, restart, or loss of tracking state. Because camera neighborhoods are maintained as a relational \texttt{CameraTopologyTable} rather than hardcoded logic, operators can add, remove, or reassign camera links by simply injecting \texttt{CameraTopology} events into the live stream. The system's reactive reconciliation loop automatically detects the change, recomputes the Connected Components of the neighborhood graph, and atomically deploys the updated EPL aggregation queries.
+
+\paragraph{Key Features of Runtime Reconfiguration.}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Zero Downtime:} The pipeline continues processing without interruption. No restart, no pause, no manual intervention.
+    \item \textbf{Instant Propagation:} The new topology takes effect on the \emph{very next} synchronization window (sub-second propagation latency).
+    \item \textbf{Scoped Impact:} Only the affected camera groups are redeployed; unrelated groups remain completely untouched.
+    \item \textbf{State Preservation:} The \texttt{GlobalIDTable} and all accumulated tracking state are fully preserved across the reconfiguration boundary.
+\end{itemize}
+
+\paragraph{Controlled Experiment.}
+We validated this capability on the NVIDIA SmartSpaces network. The pipeline was initialized with the four-group topology shown in the pre-reconfiguration state of Figure~\ref{fig:reconfig_before_after} and processed two synchronization windows (frames 1--180). At frame 180, a reconfiguration event was injected---\emph{without pausing or restarting the pipeline}---executing two simultaneous changes: (i) a \textbf{group split} (disabling the link between cameras 01 and 11) and (ii) a \textbf{group merge} (enabling a new link between cameras 17 and 19, merging two groups into a single four-camera cluster). Figure~\ref{fig:reconfig_before_after} visualizes this reconfiguration transition on the actual floor plan.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{Evidence/map_reconfig_combined.png}
+    \caption{Runtime topology reconfiguration on the NVIDIA SmartSpaces floor plan. The left panel shows the initial four-group topology, and the right panel shows the reconfigured state after a group split (cameras 01 and 11) and a group merge (cameras 17 and 19). The transition completed in \textbf{464 ms} with \textbf{zero downtime} or interruptions to the tracking pipeline.}
+    \label{fig:reconfig_before_after}
+\end{figure}
+
+\paragraph{Quantitative Results.}
+The entire reconfiguration cycle completed in \textbf{464~ms}---a negligible overhead relative to the 3-second synchronization window---with zero pipeline interruptions and zero post-reconfiguration errors. Following the transition, the pipeline successfully processed the subsequent windows (Windows 2--5) under the new topology, preserving all tracking states while handling up to \textbf{58 tracklets} in the newly-merged four-camera group.
 
 
 \subsection{Overall Performance Analysis}
@@ -478,7 +510,7 @@ Recent MCPT systems have achieved strong accuracy through sophisticated clusteri
 The conceptual foundation of our approach draws from the streams-and-tables duality formalized by Sax et al.~\cite{sax2018streams}, which established that streams and tables are dual representations of the same underlying data. We apply this principle to the MCOT domain: detection observations are streams, while tracklet state and global identities are tables. Our implementation uses Esper~\cite{espertech2024}, a mature Complex Event Processing (CEP) engine that supports continuous SQL-like queries (EPL) over event streams with full relational table semantics. Unlike batch-oriented frameworks, Esper enables event-driven operator evaluation, where downstream operators fire immediately upon upstream state changes rather than waiting for batch boundaries.
 
 \section{Conclusion and Future Work}\label{sec:conclusion}
-We presented \textbf{STREAMTRACK}, a relational streams-and-tables architecture for multi-camera object tracking. By recasting MCOT as a continuous query problem and utilizing topology-aware stream joins, we achieved a \textbf{156$\times$ average speedup} in similarity generation and a \textbf{34$\times$ overall speedup} over batch-oriented baselines on the NVIDIA SmartSpaces dataset. Scaling to a 9-camera network with topology-aware partitioning yields a further \textbf{4.16$\times$} latency reduction per association call. Our system ensures real-time performance even as the camera network grows, while providing an architecture that supports unique operational benefits like runtime reconfigurability and SQL-based inspectability.
+We presented \textbf{STREAMTRACK}, a relational streams-and-tables architecture for multi-camera object tracking. By recasting MCOT as a continuous query problem and utilizing topology-aware stream joins, we achieved a \textbf{156$\times$ average speedup} in similarity generation and a \textbf{34$\times$ overall speedup} over batch-oriented baselines on the NVIDIA SmartSpaces dataset. Scaling the NVIDIA SmartSpaces network with topology-aware partitioning yields a further \textbf{4.16$\times$} latency reduction per association call. Our system ensures real-time performance even as the camera network grows, while providing an architecture that supports unique operational benefits like runtime reconfigurability and SQL-based inspectability.
 
 \paragraph{Future work.}
 Future directions include: (i) multi-hop topology reasoning, where cameras beyond immediate neighbors contribute to association via transitive similarity; and (ii) learning topology weights from historical data to dynamically adjust join selectivity.

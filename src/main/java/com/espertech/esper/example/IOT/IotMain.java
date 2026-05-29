@@ -231,8 +231,12 @@ public class IotMain implements Runnable {
         EventEPLUtil.addEpl(createTableEPL);
         EventEPLUtil.addEpl("create index CameraTopologyNeighborIndex on CameraTopologyTable (neighborId);");
 
-        // Insert incoming CameraTopology events into the table to allow runtime updates
-        String insertEPL = "insert into CameraTopologyTable select cameraId, neighborId, enabled from CameraTopology;";
+        // Upsert incoming CameraTopology events into the table to allow runtime updates without unique index violations
+        String insertEPL = "on CameraTopology as ct " +
+                "merge into CameraTopologyTable as target " +
+                "where target.cameraId = ct.cameraId and target.neighborId = ct.neighborId " +
+                "when matched then update set target.enabled = ct.enabled " +
+                "when not matched then insert select ct.cameraId as cameraId, ct.neighborId as neighborId, ct.enabled as enabled;";
         EventEPLUtil.addEpl(insertEPL);
 
         // Initial population from static groups to bootstrap the "Graph"
@@ -317,8 +321,11 @@ public class IotMain implements Runnable {
     }
 
     private void reconcileDeployments() {
+        long reconStartNs = System.nanoTime();
         java.util.List<java.util.Set<String>> currentClusters = computeClusters();
         java.util.Set<java.util.Set<String>> clusterNames = new java.util.HashSet<>(currentClusters);
+
+        int undeployed = 0, deployed = 0, unchanged = 0;
 
         // 1. Remove deployments for clusters that no longer exist
         for (java.util.Set<String> deployedCluster : new java.util.HashSet<>(activeDeployments.keySet())) {
@@ -326,17 +333,26 @@ public class IotMain implements Runnable {
                 String depId = activeDeployments.remove(deployedCluster);
                 EventEPLUtil.undeploy(depId);
                 logger.info("Undeployed aggregation query for obsolete group: " + deployedCluster);
+                undeployed++;
             }
         }
 
-        // 2. Add deployments for new clusters
+        // 2. Add deployments for new clusters; report unchanged ones
         for (java.util.Set<String> cluster : currentClusters) {
             if (!activeDeployments.containsKey(cluster)) {
                 String depId = deployAggregationQuery(cluster);
                 activeDeployments.put(cluster, depId);
                 logger.info("Deployed NEW dynamic aggregation query for group: " + cluster);
+                deployed++;
+            } else {
+                logger.info("UNCHANGED aggregation query for group: " + cluster);
+                unchanged++;
             }
         }
+
+        long reconElapsedMs = (System.nanoTime() - reconStartNs) / 1_000_000;
+        logger.info("Reconciliation summary: " + deployed + " deployed, " + undeployed + " undeployed, " + unchanged + " unchanged. Took " + reconElapsedMs + " ms.");
+        logger.info("Active deployment count: " + activeDeployments.size() + " | Current clusters: " + currentClusters);
     }
 
     private java.util.List<java.util.Set<String>> computeClusters() {

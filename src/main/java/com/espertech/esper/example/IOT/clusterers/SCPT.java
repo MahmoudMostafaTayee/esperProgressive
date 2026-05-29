@@ -77,8 +77,14 @@ public class SCPT {
                 featuresArray.length);
 
         // 4. Clustering
-        HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
-        int[] clusterLabels = hc.partition(TrackingParameters.epsilonScpt);
+        int[] clusterLabels;
+        try {
+            HierarchicalClustering hc = HierarchicalClustering.fit(new SingleLinkage(distanceMatrix));
+            clusterLabels = hc.partition(TrackingParameters.epsilonScpt);
+        } catch (Exception e) {
+            clusterLabels = new int[distanceMatrix.length];
+            Arrays.fill(clusterLabels, 0);
+        }
 
         if (TrackingParameters.isDebug) {
             try {

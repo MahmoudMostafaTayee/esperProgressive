@@ -34,7 +34,7 @@ public class TrackingParameters {
     public static double iouTh = 0.9;
     public static boolean overlap_suppression = true;
     public static boolean isDebug = false;
-    public static int max_number_of_windows_to_process = 5; // Limit to 5 windows for benchmarking
+    public static int max_number_of_windows_to_process = 50; // Limit to 50 windows for benchmarking
     static {
         String mw = System.getenv("MAX_WINDOWS");
         if (mw != null && !mw.trim().isEmpty()) {
@@ -46,6 +46,7 @@ public class TrackingParameters {
         }
     }
     public static boolean turboMode = false;
+    public static boolean reconfigExperiment = false;
 
     // SNMS Parameters
     public static boolean sequential_nms = true;
@@ -131,6 +132,9 @@ public class TrackingParameters {
         // ---------- Turbo Mode ----------
         turboMode = cmd.hasOption("turbo");
 
+        // ---------- Reconfig Experiment ----------
+        reconfigExperiment = cmd.hasOption("reconfig");
+
         // ---------- Clustering Method ----------
         clustering_method = cmd.getOptionValue("clusterer", "agglomerative");
 
@@ -179,6 +183,7 @@ public class TrackingParameters {
 
         options.addOption(Option.builder().longOpt("debug").desc("Debug mode").build());
         options.addOption(Option.builder().longOpt("turbo").desc("Turbo mode").build());
+        options.addOption(Option.builder().longOpt("reconfig").desc("Enable runtime topology reconfiguration experiment").build());
 
         options.addOption(Option.builder().longOpt("exec_all").desc("Execute all stages").build());
         options.addOption(Option.builder().longOpt("exec_scpt").desc("Execute SCPT stage").build());

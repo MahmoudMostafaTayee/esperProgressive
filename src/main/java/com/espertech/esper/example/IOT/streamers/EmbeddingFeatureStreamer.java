@@ -65,6 +65,12 @@ public class EmbeddingFeatureStreamer {
                 }
 
                 framesStreamed++;
+                if (TrackingParameters.reconfigExperiment && framesStreamed == 180) {
+                    triggerCameraOutage();
+                }
+                if (TrackingParameters.reconfigExperiment && framesStreamed == 360) {
+                    triggerCameraRecovery();
+                }
                 boolean anySceneHasMore = false;
                 for (Map.Entry<Path, Map<Path, List<Path>>> sceneEntry : sceneData.entrySet()) {
                     Path scenePath = sceneEntry.getKey();
@@ -96,6 +102,12 @@ public class EmbeddingFeatureStreamer {
                     return;
                 }
                 framesStreamed++;
+                if (TrackingParameters.reconfigExperiment && framesStreamed == 180) {
+                    triggerCameraOutage();
+                }
+                if (TrackingParameters.reconfigExperiment && framesStreamed == 360) {
+                    triggerCameraRecovery();
+                }
                 for (Map.Entry<Path, Map<Path, List<Path>>> sceneEntry : sceneData.entrySet()) {
                     Path scene = sceneEntry.getKey();
                     if (!Files.isDirectory(scene))
@@ -559,5 +571,53 @@ public class EmbeddingFeatureStreamer {
             this.y2 = y2;
             this.conf = conf;
         }
+    }
+
+    private static void triggerCameraOutage() {
+        logger.info("==========================================================================");
+        logger.info("TRIGGERING RUNTIME TOPOLOGY RECONFIGURATION: CAMERA 30 OUTAGE (DISABLE)");
+        logger.info("Disabling links for camera_0030 to simulate a network outage...");
+        logger.info("==========================================================================");
+
+        com.espertech.esper.example.IOT.streams.CameraTopology break1 =
+                new com.espertech.esper.example.IOT.streams.CameraTopology("camera_0021", "camera_0030", false);
+        com.espertech.esper.example.IOT.streams.CameraTopology break2 =
+                new com.espertech.esper.example.IOT.streams.CameraTopology("camera_0030", "camera_0021", false);
+        com.espertech.esper.example.IOT.streams.CameraTopology break3 =
+                new com.espertech.esper.example.IOT.streams.CameraTopology("camera_0025", "camera_0030", false);
+        com.espertech.esper.example.IOT.streams.CameraTopology break4 =
+                new com.espertech.esper.example.IOT.streams.CameraTopology("camera_0030", "camera_0025", false);
+
+        EventEPLUtil.streamEvent(break1, "CameraTopology");
+        EventEPLUtil.streamEvent(break2, "CameraTopology");
+        EventEPLUtil.streamEvent(break3, "CameraTopology");
+        EventEPLUtil.streamEvent(break4, "CameraTopology");
+
+        logger.info("Camera 30 outage events successfully streamed into the Esper pipeline!");
+        logger.info("==========================================================================");
+    }
+
+    private static void triggerCameraRecovery() {
+        logger.info("==========================================================================");
+        logger.info("TRIGGERING RUNTIME TOPOLOGY RECONFIGURATION: CAMERA 30 RECOVERY (ENABLE)");
+        logger.info("Enabling links for camera_0030 back to simulate network recovery...");
+        logger.info("==========================================================================");
+
+        com.espertech.esper.example.IOT.streams.CameraTopology join1 =
+                new com.espertech.esper.example.IOT.streams.CameraTopology("camera_0021", "camera_0030", true);
+        com.espertech.esper.example.IOT.streams.CameraTopology join2 =
+                new com.espertech.esper.example.IOT.streams.CameraTopology("camera_0030", "camera_0021", true);
+        com.espertech.esper.example.IOT.streams.CameraTopology join3 =
+                new com.espertech.esper.example.IOT.streams.CameraTopology("camera_0025", "camera_0030", true);
+        com.espertech.esper.example.IOT.streams.CameraTopology join4 =
+                new com.espertech.esper.example.IOT.streams.CameraTopology("camera_0030", "camera_0025", true);
+
+        EventEPLUtil.streamEvent(join1, "CameraTopology");
+        EventEPLUtil.streamEvent(join2, "CameraTopology");
+        EventEPLUtil.streamEvent(join3, "CameraTopology");
+        EventEPLUtil.streamEvent(join4, "CameraTopology");
+
+        logger.info("Camera 30 recovery events successfully streamed into the Esper pipeline!");
+        logger.info("==========================================================================");
     }
 }
