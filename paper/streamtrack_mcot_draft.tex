@@ -445,7 +445,6 @@ A distinctive operational advantage of \textbf{STREAMTRACK} is its ability to re
     \item \textbf{State Preservation:} The \texttt{GlobalIDTable} and all accumulated tracking state are fully preserved across the reconfiguration boundary.
 \end{itemize}
 
-\paragraph{Controlled Experiment.}
 We validated this capability on the NVIDIA SmartSpaces network. The pipeline was initialized with the four-group topology shown in the pre-reconfiguration state of Figure~\ref{fig:reconfig_before_after} and processed two synchronization windows (frames 1--180). At frame 180, a reconfiguration event was injected---\emph{without pausing or restarting the pipeline}---executing two simultaneous changes: (i) a \textbf{group split} (disabling the link between cameras 01 and 11) and (ii) a \textbf{group merge} (enabling a new link between cameras 17 and 19, merging two groups into a single four-camera cluster). Figure~\ref{fig:reconfig_before_after} visualizes this reconfiguration transition on the actual floor plan.
 
 \begin{figure}[H]
