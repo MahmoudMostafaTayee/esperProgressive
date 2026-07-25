@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="73335b44-3dc6-40ed-a0b9-65ef1447e0a5" name="Changes" comment="Integration of MCPT within the workflow.">
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/espertech/esper/example/IOT/IotMain.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/espertech/esper/example/IOT/IotMain.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/espertech/esper/example/IOT/clusterers/MCPT.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/espertech/esper/example/IOT/clusterers/MCPT.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/espertech/esper/example/IOT/clusterers/Tracker.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/espertech/esper/example/IOT/clusterers/Tracker.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/espertech/esper/example/IOT/helpers/TrackingParameters.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/espertech/esper/example/IOT/helpers/TrackingParameters.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/espertech/esper/example/IOT/streamers/EmbeddingFeatureStreamer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/espertech/esper/example/IOT/streamers/EmbeddingFeatureStreamer.java" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 7
+}</component>
+  <component name="ProjectId" id="36nmB6inKAzpMC6anPlN73R8SLM" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Application.IOT-Main.executor&quot;: &quot;Run&quot;,
+    &quot;Application.IotMain.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;match-AII-repo&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;reference.projectsettings.compiler.javacompiler&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="RunManager">
+    <configuration name="IOT-Main" type="Application" factoryName="Application">
+      <option name="MAIN_CLASS_NAME" value="com.espertech.esper.example.IOT.IotMain" />
+      <module name="esper-example-IOT" />
+      <option name="PROGRAM_PARAMETERS" value="--scene 1 --features_dir C:\OURs\Thesis\Real-Time_Multi-Camera_People_Tracking_using_Event_Stream_Processing\Datasets\EmbedFeature --camera 0001 --output_dir ./outputs/scene1" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-cffe25b9f5b3-intellij.indexing.shared.core-IU-253.28294.334" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="73335b44-3dc6-40ed-a0b9-65ef1447e0a5" name="Changes" comment="" />
+      <created>1765650572695</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1765650572695</updated>
+      <workItem from="1765650585779" duration="3957000" />
+      <workItem from="1767025340602" duration="4280000" />
+      <workItem from="1767040694556" duration="2908000" />
+      <workItem from="1767090584540" duration="9296000" />
+      <workItem from="1767122598321" duration="4000" />
+      <workItem from="1767327361152" duration="8991000" />
+      <workItem from="1767362410906" duration="7690000" />
+      <workItem from="1767380719501" duration="4641000" />
+      <workItem from="1767416639975" duration="7803000" />
+      <workItem from="1767674278936" duration="39000" />
+      <workItem from="1767730508887" duration="168000" />
+      <workItem from="1768038434101" duration="24146000" />
+      <workItem from="1768248611710" duration="16000" />
+    </task>
+    <task id="LOCAL-00001" summary="Adding new files for MCPT(First draft) + Visualization script.">
+      <option name="closed" value="true" />
+      <created>1767472331898</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1767472331898</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Integration of MCPT.">
+      <option name="closed" value="true" />
+      <created>1767472501974</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1767472501974</updated>
+    </task>
+    <task id="LOCAL-00003" summary="Update README.md">
+      <option name="closed" value="true" />
+      <created>1767472519494</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1767472519494</updated>
+    </task>
+    <task id="LOCAL-00004" summary="Adding MCPT and SCPT to follow the python code + Renaming AgglomerativeClusterer.java to Tracker.java">
+      <option name="closed" value="true" />
+      <created>1768070557127</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1768070557127</updated>
+    </task>
+    <task id="LOCAL-00005" summary="Integration of MCPT within the workflow.">
+      <option name="closed" value="true" />
+      <created>1769262133865</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1769262133865</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Embedded feature streamer refactoring, needs more testing." />
+    <MESSAGE value="Adding new files for MCPT(First draft) + Visualization script." />
+    <MESSAGE value="Integration of MCPT." />
+    <MESSAGE value="Update README.md" />
+    <MESSAGE value="Adding MCPT and SCPT to follow the python code + Renaming AgglomerativeClusterer.java to Tracker.java" />
+    <MESSAGE value="Integration of MCPT within the workflow." />
+    <option name="LAST_COMMIT_MESSAGE" value="Integration of MCPT within the workflow." />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+</project>

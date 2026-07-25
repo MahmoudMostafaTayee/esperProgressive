@@ -1,5 +1,8 @@
 Datasets/
 target/
+outputs/
+output/
+.settings/
 
 # Compiled class file
 *.class

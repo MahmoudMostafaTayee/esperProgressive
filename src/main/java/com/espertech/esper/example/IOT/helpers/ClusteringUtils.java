@@ -3,14 +3,10 @@ package com.espertech.esper.example.IOT.helpers;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import com.espertech.esper.example.IOT.clusterers.AgglomerativeClusterer;
-import com.espertech.esper.example.IOT.helpers.OverlapDetector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import smile.clustering.HierarchicalClustering;
 import smile.clustering.linkage.SingleLinkage;
-
-import static java.lang.System.exit;
 
 /**
  * A utility class for various clustering operations.

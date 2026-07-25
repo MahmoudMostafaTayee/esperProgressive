@@ -12,21 +12,41 @@ public class TrackingParameters {
     };
 
     public static double epsilonScpt = 0.10;
-    public static int timePeriod = 1;
-    public static int fps = 10;
+    public static int timePeriod = 3;
+    public static int fps = 30;
     public static double epsilonMcpt = 0.37;
-    public static int shortTrackTh = 120;
-    public static int keypointConditionTh = 1;
-    public static boolean replaceSimilarityByWCoordinate = true;
-    public static String distanceType = "min";
-    public static int distanceTh = 10;
-    public static double simTh = 0.85;
-    public static int deleteGidTh = 5000;
+    public static int shortTrackTh = 0;
+    public static int keypointConditionTh = 2;
+    public static boolean replaceSimilarityByWCoordinate = false; // Python default: False
+    public static String distanceType = "max"; // Python default: "max"
+    public static int distanceTh = 10; // Python default: 5
+    public static double simTh = 0.75; // Python default: 0.75
+    public static double keypointTh = 0.7;
+    public static double aspectTh = 1.6;
+    public static double replaceValue = -10.0;
+    public static int deleteGidTh = 6000;
+
+    public static int min_samples = 4;
+    public static String clustering_method = "agglomerative";
+    public static String representativeSelectionMethod = "keypoint";
+
     public static exec_level exec_lvl = exec_level.ALL;
     public static double iouTh = 0.9;
     public static boolean overlap_suppression = true;
-    public static boolean isDebug = true;
-    public static int max_number_of_windows_to_process = 3; // This won't work unless in isDebug is ture.
+    public static boolean isDebug = false;
+    public static int max_number_of_windows_to_process = 50; // Limit to 50 windows for benchmarking
+    static {
+        String mw = System.getenv("MAX_WINDOWS");
+        if (mw != null && !mw.trim().isEmpty()) {
+            try {
+                max_number_of_windows_to_process = Integer.parseInt(mw.trim());
+            } catch (NumberFormatException e) {
+                // Ignore
+            }
+        }
+    }
+    public static boolean turboMode = false;
+    public static boolean reconfigExperiment = false;
 
     // SNMS Parameters
     public static boolean sequential_nms = true;
@@ -39,10 +59,10 @@ public class TrackingParameters {
     public static int warp_th = 40;
     public static double alpha = 0.5;
 
-    public static boolean exclude_short = true;
-    public static int short_tracklet_th = 5;
+    public static boolean exclude_short = false; // Python default: False
+    public static int short_tracklet_th = 120; // Python default: 120
 
-    public static boolean exclude_motionless = true;
+    public static boolean exclude_motionless = false; // Python default: False
     public static int stop_track_th = 25;
 
     // ===== Runtime-configurable paths =====
@@ -53,7 +73,11 @@ public class TrackingParameters {
     // "all" OR "0001", "0002", ...
     public static String CAMERA_FILTER;
 
-    public static int scene;
+    // ===== Camera groups =====
+    // "all" OR "1,2;2,3,4"
+    public static String CAMERA_GROUPS;
+
+    public static int scene = 2;
 
     private TrackingParameters() {
         /* Prevent instantiation */
@@ -67,12 +91,14 @@ public class TrackingParameters {
         }
 
         // ---------- Scene ----------
-        scene = Integer.parseInt(
-                cmd.getOptionValue("scene"));
+        if (cmd.hasOption("scene")) {
+            scene = Integer.parseInt(cmd.getOptionValue("scene"));
+        }
 
         // ---------- Feature directory ----------
-        FEATURES_BASE_DIR = cmd.getOptionValue(
-                "features_dir");
+        if (cmd.hasOption("features_dir")) {
+            FEATURES_BASE_DIR = cmd.getOptionValue("features_dir");
+        }
 
         // ---------- Output directory ----------
         OUTPUT_DIR = cmd.getOptionValue(
@@ -81,6 +107,9 @@ public class TrackingParameters {
 
         // ---------- Camera filter ----------
         CAMERA_FILTER = cmd.getOptionValue("camera", "all");
+
+        // ---------- Camera groups ----------
+        CAMERA_GROUPS = cmd.getOptionValue("camera_groups", "all");
 
         // ---------- Execution level ----------
         if (cmd.hasOption("exec_all")) {
@@ -100,6 +129,15 @@ public class TrackingParameters {
         // ---------- Log everything ----------
         printArgs();
 
+        // ---------- Turbo Mode ----------
+        turboMode = cmd.hasOption("turbo");
+
+        // ---------- Reconfig Experiment ----------
+        reconfigExperiment = cmd.hasOption("reconfig");
+
+        // ---------- Clustering Method ----------
+        clustering_method = cmd.getOptionValue("clusterer", "agglomerative");
+
         return ErrorCode.SUCCESS;
     }
 
@@ -118,8 +156,6 @@ public class TrackingParameters {
         options.addOption(Option.builder()
                 .longOpt("scene")
                 .hasArg()
-                .required()
-                .desc("Scene number (e.g., 1, 2, 3)")
                 .build());
 
         options.addOption(Option.builder()
@@ -127,11 +163,16 @@ public class TrackingParameters {
                 .hasArg()
                 .desc("Base directory for embedding features")
                 .build());
-
         options.addOption(Option.builder()
                 .longOpt("camera")
                 .hasArg()
                 .desc("Camera number (e.g., 0001) or 'all'")
+                .build());
+
+        options.addOption(Option.builder()
+                .longOpt("camera_groups")
+                .hasArg()
+                .desc("Camera groups (e.g., '1,2;2,3,4') or 'all'")
                 .build());
 
         options.addOption(Option.builder()
@@ -140,9 +181,19 @@ public class TrackingParameters {
                 .desc("Directory to save logs and outputs")
                 .build());
 
-        options.addOption("exec_all", false, "Execute all stages");
-        options.addOption("exec_scpt", false, "Execute SCPT stage");
-        options.addOption("exec_mcpt", false, "Execute MCPT stage");
+        options.addOption(Option.builder().longOpt("debug").desc("Debug mode").build());
+        options.addOption(Option.builder().longOpt("turbo").desc("Turbo mode").build());
+        options.addOption(Option.builder().longOpt("reconfig").desc("Enable runtime topology reconfiguration experiment").build());
+
+        options.addOption(Option.builder().longOpt("exec_all").desc("Execute all stages").build());
+        options.addOption(Option.builder().longOpt("exec_scpt").desc("Execute SCPT stage").build());
+        options.addOption(Option.builder().longOpt("exec_mcpt").desc("Execute MCPT stage").build());
+
+        options.addOption(Option.builder()
+                .longOpt("clusterer")
+                .hasArg()
+                .desc("Clustering algorithm (agglomerative, clustream, clustree)")
+                .build());
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
@@ -165,7 +216,10 @@ public class TrackingParameters {
                         "scene=" + scene +
                         ", FEATURES_BASE_DIR='" + FEATURES_BASE_DIR + '\'' +
                         ", OUTPUT_DIR='" + OUTPUT_DIR + '\'' +
+                        ", FEATURES_BASE_DIR='" + FEATURES_BASE_DIR + '\'' +
+                        ", OUTPUT_DIR='" + OUTPUT_DIR + '\'' +
                         ", CAMERA_FILTER='" + CAMERA_FILTER + '\'' +
+                        ", CAMERA_GROUPS='" + CAMERA_GROUPS + '\'' +
                         ", epsilonScpt=" + epsilonScpt +
                         ", timePeriod=" + timePeriod +
                         ", epsilonMcpt=" + epsilonMcpt +
